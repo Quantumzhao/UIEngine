@@ -6,136 +6,88 @@ using System.Linq;
 
 namespace UIEngine
 {
-	public delegate void NodeOperations(Node node);
-
-	internal class AST
-	{
-		public static IEnumerable<ObjectNode> Global = new HashSet<ObjectNode>();
-		public Node Root;
-		public Node current;
-
-		public event NodeOperations Show;
-
-		public void NavigateTo(Node node)
-		{
-			current = node;
-			if (node is MethodNode)
-			{
-
-			}
-			else
-			{
-
-			}
-
-			//Show(node);
-		}
-	}
-
-	public abstract class Node
-	{
-		public Node(string name)
-		{
-			Name = name;
-		}
-
-		public string Name;
-		public ObjectNode Parent;
-	}
-
-	public class ObjectNode : Node
-	{
-		public ObjectNode(string name,
-			IEnumerable<PropertyInfo> properties = null,
-			IEnumerable<MethodInfo> methods = null) : base(name)
-		{
-			Properties = properties
-				?.Where(pi => pi.GetCustomAttribute<Visible>() != null)
-				?.Select(pi => new ObjectNode(pi.Name));
-		}
-
-		public IEnumerable<ObjectNode> Properties;
-		public IEnumerable<MethodNode> Methods;
-
-		public ObjectNode GetProperty(string name)
-		{
-			return Properties.Where(p => p.Name == name).FirstOrDefault();
-		}
-
-		public MethodNode GetMethod(string name)
-		{
-			return Methods.Where(m => m.Name == name).FirstOrDefault();
-		}
-	}
-
-	public class MethodNode : Node
-	{
-		public MethodNode(MethodInfo methodInfo, ObjectNode parent) : base(methodInfo.Name)
-		{
-			Parent = parent;
-			Body = methodInfo;
-		}
-
-		public List<ObjectNode> Parameters;
-		private MethodInfo Body;
-
-		public object Invoke()
-		{
-			return Body.Invoke(Parent, Parameters.ToArray());
-		}
-
-		public void PassInArg(object arg, int index)
-		{
-			throw new NotImplementedException();
-		}
-	}
-
+	public delegate void NodeOperationsDelegate(Node node);
 
 	public static class Dashboard
 	{
-		public static IEnumerable<VisualObject> GlobalObjects;
-	}
-
-	public class VisualObject
-	{
-		/// <summary>
-		///		And change the current visual object to the new object specified by its name
-		/// </summary>
-		/// <param name="name">
-		///		Name of the object
-		/// </param>
-		/// <returns>
-		///		The new object
-		/// </returns>
-		public VisualObject AccessProperty(string name)
-		{
-			throw new NotImplementedException();
-		}
+		public static readonly List<VisualStatement> Statements = new List<VisualStatement>();
+		public static IEnumerable<VisualObject> GlobalObjects = null;
 
 		/// <summary>
-		///		And change the current visual object to the return value of the method
+		///		Put all static objects into global objects collection.
+		///		<para>
+		///			THIS METHOD MUST BE CALLED PRIOR TO ANY OTHER CALLS!
+		///		</para>
 		/// </summary>
-		/// <param name="name">
-		///		name of the method
+		/// <param name="classes">
+		///		The classes where the desired importing static objects are located
 		/// </param>
-		/// <returns>
-		///		The method and its info about signature and etc
-		/// </returns>
-		public VisualProcedure AcessMethod(string name)
+		public static void ImportEntryObjects(params Type[] classes)
 		{
-			throw new NotImplementedException();
+			var globalObjects = new HashSet<VisualObject>();
+			foreach (var type in classes)
+			{
+				foreach (var property in type.GetProperties().GetVisibleProperty())
+				{
+					Type propertyType = property.GetValue(null).GetType();
+					ObjectNode node = new ObjectNode(
+						property.Name,
+						propertyType
+							.GetProperties()
+							.GetVisibleProperty(),
+						propertyType
+							.GetMethods()
+					);
+				}
+			}
+			GlobalObjects = globalObjects;
+		}
+
+		public static void AddStatement()
+		{
+			Statements.Add(new VisualStatement());
+		}
+
+		public static IEnumerable<VisualObject> GetGlobalObjects()
+		{
+			return GlobalObjects;
 		}
 	}
 
-	public class VisualProcedure
+	[AttributeUsage(AttributeTargets.Property | AttributeTargets.Method | AttributeTargets.Class)]
+	public class Visible : Attribute
 	{
-
+		/// <summary>
+		///		Initializing the visibility tag. Any member marked with "Visible" can be accessed via front end
+		/// </summary>
+		/// <param name="header">
+		///		The name of the member that is to be displayed
+		///		<para>
+		///			The easiest way to do this: nameof([member name])
+		///		</para>
+		/// </param>
+		/// <param name="description">
+		///		Some description (optional)
+		/// </param>
+		public Visible(string header, string description = "")
+		{
+			Header = header;
+			Description = description;
+		}
+		public string Header { get; set; }
+		public string Description { get; set; }
 	}
-
-	[AttributeUsage(AttributeTargets.Property | AttributeTargets.Method)]
-	public class Visible : Attribute { }
 
 	public static class Misc
 	{
+		public static IEnumerable<PropertyInfo> GetVisibleProperty(this IEnumerable<PropertyInfo> properties)
+		{
+			return properties.Where(p => p.GetCustomAttribute<Visible>() != null);
+		}
+
+		public static IEnumerable<MethodInfo> GetVisibleMethod(this IEnumerable<MethodInfo> methods)
+		{
+			return methods.Where(p => p.GetCustomAttribute<Visible>() != null);
+		}
 	}
 }

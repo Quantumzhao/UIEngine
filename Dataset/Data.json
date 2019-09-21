@@ -1,0 +1,18 @@
+{
+  "Person1": {
+    "Name": "Alice",
+    "Address": {
+      "Country": "US",
+      "State": "Alaska"
+    },
+    "Phone": "12345678"
+  },
+  "Person2": {
+    "Name": "Bob",
+    "Address": {
+      "Country": "Britain",
+      "State": "Portmouth"
+    },
+    "Phone": "87654321"
+  }
+}
