@@ -1,4 +1,5 @@
-﻿using System.Windows;
+﻿using System.Collections.Generic;
+using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using UIEngine;
@@ -11,16 +12,36 @@ namespace FrontEnd
 	/// </summary>
 	public partial class MainWindow : Window
 	{
-		VisualStatement statement = new VisualStatement();
+		Tree tree = new Tree();
 		public MainWindow()
 		{
 			InitializeComponent();
-			Dashboard.Statements.Add(statement);
+			Dashboard.ImportEntryObjects(typeof(Dataset.Dataset));
+			Dashboard.Trees.Add(tree);
 		}
 
 		private void Grid_MouseRightButtonDown(object sender, MouseButtonEventArgs e)
 		{
-			var cb = new ComboBox();
+			var cb = new ComboBox
+			{
+				Margin = new Thickness(10, 0, 0, 0),
+				ItemsSource = Dashboard.GlobalObjects
+			};
+			cb.SelectionChanged += Cb_SelectionChanged;
+			MainPanel.Children.Add(cb);
+		}
+
+		private void Cb_SelectionChanged(object sender, SelectionChangedEventArgs e)
+		{
+			var cb = new ComboBox
+			{
+				Margin = new Thickness(10, 0, 0, 0)
+			};
+			ObjectNode current = e.Source as ObjectNode;
+			current.Select();
+			Dashboard.GetMembers(current, out List<ObjectNode> properties, out _);
+			cb.ItemsSource = properties;
+			cb.SelectionChanged += Cb_SelectionChanged;
 			MainPanel.Children.Add(cb);
 		}
 	}

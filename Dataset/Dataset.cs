@@ -35,7 +35,6 @@ namespace Dataset
 		public bool Has(string propertyName) => jObject.Properties().Where(p => p.Name == propertyName).Count() != 0;
 	}
 
-	[Visible(nameof(Dataset))]
 	public static class Dataset
 	{
 		[Visible(nameof(People))]

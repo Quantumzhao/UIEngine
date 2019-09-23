@@ -6,7 +6,7 @@ using System.Text;
 
 namespace UIEngine
 {
-	internal class Tree
+	public class Tree
 	{
 		private static IEnumerable<Node> Global = new HashSet<Node>();
 		public Node Root;
@@ -32,46 +32,83 @@ namespace UIEngine
 
 	public abstract class Node
 	{
-		public Node(string name)
+		public Node(string name, string description)
 		{
 			Name = name;
+			Description = description;
 		}
 
 		public string Name;
 		public ObjectNode Parent;
+		public string Description;
+
+		public abstract void Load(object objectData);
+		public abstract void Select();
 	}
 
 	public class ObjectNode : Node
 	{
-		public ObjectNode(string name,
-			IEnumerable<PropertyInfo> properties = null,
-			IEnumerable<MethodInfo> methods = null) : base(name)
+		internal ObjectNode(string name, string header, string description)
+			: base(name, description)
 		{
-			Properties = properties
-				?.GetVisibleProperty()
-				?.Select(pi => new ObjectNode(pi.Name));
+			Header = header;
 		}
 
-		public IEnumerable<ObjectNode> Properties;
-		public IEnumerable<MethodNode> Methods;
+		public List<ObjectNode> Properties;
+		public List<MethodNode> Methods;
+		public string Header;
+		internal object ObjectData;
 
 		public ObjectNode GetProperty(string name)
 		{
-			return Properties.Where(p => p.Name == name).FirstOrDefault();
+			var property = Properties.Where(p => p.Name == name).FirstOrDefault();
+			// Load and fill the blank property with actual data from property info
+			if (property.Properties == null)
+			{
+				property.Load(ObjectData.GetType().GetProperty(name).GetValue(ObjectData));
+			}
+			return property;
 		}
 
 		public MethodNode GetMethod(string name)
 		{
 			return Methods.Where(m => m.Name == name).FirstOrDefault();
 		}
+
+		public override void Load(object objectData)
+		{
+			Properties = objectData.GetType().GetProperties().GetVisibleProperties()
+				.Select(pi =>
+				{
+					var attr = pi.GetCustomAttribute<Visible>();
+					return new ObjectNode(pi.Name, attr.Header, attr.Description) { Parent = this };
+				})
+				.ToList();
+		}
+
+		/// <summary>
+		///		Call this method when it is being selected. 
+		///		<para>
+		///			Make itself acquiring its context and prepare 
+		///			for navigating to its properties and methods
+		///		</para>
+		/// </summary>
+		public override void Select()
+		{
+			Load(
+				Parent
+				.ObjectData
+				.GetType()
+				.GetProperty(Name)
+				.GetValue(Parent.ObjectData)
+			);
+		}
 	}
 
 	public class MethodNode : Node
 	{
-		public MethodNode(MethodInfo methodInfo, ObjectNode parent) : base(methodInfo.Name)
+		public MethodNode(string name, string description) : base(name, description)
 		{
-			Parent = parent;
-			Body = methodInfo;
 		}
 
 		public List<ObjectNode> Parameters;
@@ -83,6 +120,16 @@ namespace UIEngine
 		}
 
 		public void PassInArg(object arg, int index)
+		{
+			throw new NotImplementedException();
+		}
+
+		public override void Load(object objectData)
+		{
+			throw new NotImplementedException();
+		}
+
+		public override void Select()
 		{
 			throw new NotImplementedException();
 		}
