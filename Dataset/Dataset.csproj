@@ -9,10 +9,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\UIEngine\UIEngine.csproj" />
-  </ItemGroup>
-
-  <ItemGroup>
     <None Update="Data.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>

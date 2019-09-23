@@ -38,7 +38,6 @@ namespace FrontEnd
 				Margin = new Thickness(10, 0, 0, 0)
 			};
 			ObjectNode current = e.Source as ObjectNode;
-			current.Select();
 			Dashboard.GetMembers(current, out List<ObjectNode> properties, out _);
 			cb.ItemsSource = properties;
 			cb.SelectionChanged += Cb_SelectionChanged;

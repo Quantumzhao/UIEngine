@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using System.Text;
+using System.Threading.Tasks;
 
 namespace UIEngine
 {
@@ -42,6 +43,12 @@ namespace UIEngine
 		public ObjectNode Parent;
 		public string Description;
 
+		private string preview = "...";
+		protected string Preview
+		{
+			get;set;
+		}
+
 		public abstract void Load(object objectData);
 		public abstract void Select();
 	}
@@ -59,6 +66,9 @@ namespace UIEngine
 		public string Header;
 		internal object ObjectData;
 
+		public delegate string PreviewExpressionDelegate(object data);
+		public event PreviewExpressionDelegate PreviewExpression;
+
 		public ObjectNode GetProperty(string name)
 		{
 			var property = Properties.Where(p => p.Name == name).FirstOrDefault();
@@ -75,15 +85,18 @@ namespace UIEngine
 			return Methods.Where(m => m.Name == name).FirstOrDefault();
 		}
 
-		public override void Load(object objectData)
+		public override async void Load(object objectData)
 		{
-			Properties = objectData.GetType().GetProperties().GetVisibleProperties()
-				.Select(pi =>
-				{
-					var attr = pi.GetCustomAttribute<Visible>();
-					return new ObjectNode(pi.Name, attr.Header, attr.Description) { Parent = this };
-				})
-				.ToList();
+			await Task.Run(() => {
+				Properties = objectData.GetType().GetVisibleProperties()
+					.Select(pi =>
+					{
+						var attr = pi.GetCustomAttribute<Visible>();
+						return new ObjectNode(pi.Name, attr.Header, attr.Description) { Parent = this };
+					})
+					.ToList();
+				Preview = PreviewExpression?.Invoke(ObjectData);
+			});
 		}
 
 		/// <summary>

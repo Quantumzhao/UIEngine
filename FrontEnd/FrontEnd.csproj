@@ -101,7 +101,7 @@
       <Name>Dataset</Name>
     </ProjectReference>
     <ProjectReference Include="..\UIEngine\UIEngine.csproj">
-      <Project>{33884a00-132b-4a6e-ab45-e5a0a3364e09}</Project>
+      <Project>{d55a802c-0976-42e0-a1f7-cae96c1330e9}</Project>
       <Name>UIEngine</Name>
     </ProjectReference>
   </ItemGroup>

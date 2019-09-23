@@ -28,7 +28,7 @@ namespace UIEngine
 			foreach (var type in classes)
 			{
 				// Load all static properties
-				foreach (var property in type.GetProperties().GetVisibleProperties())
+				foreach (var property in type.GetVisibleProperties())
 				{
 					var attr = property.GetCustomAttribute<Visible>();
 					ObjectNode node = new ObjectNode(
@@ -95,9 +95,9 @@ namespace UIEngine
 
 	public static class Misc
 	{
-		public static IEnumerable<PropertyInfo> GetVisibleProperties(this IEnumerable<PropertyInfo> properties)
+		public static IEnumerable<PropertyInfo> GetVisibleProperties(this Type type)
 		{
-			return properties.Where( p =>
+			return type.GetProperties().Where( p =>
 			{
 				var attr = p.GetCustomAttribute<Visible>();
 				return attr != null && attr.IsEnabled;
