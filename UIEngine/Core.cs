@@ -11,7 +11,7 @@ namespace UIEngine
 	public static class Dashboard
 	{
 		public static readonly List<Tree> Trees = new List<Tree>();
-		public static HashSet<ObjectNode> GlobalObjects = null;
+		public static HashSet<ObjectNode> GlobalObjects = new HashSet<ObjectNode>();
 
 		/// <summary>
 		///		Put all static objects into global objects collection.
@@ -24,21 +24,16 @@ namespace UIEngine
 		/// </param>
 		public static void ImportEntryObjects(params Type[] classes)
 		{
-			var globalObjects = new HashSet<ObjectNode>();
 			foreach (var type in classes)
 			{
 				// Load all static properties
 				foreach (var property in type.GetVisibleProperties())
 				{
 					var attr = property.GetCustomAttribute<Visible>();
-					ObjectNode node = new ObjectNode(
-						property.Name,
-						attr.Header,
-						attr.Description
-					);
+					ObjectNode node = new ObjectNode(null, property);
+					GlobalObjects.Add(node);
 				}
 			}
-			GlobalObjects = globalObjects;
 		}
 
 		public static void AddTree()
@@ -49,17 +44,6 @@ namespace UIEngine
 		public static IEnumerable<ObjectNode> GetGlobalObjects()
 		{
 			return GlobalObjects;
-		}
-
-		public static void GetMembers(ObjectNode node, 
-			out List<ObjectNode> properties, out List<MethodNode> methods)
-		{
-			if (node.Properties == null || node.Methods == null)
-			{
-				node.Select();
-			}
-			properties = node.Properties;
-			methods = node.Methods;
 		}
 
 		public static List<ObjectNode> GetCandidates(MethodNode method, int index)
@@ -91,6 +75,7 @@ namespace UIEngine
 		public string Header { get; set; }
 		public string Description { get; set; }
 		public bool IsEnabled { get; set; } = true;
+		public Func<object, string> PreviewExpression { get; set; } = o => o.ToString();
 	}
 
 	public static class Misc
@@ -104,9 +89,9 @@ namespace UIEngine
 			});
 		}
 
-		public static IEnumerable<MethodInfo> GetVisibleMethod(this IEnumerable<MethodInfo> methods)
+		public static IEnumerable<MethodInfo> GetVisibleMethods(this Type type)
 		{
-			return methods.Where(m =>
+			return type.GetMethods().Where(m =>
 			{
 				var attr = m.GetCustomAttribute<Visible>();
 				return attr != null && attr.IsEnabled;

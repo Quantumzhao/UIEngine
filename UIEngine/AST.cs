@@ -4,7 +4,9 @@ using System.Linq;
 using System.Reflection;
 using System.Text;
 using System.Threading.Tasks;
-
+using System.ComponentModel;
+using System.Collections.Specialized;
+using System.Collections.ObjectModel;
 namespace UIEngine
 {
 	public class Tree
@@ -14,118 +16,116 @@ namespace UIEngine
 		public Node current;
 
 		public event NodeOperationsDelegate Show;
-
-		public void NavigateTo(Node node)
-		{
-			current = node;
-			if (node is MethodNode)
-			{
-
-			}
-			else
-			{
-
-			}
-
-			//Show(node);
-		}
 	}
 
 	public abstract class Node
 	{
-		public Node(string name, string description)
-		{
-			Name = name;
-			Description = description;
-		}
-
 		public string Name;
 		public ObjectNode Parent;
 		public string Description;
 
-		private string preview = "...";
-		protected string Preview
-		{
-			get;set;
-		}
-
-		public abstract void Load(object objectData);
-		public abstract void Select();
+		protected string preview = "...";
+		protected abstract string Preview { get; set; }
 	}
 
 	public class ObjectNode : Node
 	{
-		internal ObjectNode(string name, string header, string description)
-			: base(name, description)
+		internal ObjectNode(ObjectNode parent, PropertyInfo propertyInfo)
 		{
-			Header = header;
+			Parent = parent;
+			this.propertyInfo = propertyInfo;
+			Name = propertyInfo.Name;
+			var attr = propertyInfo.GetCustomAttribute<Visible>();
+			Header = attr.Header;
+			Description = attr.Description;
+
+			ObjectDataLoaded += o => Preview = PreviewExpression?.Invoke(o);
 		}
 
-		public List<ObjectNode> Properties;
-		public List<MethodNode> Methods;
-		public string Header;
-		internal object ObjectData;
-
-		public delegate string PreviewExpressionDelegate(object data);
-		public event PreviewExpressionDelegate PreviewExpression;
-
-		public ObjectNode GetProperty(string name)
+		private List<ObjectNode> _Properties = null;
+		public List<ObjectNode> Properties
 		{
-			var property = Properties.Where(p => p.Name == name).FirstOrDefault();
-			// Load and fill the blank property with actual data from property info
-			if (property.Properties == null)
+			get
 			{
-				property.Load(ObjectData.GetType().GetProperty(name).GetValue(ObjectData));
+				if (_Properties == null)
+				{
+					LoadProperties(ObjectData);
+				}
+				return _Properties;
 			}
-			return property;
+			set => _Properties = value;
 		}
 
-		public MethodNode GetMethod(string name)
+		private List<MethodNode> _Methods = null;
+		public List<MethodNode> Methods
 		{
-			return Methods.Where(m => m.Name == name).FirstOrDefault();
+			get
+			{
+				if (_Methods == null)
+				{
+					LoadMethods(ObjectData);
+				}
+				return _Methods;
+			}
+			set => _Methods = value;
+		}
+		public string Header;
+		#region Object Data
+		private PropertyInfo propertyInfo;
+		public delegate void ObjectdataChangeDelegate(object data);
+		public event ObjectdataChangeDelegate ObjectDataLoaded;
+		internal object ObjectData { get; set; }
+		#endregion
+
+		/// <summary>
+		///		It defines the way that the object data should be interpreted as a preview
+		/// </summary>
+		public Func<object, string> PreviewExpression { get; set; } = o => o.ToString();
+		protected override string Preview
+		{
+			get => preview;
+			set => preview = value;
 		}
 
-		public override async void Load(object objectData)
+		private async void LoadObject(PropertyInfo propertyInfo)
 		{
-			await Task.Run(() => {
-				Properties = objectData.GetType().GetVisibleProperties()
-					.Select(pi =>
-					{
-						var attr = pi.GetCustomAttribute<Visible>();
-						return new ObjectNode(pi.Name, attr.Header, attr.Description) { Parent = this };
-					})
-					.ToList();
-				Preview = PreviewExpression?.Invoke(ObjectData);
+			await Task.Run(() =>
+			{
+				ObjectData = propertyInfo.GetValue(Parent?.ObjectData);
+				ObjectDataLoaded(ObjectData);
 			});
 		}
 
-		/// <summary>
-		///		Call this method when it is being selected. 
-		///		<para>
-		///			Make itself acquiring its context and prepare 
-		///			for navigating to its properties and methods
-		///		</para>
-		/// </summary>
-		public override void Select()
+		private void LoadProperties(object data)
 		{
-			Load(
-				Parent
-				.ObjectData
-				.GetType()
-				.GetProperty(Name)
-				.GetValue(Parent.ObjectData)
-			);
+			if (data == null)
+			{
+				LoadObject(propertyInfo);
+			}
+			Properties = data.GetType().GetVisibleProperties()
+				.Select(pi => new ObjectNode(this, pi)).ToList();
+		}
+		private void LoadMethods(object data)
+		{
+			if (data == null)
+			{
+				LoadObject(propertyInfo);
+			}
+			Methods = data.GetType().GetVisibleMethods()
+				.Select(mi => new MethodNode(this, mi)).ToList();
 		}
 	}
 
 	public class MethodNode : Node
 	{
-		public MethodNode(string name, string description) : base(name, description)
+		public MethodNode(ObjectNode parent, MethodInfo methodInfo)
 		{
 		}
 
 		public List<ObjectNode> Parameters;
 		private MethodInfo Body;
+
+		protected override string Preview { get => throw new NotImplementedException(); set => throw new NotImplementedException(); }
 
 		public object Invoke()
 		{
@@ -133,16 +133,6 @@ namespace UIEngine
 		}
 
 		public void PassInArg(object arg, int index)
-		{
-			throw new NotImplementedException();
-		}
-
-		public override void Load(object objectData)
-		{
-			throw new NotImplementedException();
-		}
-
-		public override void Select()
 		{
 			throw new NotImplementedException();
 		}

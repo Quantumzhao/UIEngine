@@ -6,8 +6,9 @@
         xmlns:local="clr-namespace:FrontEnd"
         mc:Ignorable="d"
         Title="MainWindow" Height="450" Width="800">
-    <Grid MouseRightButtonDown="Grid_MouseRightButtonDown">
+	<Grid>
 		<StackPanel x:Name="MainPanel" Orientation="Horizontal" Height="Auto" VerticalAlignment="Top">
 		</StackPanel>
-    </Grid>
+		<Button x:Name="Add" Content="Add" HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="0,0,10,10.5" Click="Add_Click"></Button>
+	</Grid>
 </Window>
