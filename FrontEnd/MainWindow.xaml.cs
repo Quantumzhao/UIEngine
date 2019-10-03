@@ -15,6 +15,7 @@ namespace FrontEnd
 		public MainWindow()
 		{
 			InitializeComponent();
+			Dataset.Dataset.Init();
 			Dashboard.ImportEntryObjects(typeof(Dataset.Dataset));
 		}
 
@@ -24,8 +25,7 @@ namespace FrontEnd
 			{
 				Margin = new Thickness(10, 0, 0, 0)
 			};
-			ObjectNode current = cb.SelectedItem as ObjectNode;
-			cb.ItemsSource = current.Properties;
+			cb.ItemsSource = (e.AddedItems[0] as ObjectNode).Properties;
 			cb.SelectionChanged += Cb_SelectionChanged;
 			MainPanel.Children.Add(cb);
 		}
@@ -37,7 +37,8 @@ namespace FrontEnd
 				Margin = new Thickness(10, 0, 0, 0),
 				ItemsSource = Dashboard.GlobalObjects
 			};
-			//cb.SelectionChanged += Cb_SelectionChanged;
+			
+			cb.SelectionChanged += Cb_SelectionChanged;
 			MainPanel.Children.Add(cb);
 		}
 	}

@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Collections;
 using System.Linq;
 using System.Reflection;
 using System.Text;
@@ -14,8 +15,6 @@ namespace UIEngine
 		private static IEnumerable<Node> Global = new HashSet<Node>();
 		public Node Root;
 		public Node current;
-
-		public event NodeOperationsDelegate Show;
 	}
 
 	public abstract class Node
@@ -30,16 +29,28 @@ namespace UIEngine
 
 	public class ObjectNode : Node
 	{
-		internal ObjectNode(ObjectNode parent, PropertyInfo propertyInfo)
+		private ObjectNode(ObjectNode parent, Visible attribute)
 		{
 			Parent = parent;
+			PreviewExpression = attribute.PreviewExpression;
+			Description = attribute.Description;
+			ObjectDataLoaded += o => Preview = PreviewExpression?.Invoke(o);
+		}
+		internal ObjectNode(ObjectNode parent, PropertyInfo propertyInfo) 
+			: this(parent, propertyInfo.GetCustomAttribute<Visible>())
+		{
+			Header = propertyInfo.GetCustomAttribute<Visible>().Header;
 			this.propertyInfo = propertyInfo;
 			Name = propertyInfo.Name;
-			var attr = propertyInfo.GetCustomAttribute<Visible>();
-			Header = attr.Header;
-			Description = attr.Description;
-
-			ObjectDataLoaded += o => Preview = PreviewExpression?.Invoke(o);
+		}
+		// create object nodes from annonymous objects, like elements in a collection
+		internal ObjectNode(ObjectNode parent, object objectData, Visible attribute) 
+			: this(parent, attribute)
+		{
+			propertyInfo = null;
+			Name = "N/A";
+			Header = objectData.ToString();
+			ObjectData = objectData;
 		}
 
 		private List<ObjectNode> _Properties = null;
@@ -69,7 +80,7 @@ namespace UIEngine
 			}
 			set => _Methods = value;
 		}
-		public string Header;
+		public string Header { get; set; }
 		#region Object Data
 		private PropertyInfo propertyInfo;
 		public delegate void ObjectdataChangeDelegate(object data);
@@ -80,20 +91,17 @@ namespace UIEngine
 		/// <summary>
 		///		It defines the way that the object data should be interpreted as a preview
 		/// </summary>
-		public Func<object, string> PreviewExpression { get; set; } = o => o.ToString();
+		public Func<object, string> PreviewExpression { get; private set; } = o => o.ToString();
 		protected override string Preview
 		{
 			get => preview;
 			set => preview = value;
 		}
 
-		private async void LoadObject(PropertyInfo propertyInfo)
+		private void LoadObject(PropertyInfo propertyInfo)
 		{
-			await Task.Run(() =>
-			{
-				ObjectData = propertyInfo.GetValue(Parent?.ObjectData);
-				ObjectDataLoaded(ObjectData);
-			});
+			ObjectData = propertyInfo.GetValue(Parent?.ObjectData);
+			ObjectDataLoaded(ObjectData);
 		}
 
 		private void LoadProperties(object data)
@@ -101,9 +109,21 @@ namespace UIEngine
 			if (data == null)
 			{
 				LoadObject(propertyInfo);
+				data = ObjectData;
 			}
-			Properties = data.GetType().GetVisibleProperties()
-				.Select(pi => new ObjectNode(this, pi)).ToList();
+
+			if (data is IEnumerable<object>)
+			{
+				Properties = (data as IEnumerable<object>)
+					.Select(o => new ObjectNode(
+						this, o, propertyInfo.GetCustomAttribute<Visible>()
+					)).ToList();
+			}
+			else
+			{
+				Properties = data.GetType().GetVisibleProperties()
+					.Select(pi => new ObjectNode(this, pi)).ToList();
+			}
 		}
 		private void LoadMethods(object data)
 		{
@@ -113,6 +133,11 @@ namespace UIEngine
 			}
 			Methods = data.GetType().GetVisibleMethods()
 				.Select(mi => new MethodNode(this, mi)).ToList();
+		}
+
+		public override string ToString()
+		{
+			return Header;
 		}
 	}
 
@@ -135,6 +160,15 @@ namespace UIEngine
 		public void PassInArg(object arg, int index)
 		{
 			throw new NotImplementedException();
+		}
+	}
+
+	public class LinqNode : Node
+	{
+		protected override string Preview
+		{
+			get => preview;
+			set => preview = value;
 		}
 	}
 }

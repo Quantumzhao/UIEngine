@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Reflection;
 using UIEngine;
 
 namespace Dataset
@@ -37,7 +38,7 @@ namespace Dataset
 
 	public static class Dataset
 	{
-		[Visible(nameof(People))]
+		[Visible("People")]
 		public static List<Person> People { get; } = new List<Person>();
 		public static void Init()
 		{
@@ -65,24 +66,33 @@ namespace Dataset
 					}
 				}
 			);
+
+			//var p = typeof(Dataset).GetVisibleProperties().ToList();
+			//var v1 = p[0].GetValue(null);
+			//var t1 = v1.GetType();
+			//var p1 = t1.GetProperties().ToList();
 		}
 	}
 
 	public class Person
 	{
-		[Visible(nameof(Name))]
+		[Visible("Name")]
 		public string Name { get; set; }
-		[Visible(nameof(Phone))]
+		[Visible("Phone")]
 		public string Phone { get; set; }
-		[Visible(nameof(Address))]
+		[Visible("Address")]
 		public Address Address { get; set; }
+		public override string ToString()
+		{
+			return Name;
+		}
 	}
 
 	public class Address
 	{
-		[Visible(nameof(Country))]
+		[Visible("Country")]
 		public string Country { get; set; }
-		[Visible(nameof(State))]
+		[Visible("State")]
 		public string State { get; set; }
 	}
 }
