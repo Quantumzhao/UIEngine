@@ -66,11 +66,6 @@ namespace Dataset
 					}
 				}
 			);
-
-			//var p = typeof(Dataset).GetVisibleProperties().ToList();
-			//var v1 = p[0].GetValue(null);
-			//var t1 = v1.GetType();
-			//var p1 = t1.GetProperties().ToList();
 		}
 	}
 
