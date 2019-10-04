@@ -10,7 +10,6 @@ namespace UIEngine
 
 	public static class Dashboard
 	{
-		public static readonly List<Tree> Trees = new List<Tree>();
 		public static HashSet<ObjectNode> GlobalObjects = new HashSet<ObjectNode>();
 
 		/// <summary>
@@ -34,11 +33,6 @@ namespace UIEngine
 					GlobalObjects.Add(node);
 				}
 			}
-		}
-
-		public static void AddTree()
-		{
-			Trees.Add(new Tree());
 		}
 
 		public static IEnumerable<ObjectNode> GetGlobalObjects()
@@ -67,7 +61,7 @@ namespace UIEngine
 		/// <param name="description">
 		///		Some description (optional)
 		/// </param>
-		public Visible(string header, string description = "")
+		public Visible(string header = "", string description = "")
 		{
 			Header = header;
 			Description = description;

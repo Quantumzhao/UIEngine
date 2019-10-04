@@ -10,13 +10,6 @@ using System.Collections.Specialized;
 using System.Collections.ObjectModel;
 namespace UIEngine
 {
-	public class Tree
-	{
-		private static IEnumerable<Node> Global = new HashSet<Node>();
-		public Node Root;
-		public Node current;
-	}
-
 	public abstract class Node
 	{
 		public string Name;
@@ -36,15 +29,17 @@ namespace UIEngine
 			Description = attribute.Description;
 			ObjectDataLoaded += o => Preview = PreviewExpression?.Invoke(o);
 		}
-		internal ObjectNode(ObjectNode parent, PropertyInfo propertyInfo) 
+		internal ObjectNode(ObjectNode parent, PropertyInfo propertyInfo)
 			: this(parent, propertyInfo.GetCustomAttribute<Visible>())
 		{
 			Header = propertyInfo.GetCustomAttribute<Visible>().Header;
 			this.propertyInfo = propertyInfo;
+			var setter = propertyInfo.SetMethod;
+			CanWrite = setter.IsPublic && (setter.GetCustomAttribute<Visible>()?.IsEnabled ?? true);
 			Name = propertyInfo.Name;
 		}
 		// create object nodes from annonymous objects, like elements in a collection
-		internal ObjectNode(ObjectNode parent, object objectData, Visible attribute) 
+		internal ObjectNode(ObjectNode parent, object objectData, Visible attribute)
 			: this(parent, attribute)
 		{
 			propertyInfo = null;
@@ -52,7 +47,7 @@ namespace UIEngine
 			Header = objectData.ToString();
 			ObjectData = objectData;
 		}
-
+		public bool CanWrite { get; internal set; } = false;
 		private List<ObjectNode> _Properties = null;
 		public List<ObjectNode> Properties
 		{
@@ -85,7 +80,71 @@ namespace UIEngine
 		private PropertyInfo propertyInfo;
 		public delegate void ObjectdataChangeDelegate(object data);
 		public event ObjectdataChangeDelegate ObjectDataLoaded;
-		internal object ObjectData { get; set; }
+		private object _ObjectData;
+		internal object ObjectData
+		{
+			get => _ObjectData;
+			set
+			{
+				if (value != _ObjectData)
+				{
+					_ObjectData = value;
+					ObjectDataLoaded(value);
+				}
+			}
+		}
+		/// <summary>
+		///		Retrieves object value of the object node. 
+		///		Returns null if cannot cast object to the given type
+		///		<para>
+		///			Only use it if necessary. 
+		///		</para>
+		/// </summary>
+		/// <typeparam name="T">
+		///		Typeof the specified object
+		/// </typeparam>
+		/// <returns>
+		///		A reference to object of the object node. Strongly suggest not to modify it. 
+		/// </returns>
+		public T GetValue<T>()
+		{
+			if (ObjectData is T)
+			{
+				return (T)ObjectData;
+			}
+			else
+			{
+				return default;
+			}
+		}
+		/// <summary>
+		///		Set the object data
+		/// </summary>
+		/// <param name="value"></param>
+		/// <returns>
+		///		false if this property is read only 
+		///		or there is an exception when setting property value
+		/// </returns>
+		public bool SetValue(object value)
+		{
+			if (CanWrite)
+			{
+				try
+				{
+					propertyInfo.SetValue(Parent.ObjectData, value);
+				}
+				catch
+				{
+					return false;
+				}
+
+				ObjectData = value;
+
+				return true;
+			}
+
+			return false;
+		}
 		#endregion
 
 		/// <summary>
@@ -101,7 +160,6 @@ namespace UIEngine
 		private void LoadObject(PropertyInfo propertyInfo)
 		{
 			ObjectData = propertyInfo.GetValue(Parent?.ObjectData);
-			ObjectDataLoaded(ObjectData);
 		}
 
 		private void LoadProperties(object data)
@@ -130,36 +188,69 @@ namespace UIEngine
 			if (data == null)
 			{
 				LoadObject(propertyInfo);
+				data = ObjectData;
 			}
 			Methods = data.GetType().GetVisibleMethods()
 				.Select(mi => new MethodNode(this, mi)).ToList();
 		}
 
-		public override string ToString()
-		{
-			return Header;
-		}
+		public override string ToString() => Header;
 	}
 
 	public class MethodNode : Node
 	{
 		public MethodNode(ObjectNode parent, MethodInfo methodInfo)
 		{
+			Parent = parent;
+			Body = methodInfo;
+			Signature = methodInfo.GetParameters().Select(p => new Parameter(p.ParameterType)).ToList();
+			ReturnType = methodInfo.ReturnType;
 		}
 
-		public List<ObjectNode> Parameters;
+		public List<Parameter> Signature;
+		public Type ReturnType { get; private set; }
 		private MethodInfo Body;
 
-		protected override string Preview { get => throw new NotImplementedException(); set => throw new NotImplementedException(); }
-
-		public object Invoke()
+		protected override string Preview
 		{
-			return Body.Invoke(Parent, Parameters.ToArray());
+			get => preview;
+			set => preview = value;
 		}
 
-		public void PassInArg(object arg, int index)
+		/// <summary>
+		///		It defines the way that the object data should be interpreted as a preview
+		/// </summary>
+		public Func<object, string> PreviewExpression { get; private set; } = o => o.ToString();
+
+		public ObjectNode Invoke()
+		{
+			var objectData = Body.Invoke(
+				Parent?.ObjectData, 
+				Signature.Select(p => p.Data.ObjectData).ToArray()
+			);
+			return new ObjectNode(null, objectData, null);
+		}
+
+		public void SetParameter(ObjectNode argument, int index)
 		{
 			throw new NotImplementedException();
+		}
+
+		public Dictionary<ObjectNode, bool> GetCandidates(int index)
+		{
+			throw new NotImplementedException();
+		}
+
+		public class Parameter
+		{
+			public Parameter(Type type, ObjectNode data = null)
+			{
+				Type = type;
+				Data = data;
+			}
+
+			public Type Type { get; private set; }
+			public ObjectNode Data { get; set; }
 		}
 	}
 

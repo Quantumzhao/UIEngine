@@ -16,8 +16,8 @@ The project is still under development.
 
 - [x] Navigating to properties
 - [x] Read and load property information
-- [ ] Display property value
-- [ ] Write property value
+- [X] Display property value
+- [X] Write property value
 
 ### Phase 2: Method/Function Accessing and invoking
 

@@ -61,7 +61,7 @@ namespace Dataset
 					Phone = "87654321",
 					Address = new Address()
 					{
-						Country = "GB",
+						Country = "UK",
 						State = "Portmouth"
 					}
 				}
