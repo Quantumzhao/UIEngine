@@ -12,12 +12,18 @@ namespace UIEngine
 {
 	public abstract class Node
 	{
-		public string Name;
-		public ObjectNode Parent;
-		public string Description;
+		public string Name { get; set; }
+		public string Header { get; set; }
+		public ObjectNode Parent { get; internal set; }
+		public string Description { get; set; }
 
-		protected string preview = "...";
+		protected string _Preview = "...";
 		protected abstract string Preview { get; set; }
+
+		/// <summary>
+		///		It defines the way that the object data should be interpreted as a preview
+		/// </summary>
+		public Func<object, string> PreviewExpression { get; protected set; } = o => o.ToString();
 	}
 
 	public class ObjectNode : Node
@@ -75,7 +81,6 @@ namespace UIEngine
 			}
 			set => _Methods = value;
 		}
-		public string Header { get; set; }
 		#region Object Data
 		private PropertyInfo propertyInfo;
 		public delegate void ObjectdataChangeDelegate(object data);
@@ -147,14 +152,10 @@ namespace UIEngine
 		}
 		#endregion
 
-		/// <summary>
-		///		It defines the way that the object data should be interpreted as a preview
-		/// </summary>
-		public Func<object, string> PreviewExpression { get; private set; } = o => o.ToString();
 		protected override string Preview
 		{
-			get => preview;
-			set => preview = value;
+			get => _Preview;
+			set => _Preview = value;
 		}
 
 		private void LoadObject(PropertyInfo propertyInfo)
@@ -203,6 +204,9 @@ namespace UIEngine
 		{
 			Parent = parent;
 			Body = methodInfo;
+			var attr = methodInfo.GetCustomAttribute<Visible>();
+			Header = attr.Header;
+			Description = attr.Description;
 			Signature = methodInfo.GetParameters().Select(p => new Parameter(p.ParameterType)).ToList();
 			ReturnType = methodInfo.ReturnType;
 		}
@@ -213,14 +217,9 @@ namespace UIEngine
 
 		protected override string Preview
 		{
-			get => preview;
-			set => preview = value;
+			get => _Preview;
+			set => _Preview = value;
 		}
-
-		/// <summary>
-		///		It defines the way that the object data should be interpreted as a preview
-		/// </summary>
-		public Func<object, string> PreviewExpression { get; private set; } = o => o.ToString();
 
 		public ObjectNode Invoke()
 		{
@@ -228,12 +227,19 @@ namespace UIEngine
 				Parent?.ObjectData, 
 				Signature.Select(p => p.Data.ObjectData).ToArray()
 			);
-			return new ObjectNode(null, objectData, null);
+			
+			return new ObjectNode(null, objectData, new Visible(Header, Description)) { CanWrite = false };
 		}
 
-		public void SetParameter(ObjectNode argument, int index)
+		public bool SetParameter(ObjectNode argument, int index)
 		{
-			throw new NotImplementedException();
+			var param = Signature[index];
+			if (param.Type.IsAssignableFrom(argument.ObjectData.GetType()))
+			{
+				param.Data = argument;
+				return true;
+			}
+			return false;
 		}
 
 		public Dictionary<ObjectNode, bool> GetCandidates(int index)
@@ -258,8 +264,8 @@ namespace UIEngine
 	{
 		protected override string Preview
 		{
-			get => preview;
-			set => preview = value;
+			get => _Preview;
+			set => _Preview = value;
 		}
 	}
 }
