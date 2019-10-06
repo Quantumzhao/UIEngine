@@ -47,7 +47,7 @@ namespace FrontEnd
 			var cb = new ComboBox
 			{
 				Margin = new Thickness(10, 0, 0, 0),
-				ItemsSource = Dashboard.GlobalObjects
+				ItemsSource = Dashboard.GetGlobalObjects()
 			};
 			
 			cb.SelectionChanged += Cb_SelectionChanged;

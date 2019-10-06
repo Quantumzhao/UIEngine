@@ -10,7 +10,11 @@ namespace UIEngine
 
 	public static class Dashboard
 	{
-		public static HashSet<ObjectNode> GlobalObjects = new HashSet<ObjectNode>();
+		public static HashSet<Node> Roots { get; } = new HashSet<Node>();
+		public static HashSet<ObjectNode> GetGlobalObjects()
+			=> new HashSet<ObjectNode>(Roots.Where(n => n is ObjectNode).Select(n => n as ObjectNode));
+		public static HashSet<MethodNode> GetGlobalMethods()
+			=> new HashSet<MethodNode>(Roots.Where(n => n is MethodNode).Select(n => n as MethodNode));
 
 		/// <summary>
 		///		Put all static objects into global objects collection.
@@ -30,19 +34,9 @@ namespace UIEngine
 				{
 					var attr = property.GetCustomAttribute<Visible>();
 					ObjectNode node = new ObjectNode(null, property);
-					GlobalObjects.Add(node);
+					Roots.Add(node);
 				}
 			}
-		}
-
-		public static IEnumerable<ObjectNode> GetGlobalObjects()
-		{
-			return GlobalObjects;
-		}
-
-		public static List<ObjectNode> GetCandidates(MethodNode method, int index)
-		{
-			throw new NotImplementedException();
 		}
 	}
 

@@ -54,6 +54,7 @@ namespace UIEngine
 			ObjectData = objectData;
 		}
 		public bool CanWrite { get; internal set; } = false;
+		public bool IsLeaf => Properties.Count == 0;
 		private List<ObjectNode> _Properties = null;
 		public List<ObjectNode> Properties
 		{
