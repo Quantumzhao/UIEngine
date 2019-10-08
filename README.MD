@@ -21,18 +21,20 @@ The project is still under development.
 
 ### Phase 2: Method/Function Accessing and invoking
 
-- [ ] Read and load function information
+- [X] Read and load function information
 - [ ] load function signature and return type
 - [ ] Implement function parameters and their initialization
 - [ ] Integrate function return value into the property accessing system
 
 ### Phase 3: LINQ Accessing and invoking
 
-- [ ] LINQ functionality
+- [ ] LINQ expression Parser
+- [ ] Integration with method and property accessing system
 - [ ] Others...
 
 ### Phase 4: Finalization and Optimization
 
 - [ ] Asynchronization and parallelization
 - [ ] Complete data view support
+- [ ] Data view and layout saving functionality
 - [ ] And others...
