@@ -16,7 +16,7 @@ namespace UIEngine
 		public string Header { get; set; }
 		public ObjectNode Parent { get; internal set; }
 		public string Description { get; set; }
-
+		public Type ReturnType { get; protected set; }
 		protected string _Preview = "...";
 		protected abstract string Preview { get; set; }
 
@@ -41,6 +41,7 @@ namespace UIEngine
 			Header = propertyInfo.GetCustomAttribute<Visible>().Header;
 			this.propertyInfo = propertyInfo;
 			var setter = propertyInfo.SetMethod;
+			ReturnType = propertyInfo.PropertyType;
 			CanWrite = setter.IsPublic && (setter.GetCustomAttribute<Visible>()?.IsEnabled ?? true);
 			Name = propertyInfo.Name;
 		}
@@ -52,6 +53,7 @@ namespace UIEngine
 			Name = "N/A";
 			Header = objectData.ToString();
 			ObjectData = objectData;
+			ReturnType = objectData.GetType();
 		}
 		public bool CanWrite { get; internal set; } = false;
 		public bool IsLeaf => Properties.Count == 0;
@@ -213,7 +215,6 @@ namespace UIEngine
 		}
 
 		public List<Parameter> Signature;
-		public Type ReturnType { get; private set; }
 		private MethodInfo Body;
 
 		protected override string Preview
@@ -232,20 +233,45 @@ namespace UIEngine
 			return new ObjectNode(null, objectData, new Visible(Header, Description)) { CanWrite = false };
 		}
 
+		/// <Summary>
+		/// 	Checks if the parameter can be assigned by the argument
+		/// </Summary>
+		/// <param name="index">
+		/// 	the index of the parameter that is to be assigned
+		/// </param>
+		public bool CanAssignArgument(Node argument, int index) 
+		{
+			return Signature[index].Type.IsAssignableFrom(argument.ReturnType);
+		}
 		public bool SetParameter(ObjectNode argument, int index)
 		{
-			var param = Signature[index];
-			if (param.Type.IsAssignableFrom(argument.ObjectData.GetType()))
+			if (CanAssignArgument(argument, index))
 			{
-				param.Data = argument;
+				Signature[index].Data = argument;
 				return true;
 			}
 			return false;
 		}
 
-		public Dictionary<ObjectNode, bool> GetCandidates(int index)
+		/// <Summary>
+		/// 	Get the candidate arguments for a specified parameter
+		/// </Sumamry>
+		/// <param name="index">
+		/// 	the index of the specified parameter
+		/// </param>
+		/// <returns>
+		/// 	A dictionary of all the candidate root nodes. 
+		/// 	Each node corresponds to a boolean value which indicates 
+		/// 	whether the type of the node matches parameter type
+		/// </returns>
+		public Dictionary<Node, bool> GetCandidates(int index)
 		{
-			throw new NotImplementedException();
+			var candidates = new Dictionary<Node, bool>();
+			foreach (var node in Dashboard.Roots)
+			{
+				candidates.Add(node, CanAssignArgument(node, index));
+			}
+			return candidates;
 		}
 
 		public class Parameter
@@ -261,12 +287,7 @@ namespace UIEngine
 		}
 	}
 
-	public class LinqNode : Node
+	public class LinqNode
 	{
-		protected override string Preview
-		{
-			get => _Preview;
-			set => _Preview = value;
-		}
 	}
 }
