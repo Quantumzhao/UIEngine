@@ -7,19 +7,3 @@ Object Tree -> UI: Notify controls to respond to actions
 UI -> Object Tree: User actions
 ```
 
-## APIs
-
-### UI Side
-
-#### Navigate To
-
-#### Show
-
-#### Select
-
-#### Fill
-
-### Memory/Runtime Side
-
-#### Visible
-
