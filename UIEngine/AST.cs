@@ -23,7 +23,7 @@ namespace UIEngine
 		/// <summary>
 		///		It defines the way that the object data should be interpreted as a preview
 		/// </summary>
-		public Func<object, string> PreviewExpression { get; protected set; } = o => o.ToString();
+		public Func<object, string> PreviewExpression { get; set; } = o => o.ToString();
 	}
 
 	public class ObjectNode : Node
@@ -233,9 +233,9 @@ namespace UIEngine
 			return new ObjectNode(null, objectData, new Visible(Header, Description)) { CanWrite = false };
 		}
 
-		/// <Summary>
+		/// <summary>
 		/// 	Checks if the parameter can be assigned by the argument
-		/// </Summary>
+		/// </summary>
 		/// <param name="index">
 		/// 	the index of the parameter that is to be assigned
 		/// </param>
@@ -253,9 +253,9 @@ namespace UIEngine
 			return false;
 		}
 
-		/// <Summary>
+		/// <summary>
 		/// 	Get the candidate arguments for a specified parameter
-		/// </Sumamry>
+		/// </summary>
 		/// <param name="index">
 		/// 	the index of the specified parameter
 		/// </param>

@@ -70,7 +70,7 @@ namespace UIEngine
 	{
 		public static IEnumerable<PropertyInfo> GetVisibleProperties(this Type type)
 		{
-			return type.GetProperties().Where( p =>
+			return type.GetProperties().Where(p =>
 			{
 				var attr = p.GetCustomAttribute<Visible>();
 				return attr != null && attr.IsEnabled;
