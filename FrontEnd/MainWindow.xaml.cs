@@ -16,7 +16,7 @@ namespace FrontEnd
 		{
 			InitializeComponent();
 			Dataset.Dataset.Init();
-			Dashboard.ImportEntryObjects(typeof(Dataset.Dataset));
+			Dashboard.ImportEntryObjects(typeof(Dataset.Dataset), typeof(Dataset.Person));
 		}
 
 		private void Cb_SelectionChanged(object sender, SelectionChangedEventArgs e)

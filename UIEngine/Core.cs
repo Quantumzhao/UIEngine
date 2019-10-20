@@ -32,8 +32,14 @@ namespace UIEngine
 				// Load all static properties
 				foreach (var property in type.GetVisibleProperties())
 				{
-					var attr = property.GetCustomAttribute<Visible>();
 					ObjectNode node = new ObjectNode(null, property);
+					Roots.Add(node);
+				}
+
+				// Load all static methods
+				foreach (var method in type.GetVisibleMethods())
+				{
+					MethodNode node = new MethodNode(null, method);
 					Roots.Add(node);
 				}
 			}
