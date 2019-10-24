@@ -89,10 +89,10 @@ namespace UIEngine
 		public delegate void ObjectdataChangeDelegate(object data);
 		public event ObjectdataChangeDelegate ObjectDataLoaded;
 		private object _ObjectData;
-		internal object ObjectData
+		public object ObjectData
 		{
 			get => _ObjectData;
-			set
+			internal set
 			{
 				if (value != _ObjectData)
 				{
@@ -101,6 +101,7 @@ namespace UIEngine
 				}
 			}
 		}
+
 		/// <summary>
 		///		Retrieves object value of the object node. 
 		///		Returns null if cannot cast object to the given type
@@ -125,6 +126,7 @@ namespace UIEngine
 				return default;
 			}
 		}
+
 		/// <summary>
 		///		Set the object data
 		/// </summary>

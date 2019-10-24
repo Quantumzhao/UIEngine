@@ -4,6 +4,10 @@
              xmlns:local="clr-namespace:FrontEnd"
              StartupUri="MainWindow.xaml">
     <Application.Resources>
-         
+		<Style TargetType="ComboBox" x:Key="PropertyBox">
+			<Style.Setters>
+				<Setter Property="ItemsSource" Value="{Binding Path=Properties}"></Setter>
+			</Style.Setters>
+		</Style>
     </Application.Resources>
 </Application>
