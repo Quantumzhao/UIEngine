@@ -42,7 +42,7 @@ namespace UIEngine
 			this.propertyInfo = propertyInfo;
 			var setter = propertyInfo.SetMethod;
 			ReturnType = propertyInfo.PropertyType;
-			CanWrite = setter.IsPublic && (setter.GetCustomAttribute<Visible>()?.IsEnabled ?? true);
+			//CanWrite = setter.IsPublic && (setter.GetCustomAttribute<Visible>()?.IsEnabled ?? true);
 			Name = propertyInfo.Name;
 		}
 		// create object nodes from annonymous objects, like elements in a collection

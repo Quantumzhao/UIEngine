@@ -96,6 +96,10 @@
     <None Include="App.config" />
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="..\ComponentLibrary\ComponentLibrary.csproj">
+      <Project>{3d29d6d0-ab7d-4c43-bd55-0f665d05d552}</Project>
+      <Name>ComponentLibrary</Name>
+    </ProjectReference>
     <ProjectReference Include="..\Dataset\Dataset.csproj">
       <Project>{90153826-714f-40e4-a497-d81415307b41}</Project>
       <Name>Dataset</Name>

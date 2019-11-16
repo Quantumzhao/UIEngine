@@ -11,42 +11,56 @@ namespace ComponentLibrary
 	/// </summary>
 	public partial class ObjectBox : UserControl
     {
-		public ObjectNode ObjectNode { get; set; }
+		public delegate void ObjectBoxCreatedDelegate(ObjectBox sender, ObjectBox newObjectBox);
+
+		private ObjectNode _ObjectNode;
+		public ObjectNode ObjectNode
+		{
+			get => _ObjectNode;
+			set
+			{
+				_ObjectNode = value;
+				if (value != null)
+				{
+					ContentChanged?.Invoke(this, value);
+				}
+			}
+		}
+
+		public event Action<object, ObjectNode> ContentChanged;
+		public event ObjectBoxCreatedDelegate ObjectBoxCreated;
+		public event SelectionChangedEventHandler SelectedItemChanged;
 
         public ObjectBox()
         {
             InitializeComponent();
+			ContentChanged += (me, newNode) => Initialize();
         }
 
-		private void UserControl_Initialized(object sender, EventArgs e)
+		private void Initialize()
 		{
 			DataContext = ObjectNode;
-
-			if (ObjectNode == null)
-			{
-				return;
-			}
 
 			var data = ObjectNode.ObjectData;
 			if (data is int || data is string || data is double)
 			{
-				var textbox = new TextBox();
+				var comboBox = new ComboBox();
 				{
-					textbox.SetBinding(TextBox.TextProperty, "ObjectData");
+					comboBox.SetBinding(ComboBox.TextProperty, "ObjectData");
 					if (data is int)
 					{
-						textbox.LostFocus += ChangeObjectData_Int;
+						comboBox.LostFocus += ChangeObjectData_Int;
 					}
 					else if (data is double)
 					{
-						textbox.LostFocus += ChangeObjectData_Double;
+						comboBox.LostFocus += ChangeObjectData_Double;
 					}
 					else if (data is string)
 					{
-						textbox.LostFocus += (ts, te) => ObjectNode.SetValue((ts as TextBox).Text);
+						comboBox.LostFocus += (ts, te) => ObjectNode.SetValue((ts as TextBox).Text);
 					}
 				}
-				MainGrid.Children.Add(textbox);
+				MainGrid.Children.Add(comboBox);
 			}
 			else if (data is IEnumerable)
 			{
@@ -57,8 +71,13 @@ namespace ComponentLibrary
 				var comboBox = new ComboBox();
 				{
 					comboBox.ItemsSource = ObjectNode.Properties;
-					throw new NotImplementedException();
+					comboBox.SelectionChanged += SelectedItemChanged;
+					comboBox.SelectionChanged += (sender, e) =>
+					{
+						ObjectBoxCreated?.Invoke(this, new ObjectBox() { ObjectNode = e.AddedItems[0] as ObjectNode});
+					};					
 				}
+				MainGrid.Children.Add(comboBox);
 			}
 		}
 

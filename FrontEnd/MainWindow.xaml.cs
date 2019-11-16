@@ -3,7 +3,8 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using UIEngine;
-
+using ComponentLibrary;
+using System.Linq;
 
 namespace FrontEnd
 {
@@ -44,14 +45,14 @@ namespace FrontEnd
 
 		private void Add_Click(object sender, RoutedEventArgs e)
 		{
-			var cb = new ComboBox
+			var objectBox = new ObjectBox();
+			objectBox.ObjectNode = Dashboard.Roots.Where(n => n is ObjectNode).First() as ObjectNode;
+			objectBox.ObjectBoxCreated += (me, newBox) =>
 			{
-				Margin = new Thickness(10, 0, 0, 0),
-				ItemsSource = Dashboard.GetGlobalObjects()
+				MainPanel.Children.Add(newBox);
 			};
-			
-			cb.SelectionChanged += Cb_SelectionChanged;
-			MainPanel.Children.Add(cb);
+
+			MainPanel.Children.Add(objectBox);
 		}
 	}
 }
