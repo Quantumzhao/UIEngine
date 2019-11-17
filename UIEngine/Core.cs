@@ -30,14 +30,14 @@ namespace UIEngine
 			foreach (var type in classes)
 			{
 				// Load all static properties
-				foreach (var property in type.GetVisibleProperties())
+				foreach (var property in type.GetVisibleProperties(staticOnly: true))
 				{
 					ObjectNode node = new ObjectNode(null, property);
 					Roots.Add(node);
 				}
 
 				// Load all static methods
-				foreach (var method in type.GetVisibleMethods())
+				foreach (var method in type.GetVisibleMethods(staticOnly: true))
 				{
 					MethodNode node = new MethodNode(null, method);
 					Roots.Add(node);
@@ -74,22 +74,25 @@ namespace UIEngine
 
 	public static class Misc
 	{
-		public static IEnumerable<PropertyInfo> GetVisibleProperties(this Type type)
+		public static IEnumerable<PropertyInfo> GetVisibleProperties(this Type type, bool staticOnly = false)
 		{
-			return type.GetProperties().Where(p =>
-			{
-				var attr = p.GetCustomAttribute<Visible>();
-				return attr != null && attr.IsEnabled;
-			});
+			var a = type.GetProperty("test", BindingFlags.Static);
+			return (staticOnly ? type.GetProperties(BindingFlags.Static) : type.GetProperties())
+				.Where(p =>
+				{
+					var attr = p.GetCustomAttribute<Visible>();
+					return attr != null && attr.IsEnabled;
+				});
 		}
 
-		public static IEnumerable<MethodInfo> GetVisibleMethods(this Type type)
+		public static IEnumerable<MethodInfo> GetVisibleMethods(this Type type, bool staticOnly = false)
 		{
-			return type.GetMethods().Where(m =>
-			{
-				var attr = m.GetCustomAttribute<Visible>();
-				return attr != null && attr.IsEnabled;
-			});
+			return (staticOnly ? type.GetMethods(BindingFlags.Static) : type.GetMethods())
+				.Where(m =>
+				{
+					var attr = m.GetCustomAttribute<Visible>();
+					return attr != null && attr.IsEnabled;
+				});
 		}
 	}
 }

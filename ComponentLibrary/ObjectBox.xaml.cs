@@ -28,8 +28,7 @@ namespace ComponentLibrary
 		}
 
 		public event Action<object, ObjectNode> ContentChanged;
-		public event ObjectBoxCreatedDelegate ObjectBoxCreated;
-		public event SelectionChangedEventHandler SelectedItemChanged;
+		public static event ObjectBoxCreatedDelegate ObjectBoxCreated;
 
         public ObjectBox()
         {
@@ -44,23 +43,23 @@ namespace ComponentLibrary
 			var data = ObjectNode.ObjectData;
 			if (data is int || data is string || data is double)
 			{
-				var comboBox = new ComboBox();
+				var textBox = new TextBox();
 				{
-					comboBox.SetBinding(ComboBox.TextProperty, "ObjectData");
+					textBox.SetBinding(TextBox.TextProperty, "ObjectData");
 					if (data is int)
 					{
-						comboBox.LostFocus += ChangeObjectData_Int;
+						textBox.LostFocus += ChangeObjectData_Int;
 					}
 					else if (data is double)
 					{
-						comboBox.LostFocus += ChangeObjectData_Double;
+						textBox.LostFocus += ChangeObjectData_Double;
 					}
 					else if (data is string)
 					{
-						comboBox.LostFocus += (ts, te) => ObjectNode.SetValue((ts as TextBox).Text);
+						textBox.LostFocus += (ts, te) => ObjectNode.SetValue((ts as TextBox).Text);
 					}
 				}
-				MainGrid.Children.Add(comboBox);
+				MainGrid.Children.Add(textBox);
 			}
 			else if (data is IEnumerable)
 			{
@@ -71,11 +70,10 @@ namespace ComponentLibrary
 				var comboBox = new ComboBox();
 				{
 					comboBox.ItemsSource = ObjectNode.Properties;
-					comboBox.SelectionChanged += SelectedItemChanged;
 					comboBox.SelectionChanged += (sender, e) =>
 					{
 						ObjectBoxCreated?.Invoke(this, new ObjectBox() { ObjectNode = e.AddedItems[0] as ObjectNode});
-					};					
+					};
 				}
 				MainGrid.Children.Add(comboBox);
 			}

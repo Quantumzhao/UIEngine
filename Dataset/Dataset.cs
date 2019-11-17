@@ -40,6 +40,8 @@ namespace Dataset
 	{
 		[Visible("People")]
 		public static List<Person> People { get; } = new List<Person>();
+		[Visible("Test")]
+		public static object test { get; }
 		public static void Init()
 		{
 			People.Add(

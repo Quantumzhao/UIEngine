@@ -47,7 +47,7 @@ namespace FrontEnd
 		{
 			var objectBox = new ObjectBox();
 			objectBox.ObjectNode = Dashboard.Roots.Where(n => n is ObjectNode).First() as ObjectNode;
-			objectBox.ObjectBoxCreated += (me, newBox) =>
+			ObjectBox.ObjectBoxCreated += (me, newBox) =>
 			{
 				MainPanel.Children.Add(newBox);
 			};
