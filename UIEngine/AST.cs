@@ -91,8 +91,16 @@ namespace UIEngine
 		private object _ObjectData;
 		public object ObjectData
 		{
-			get => _ObjectData;
-			internal set
+			get
+			{
+				if (_ObjectData == null)
+				{
+					LoadObject(propertyInfo);
+				}
+
+				return _ObjectData;
+			}
+			set
 			{
 				if (value != _ObjectData)
 				{

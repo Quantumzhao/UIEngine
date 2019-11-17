@@ -38,46 +38,42 @@ namespace Dataset
 
 	public static class Dataset
 	{
-		[Visible("People")]
-		public static List<Person> People { get; } = new List<Person>();
-		[Visible("Test")]
-		public static object test { get; }
+		[Visible("Alice")]
+		public static Person Alice { get; set; }
 		public static void Init()
 		{
-			People.Add(
-				new Person()
+			Alice = new Person()
+			{
+				Name = "Alice",
+				Phone = "12345678",
+				Address = new Address()
 				{
-					Name = "Alice",
-					Phone = "12345678",
-					Address = new Address()
-					{
-						Country = "US",
-						State = "Alaska"
-					}
+					Country = "US",
+					State = "Alaska"
 				}
-			);
-			People.Add(
-				new Person()
-				{
-					Name = "Bob",
-					Phone = "87654321",
-					Address = new Address()
-					{
-						Country = "UK",
-						State = "Portmouth"
-					}
-				}
-			);
+			};
+			//People.Add(
+			//	new Person()
+			//	{
+			//		Name = "Bob",
+			//		Phone = "87654321",
+			//		Address = new Address()
+			//		{
+			//			Country = "UK",
+			//			State = "Portmouth"
+			//		}
+			//	}
+			//);
 		}
 	}
 
 	public class Person
 	{
-		[Visible("GetByName")]
-		public static Person Get(string name)
-		{
-			return Dataset.People.Where(p => p.Name == name).FirstOrDefault();
-		}
+		//[Visible("GetByName")]
+		//public static Person Get(string name)
+		//{
+		//	return Dataset.People.Where(p => p.Name == name).FirstOrDefault();
+		//}
 
 		[Visible("Name")]
 		public string Name { get; set; }

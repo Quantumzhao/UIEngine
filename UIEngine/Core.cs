@@ -76,23 +76,26 @@ namespace UIEngine
 	{
 		public static IEnumerable<PropertyInfo> GetVisibleProperties(this Type type, bool staticOnly = false)
 		{
-			var a = type.GetProperty("test", BindingFlags.Static);
-			return (staticOnly ? type.GetProperties(BindingFlags.Static) : type.GetProperties())
+			return (
+				staticOnly ? type.GetProperties(BindingFlags.Static | BindingFlags.Public) : type.GetProperties())
 				.Where(p =>
 				{
 					var attr = p.GetCustomAttribute<Visible>();
 					return attr != null && attr.IsEnabled;
-				});
+				}
+			);
 		}
 
 		public static IEnumerable<MethodInfo> GetVisibleMethods(this Type type, bool staticOnly = false)
 		{
-			return (staticOnly ? type.GetMethods(BindingFlags.Static) : type.GetMethods())
+			return (
+				staticOnly ? type.GetMethods(BindingFlags.Static | BindingFlags.Public) : type.GetMethods())
 				.Where(m =>
 				{
 					var attr = m.GetCustomAttribute<Visible>();
 					return attr != null && attr.IsEnabled;
-				});
+				}
+			);
 		}
 	}
 }
