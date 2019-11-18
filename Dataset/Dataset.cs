@@ -73,7 +73,7 @@ namespace Dataset
 		//public static Person Get(string name)
 		//{
 		//	return Dataset.People.Where(p => p.Name == name).FirstOrDefault();
-		//}
+		//} 
 
 		[Visible("Name")]
 		public string Name { get; set; }
