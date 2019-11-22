@@ -23,6 +23,7 @@ Property Accessing (Reading and Writing)
 - [x] Read and load property information
 - [X] Display property value
 - [X] Write property value
+- [ ] Object collection (`IEnumerable<T>`) support
 
 ### Phase 2
 
@@ -49,3 +50,12 @@ Finalization and Optimization
 - [ ] Complete data view support
 - [ ] Data view and layout saving functionality
 - [ ] And others...
+
+### Miscellaneous
+
+#### An Implementation Using *WPF*
+
+- [X] Components for `ObjectNode`
+- [ ] Components for Collections (`IEnumerable<T>`)
+- [ ] Components for Methods/Functions
+- [ ] Components for LINQ
