@@ -12,6 +12,7 @@ namespace ComponentLibrary
 	public partial class ObjectBox : UserControl
     {
 		public delegate void ObjectBoxCreatedDelegate(ObjectBox sender, ObjectBox newObjectBox);
+		public delegate void SelectionChangedDelegate(ObjectBox sender, ObjectNode newSelection);
 
 		private ObjectNode _ObjectNode;
 		public ObjectNode ObjectNode
@@ -28,6 +29,7 @@ namespace ComponentLibrary
 		}
 
 		public event Action<object, ObjectNode> ContentChanged;
+		public static event SelectionChangedDelegate SelectionChanged;
 		public static event ObjectBoxCreatedDelegate ObjectBoxCreated;
 
         public ObjectBox()
@@ -72,6 +74,7 @@ namespace ComponentLibrary
 					comboBox.ItemsSource = ObjectNode.Properties;
 					comboBox.SelectionChanged += (sender, e) =>
 					{
+						SelectionChanged(this, e.AddedItems[0] as ObjectNode);
 						ObjectBoxCreated?.Invoke(this, new ObjectBox() { ObjectNode = e.AddedItems[0] as ObjectNode});
 					};
 				}

@@ -1,0 +1,13 @@
+﻿<UserControl x:Class="ComponentLibrary.UIPanel"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
+             xmlns:local="clr-namespace:ComponentLibrary"
+             mc:Ignorable="d" 
+             d:DesignHeight="450" d:DesignWidth="800" Loaded="UserControl_Loaded">
+    <StackPanel Orientation="Horizontal">
+		<ComboBox Name="Start" VerticalAlignment="Top" HorizontalAlignment="Left" ItemsSource="{Binding Path=Roots, Mode=TwoWay}" SelectionChanged="Start_SelectionChanged"></ComboBox>
+		<StackPanel x:Name="MainPanel" Orientation="Horizontal"></StackPanel>
+	</StackPanel>
+</UserControl>
