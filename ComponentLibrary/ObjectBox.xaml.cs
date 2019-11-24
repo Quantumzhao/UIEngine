@@ -9,7 +9,7 @@ namespace ComponentLibrary
 	/// <summary>
 	/// Interaction logic for UserControl1.xaml
 	/// </summary>
-	public partial class ObjectBox : UserControl
+	public partial class ObjectBox : UserControl, IBox
     {
 		public delegate void ObjectBoxCreatedDelegate(ObjectBox sender, ObjectBox newObjectBox);
 		public delegate void SelectionChangedDelegate(ObjectBox sender, ObjectNode newSelection);
@@ -27,6 +27,8 @@ namespace ComponentLibrary
 				}
 			}
 		}
+
+		public IBox Child { get; set; }
 
 		public event Action<object, ObjectNode> ContentChanged;
 		public static event SelectionChangedDelegate SelectionChanged;
@@ -111,6 +113,11 @@ namespace ComponentLibrary
 			{
 				throw new ArgumentException("Invalid double");
 			}
+		}
+
+		public void RemoveChild()
+		{
+			throw new NotImplementedException();
 		}
 	}
 }

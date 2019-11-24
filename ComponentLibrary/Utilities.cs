@@ -8,4 +8,10 @@ namespace ComponentLibrary
 	public static class Utility
 	{
 	}
+
+	public interface IBox
+	{
+		IBox Child { get; set; }
+		void RemoveChild();
+	}
 }

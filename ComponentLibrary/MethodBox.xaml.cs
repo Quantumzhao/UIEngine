@@ -19,7 +19,7 @@ namespace ComponentLibrary
 	/// <summary>
 	/// Interaction logic for MethodBox.xaml
 	/// </summary>
-	public partial class MethodBox : UserControl
+	public partial class MethodBox : UserControl, IBox
 	{
 		public MethodNode _MethodNode = null;
 		public MethodNode MethodNode
@@ -34,6 +34,9 @@ namespace ComponentLibrary
 				}
 			}
 		}
+
+		public IBox Child { get; set; }
+
 		public MethodBox()
 		{
 			InitializeComponent();
@@ -124,6 +127,11 @@ namespace ComponentLibrary
 			{
 				MainPanel.Children.Add(objectBox);
 			}
+		}
+
+		public void RemoveChild()
+		{
+			throw new NotImplementedException();
 		}
 	}
 }
