@@ -24,6 +24,8 @@ namespace UIEngine
 		///		It defines the way that the object data should be interpreted as a preview
 		/// </summary>
 		public Func<object, string> PreviewExpression { get; set; } = o => o.ToString();
+
+		public override string ToString() => Header;
 	}
 
 	public class ObjectNode : Node
@@ -207,8 +209,6 @@ namespace UIEngine
 			Methods = data.GetType().GetVisibleMethods()
 				.Select(mi => new MethodNode(this, mi)).ToList();
 		}
-
-		public override string ToString() => Header;
 	}
 
 	public class MethodNode : Node
@@ -237,7 +237,7 @@ namespace UIEngine
 		{
 			var objectData = Body.Invoke(
 				Parent?.ObjectData, 
-				Signature.Select(p => p.Data.ObjectData).ToArray()
+				Signature.Select(p => p.Data).ToArray()
 			);
 			
 			return new ObjectNode(null, objectData, new Visible(Header, Description)) { CanWrite = false };
@@ -249,11 +249,11 @@ namespace UIEngine
 		/// <param name="index">
 		/// 	the index of the parameter that is to be assigned
 		/// </param>
-		public bool CanAssignArgument(Node argument, int index) 
+		public bool CanAssignArgument(object argument, int index) 
 		{
-			return Signature[index].Type.IsAssignableFrom(argument.ReturnType);
+			return Signature[index].Type.IsAssignableFrom(argument.GetType());
 		}
-		public bool SetParameter(ObjectNode argument, int index)
+		public bool SetParameter(object argument, int index)
 		{
 			if (CanAssignArgument(argument, index))
 			{
@@ -286,14 +286,33 @@ namespace UIEngine
 
 		public class Parameter
 		{
-			public Parameter(Type type, ObjectNode data = null)
+			public Parameter(Type type, object data = null)
 			{
 				Type = type;
 				Data = data;
 			}
 
 			public Type Type { get; private set; }
-			public ObjectNode Data { get; set; }
+
+			private object _Data = null;
+			public object Data
+			{
+				get => _Data;
+				set
+				{
+					if (value != null)
+					{
+						if (Type.IsAssignableFrom(value.GetType()))
+						{
+							_Data = value;
+						}
+						else
+						{
+							throw new ArgumentException();
+						}
+					}
+				}
+			}
 		}
 	}
 

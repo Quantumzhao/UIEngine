@@ -49,9 +49,17 @@
     <Reference Include="PresentationFramework" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="MethodBox.xaml.cs">
+      <DependentUpon>MethodBox.xaml</DependentUpon>
+    </Compile>
     <Compile Include="UIPanel.xaml.cs">
       <DependentUpon>UIPanel.xaml</DependentUpon>
     </Compile>
+    <Compile Include="Utilities.cs" />
+    <Page Include="MethodBox.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
     <Page Include="ObjectBox.xaml">
       <Generator>MSBuild:Compile</Generator>
       <SubType>Designer</SubType>

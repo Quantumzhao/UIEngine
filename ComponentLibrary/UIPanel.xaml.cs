@@ -58,7 +58,22 @@ namespace ComponentLibrary
 			}
 			else
 			{
-				throw new NotImplementedException();
+				var methodBox = new MethodBox();
+				methodBox.MethodNode = selection as MethodNode;
+				ObjectBox.SelectionChanged += (me, newNode) =>
+				{
+					int index = MainPanel.Children.IndexOf(me);
+					while (index + 1 < MainPanel.Children.Count)
+					{
+						MainPanel.Children.RemoveAt(index + 1);
+					}
+				};
+				ObjectBox.ObjectBoxCreated += (me, newBox) =>
+				{
+					MainPanel.Children.Add(newBox);
+				};
+
+				MainPanel.Children.Add(methodBox);
 			}
 		}
 	}

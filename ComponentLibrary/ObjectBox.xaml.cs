@@ -63,6 +63,13 @@ namespace ComponentLibrary
 				}
 				MainGrid.Children.Add(textBox);
 			}
+			else if (data is bool)
+			{
+				var checkbox = new CheckBox();
+				checkbox.Content = ObjectNode.Header;
+				checkbox.IsChecked = (bool)data;
+				MainGrid.Children.Add(checkbox);
+			}
 			else if (data is IEnumerable)
 			{
 				throw new NotImplementedException();

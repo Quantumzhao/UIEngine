@@ -45,14 +45,6 @@ namespace FrontEnd
 
 		private void Add_Click(object sender, RoutedEventArgs e)
 		{
-			//var objectBox = new ObjectBox();
-			//objectBox.ObjectNode = Dashboard.Roots.Where(n => n is ObjectNode).First() as ObjectNode;
-			//ObjectBox.ObjectBoxCreated += (me, newBox) =>
-			//{
-			//	MainPanel.Children.Add(newBox);
-			//};
-
-			//MainPanel.Children.Add(objectBox);
 			MainPanel.Children.Add(new UIPanel());
 		}
 	}

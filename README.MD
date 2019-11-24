@@ -57,5 +57,5 @@ Finalization and Optimization
 
 - [X] Components for `ObjectNode`
 - [ ] Components for Collections (`IEnumerable<T>`)
-- [ ] Components for Methods/Functions
+- [X] Components for Methods/Functions
 - [ ] Components for LINQ
