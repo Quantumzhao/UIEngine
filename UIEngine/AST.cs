@@ -251,16 +251,25 @@ namespace UIEngine
 		/// </param>
 		public bool CanAssignArgument(object argument, int index) 
 		{
-			return Signature[index].Type.IsAssignableFrom(argument.GetType());
+			return CanAssignArgument(argument, Signature[index]);
 		}
-		public bool SetParameter(object argument, int index)
+		public bool CanAssignArgument(object argument, Parameter parameter)
 		{
-			if (CanAssignArgument(argument, index))
+			return parameter.Type.IsAssignableFrom(argument.GetType());
+		}
+
+		public bool SetParameter(object argument, Parameter parameter)
+		{
+			if (CanAssignArgument(argument, parameter))
 			{
-				Signature[index].Data = argument;
+				parameter.Data = argument;
 				return true;
 			}
 			return false;
+		}
+		public bool SetParameter(object argument, int index)
+		{
+			return SetParameter(argument, Signature[index]);
 		}
 
 		/// <summary>

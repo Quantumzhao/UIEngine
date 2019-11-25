@@ -7,7 +7,7 @@
              mc:Ignorable="d" 
              d:DesignHeight="450" d:DesignWidth="800" Loaded="UserControl_Loaded">
     <StackPanel Orientation="Horizontal">
-		<ComboBox Name="Start" VerticalAlignment="Top" HorizontalAlignment="Left" ItemsSource="{Binding Path=Roots, Mode=TwoWay}" SelectionChanged="Start_SelectionChanged"></ComboBox>
+		<ComboBox Name="Start" VerticalAlignment="Top" HorizontalAlignment="Left" ItemsSource="{Binding Path=Roots}" SelectionChanged="Start_SelectionChanged"></ComboBox>
 		<StackPanel x:Name="MainPanel" Orientation="Horizontal"></StackPanel>
 	</StackPanel>
 </UserControl>
