@@ -1,8 +1,8 @@
 ﻿using System;
 using System.Collections;
 using System.Collections.Generic;
-using System.Reflection;
 using System.Linq;
+using System.Reflection;
 
 namespace UIEngine
 {
@@ -96,6 +96,17 @@ namespace UIEngine
 					return attr != null && attr.IsEnabled;
 				}
 			);
+		}
+
+		public static List<object> ToObjectList(this IEnumerable collection)
+		{
+			var enumerator = collection.GetEnumerator();
+			var list = new List<object>();
+			while (enumerator.MoveNext())
+			{
+				list.Add(enumerator.Current);
+			}
+			return list;
 		}
 	}
 }

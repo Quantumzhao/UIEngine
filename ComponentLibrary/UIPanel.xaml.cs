@@ -43,15 +43,20 @@ namespace ComponentLibrary
 				objectBox.ObjectNode = selection as ObjectNode;
 				ObjectBox.SelectionChanged += (me, newNode) =>
 				{
-					int index = MainPanel.Children.IndexOf(me);
-					while (index + 1 < MainPanel.Children.Count)
-					{
-						MainPanel.Children.RemoveAt(index + 1);
-					}
+					me.Child?.RemoveSelf();
+					me.Child = newNode;
 				};
 				ObjectBox.ObjectBoxCreated += (me, newBox) =>
 				{
 					MainPanel.Children.Add(newBox);
+				};
+				ObjectBox.SelfDestroyed += me =>
+				{
+					MainPanel.Children.Remove(me as ObjectBox);
+				};
+				MethodBox.SelfDestroyed += me =>
+				{
+					MainPanel.Children.Remove(me as MethodBox);
 				};
 
 				MainPanel.Children.Add(objectBox);

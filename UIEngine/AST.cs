@@ -3,11 +3,6 @@ using System.Collections.Generic;
 using System.Collections;
 using System.Linq;
 using System.Reflection;
-using System.Text;
-using System.Threading.Tasks;
-using System.ComponentModel;
-using System.Collections.Specialized;
-using System.Collections.ObjectModel;
 namespace UIEngine
 {
 	public abstract class Node
@@ -236,10 +231,10 @@ namespace UIEngine
 		public ObjectNode Invoke()
 		{
 			var objectData = Body.Invoke(
-				Parent?.ObjectData, 
+				Parent?.ObjectData,
 				Signature.Select(p => p.Data).ToArray()
 			);
-			
+
 			return new ObjectNode(null, objectData, new Visible(Header, Description)) { CanWrite = false };
 		}
 
@@ -249,7 +244,7 @@ namespace UIEngine
 		/// <param name="index">
 		/// 	the index of the parameter that is to be assigned
 		/// </param>
-		public bool CanAssignArgument(object argument, int index) 
+		public bool CanAssignArgument(object argument, int index)
 		{
 			return CanAssignArgument(argument, Signature[index]);
 		}
@@ -321,6 +316,51 @@ namespace UIEngine
 						}
 					}
 				}
+			}
+		}
+	}
+
+	public class ValueNode : ObjectNode
+	{
+		internal ValueNode(ObjectNode parent, PropertyInfo propertyInfo)
+			: base(parent, propertyInfo) { }
+	}
+
+	public class CollectionNode : ObjectNode
+	{
+		public bool Is_2D { get; private set; }
+		public bool DisplayPropertiesAsHeadings { get; set; } = false;
+		public List<string> Headings { get; private set; } = new List<string>();
+		public List<object> FormattedData { get; private set; } = new List<object>();
+
+		internal CollectionNode(ObjectNode parent, PropertyInfo propertyInfo)
+			: base(parent, propertyInfo) { }
+
+		private void LoadFormattedData(object data)
+		{
+			if (data == null)
+			{
+				data = ObjectData;
+			}
+
+			var preFormattedData = (data as ICollection).ToObjectList();
+			if (data.GetType().IsAssignableFrom(typeof(IDictionary)))
+			{
+				Headings.Add("Key");
+				Headings.Add("Value");
+				Is_2D = true;
+			}
+			else if (preFormattedData[0] is ICollection)
+			{
+				Is_2D = true;
+				foreach (var element in preFormattedData)
+				{
+					FormattedData.Add((element as ICollection).ToObjectList());
+				}
+			}
+			else
+			{
+
 			}
 		}
 	}

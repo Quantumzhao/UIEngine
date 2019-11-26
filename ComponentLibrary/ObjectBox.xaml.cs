@@ -11,9 +11,6 @@ namespace ComponentLibrary
 	/// </summary>
 	public partial class ObjectBox : UserControl, IBox
     {
-		public delegate void ObjectBoxCreatedDelegate(ObjectBox sender, ObjectBox newObjectBox);
-		public delegate void SelectionChangedDelegate(ObjectBox sender, ObjectNode newSelection);
-
 		private ObjectNode _ObjectNode;
 		public ObjectNode ObjectNode
 		{
@@ -33,6 +30,7 @@ namespace ComponentLibrary
 		public event Action<object, ObjectNode> ContentChanged;
 		public static event SelectionChangedDelegate SelectionChanged;
 		public static event ObjectBoxCreatedDelegate ObjectBoxCreated;
+		public static event SelfDestroyedDelegate SelfDestroyed;
 
         public ObjectBox()
         {
@@ -83,8 +81,10 @@ namespace ComponentLibrary
 					comboBox.ItemsSource = ObjectNode.Properties;
 					comboBox.SelectionChanged += (sender, e) =>
 					{
-						SelectionChanged(this, e.AddedItems[0] as ObjectNode);
-						ObjectBoxCreated?.Invoke(this, new ObjectBox() { ObjectNode = e.AddedItems[0] as ObjectNode});
+						SelectionChanged?.Invoke(this, e.AddedItems[0] as IBox);
+						var newBox = new ObjectBox() { ObjectNode = e.AddedItems[0] as ObjectNode };
+						Child = newBox;
+						ObjectBoxCreated?.Invoke(this, newBox);
 					};
 				}
 				MainGrid.Children.Add(comboBox);
@@ -115,9 +115,10 @@ namespace ComponentLibrary
 			}
 		}
 
-		public void RemoveChild()
+		public void RemoveSelf()
 		{
-			throw new NotImplementedException();
+			Child?.RemoveSelf();
+			SelfDestroyed?.Invoke(this);
 		}
 	}
 }
