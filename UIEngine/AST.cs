@@ -332,9 +332,13 @@ namespace UIEngine
 		public bool DisplayPropertiesAsHeadings { get; set; } = false;
 		public List<string> Headings { get; private set; } = new List<string>();
 		public List<object> FormattedData { get; private set; } = new List<object>();
+		public List<List<ObjectNode>> Elements { get; private set; } = new List<List<ObjectNode>>();
 
 		internal CollectionNode(ObjectNode parent, PropertyInfo propertyInfo)
-			: base(parent, propertyInfo) { }
+			: base(parent, propertyInfo) 
+		{
+			ObjectDataLoaded += data => LoadFormattedData(data);
+		}
 
 		private void LoadFormattedData(object data)
 		{
@@ -344,12 +348,27 @@ namespace UIEngine
 			}
 
 			var preFormattedData = (data as ICollection).ToObjectList();
+			var list = new List<ObjectNode>();
+			// If it is a dictionary
 			if (data.GetType().IsAssignableFrom(typeof(IDictionary)))
 			{
 				Headings.Add("Key");
 				Headings.Add("Value");
 				Is_2D = true;
+				foreach (var key in (data as IDictionary).Keys)
+				{
+					list.Add(new ObjectNode(this, key, new Visible(Header, Description)));
+					Elements.Add(list);
+				}
+				var enumerator = Elements.GetEnumerator();
+				enumerator.MoveNext();
+				foreach (var value in (data as IDictionary).Values)
+				{
+					enumerator.Current.Add(new ObjectNode(this, value, new Visible(Header, Description)));
+					enumerator.MoveNext();
+				}
 			}
+			// If it's a two dimensional data structure
 			else if (preFormattedData[0] is ICollection)
 			{
 				Is_2D = true;
@@ -357,11 +376,31 @@ namespace UIEngine
 				{
 					FormattedData.Add((element as ICollection).ToObjectList());
 				}
+				foreach (var row in FormattedData)
+				{
+					var elementRow = new List<ObjectNode>();
+					foreach (var column in row as ICollection)
+					{
+						elementRow.Add(new ObjectNode(this, column, new Visible(Header, Description)));
+					}
+					Elements.Add(elementRow);
+				}
 			}
+			// If it's a one dimensional list (or set, stack ...)
 			else
 			{
-
+				Is_2D = false;
+				foreach (var objectData in data as ICollection)
+				{
+					list.Add(new ObjectNode(this, objectData, new Visible(Header, Description)));
+					Elements.Add(list);
+				}
 			}
+		}
+
+		public ObjectNode this[int row, int column]
+		{
+			get => Elements[row][column];
 		}
 	}
 

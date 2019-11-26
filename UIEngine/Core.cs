@@ -72,6 +72,19 @@ namespace UIEngine
 		public Func<object, string> PreviewExpression { get; set; } = o => o.ToString();
 	}
 
+	[AttributeUsage(AttributeTargets.GenericParameter | AttributeTargets.Parameter)]
+	public class ParamInfo : Attribute
+	{
+		public ParamInfo(string header = "", string description = "")
+		{
+			Header = header;
+			Description = description;
+		}
+
+		public string Header { get; set; }
+		public string Description { get; set; }
+	}
+
 	public static class Misc
 	{
 		public static IEnumerable<PropertyInfo> GetVisibleProperties(this Type type, bool staticOnly = false)

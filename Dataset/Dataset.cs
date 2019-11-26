@@ -75,7 +75,7 @@ namespace Dataset
 		//	return Dataset.People.Where(p => p.Name == name).FirstOrDefault();
 		//}
 		[Visible("Add", Header = "Add")]
-		public static int Add(int num1, int num2)
+		public static int Add([ParamInfo("num1")]int num1, [ParamInfo("num2")]int num2)
 		{
 			return num1 + num2;
 		}
