@@ -320,11 +320,11 @@ namespace UIEngine
 		}
 	}
 
-	public class ValueNode : ObjectNode
-	{
-		internal ValueNode(ObjectNode parent, PropertyInfo propertyInfo)
-			: base(parent, propertyInfo) { }
-	}
+	//public class ValueNode : ObjectNode
+	//{
+	//	internal ValueNode(ObjectNode parent, PropertyInfo propertyInfo)
+	//		: base(parent, propertyInfo) { }
+	//}
 
 	public class CollectionNode : ObjectNode
 	{
