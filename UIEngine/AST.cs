@@ -11,7 +11,7 @@ namespace UIEngine
 		public string Header { get; set; }
 		public ObjectNode Parent { get; internal set; }
 		public string Description { get; set; }
-		public Type ReturnType { get; protected set; }
+		public Type Type { get; protected set; }
 		protected string _Preview = "...";
 		protected abstract string Preview { get; set; }
 
@@ -38,7 +38,7 @@ namespace UIEngine
 			Header = propertyInfo.GetCustomAttribute<Visible>().Header;
 			this.propertyInfo = propertyInfo;
 			var setter = propertyInfo.SetMethod;
-			ReturnType = propertyInfo.PropertyType;
+			Type = propertyInfo.PropertyType;
 			//CanWrite = setter.IsPublic && (setter.GetCustomAttribute<Visible>()?.IsEnabled ?? true);
 			Name = propertyInfo.Name;
 		}
@@ -50,7 +50,7 @@ namespace UIEngine
 			Name = "N/A";
 			Header = objectData.ToString();
 			ObjectData = objectData;
-			ReturnType = objectData.GetType();
+			Type = objectData.GetType();
 		}
 		public bool CanWrite { get; internal set; } = false;
 		public bool IsLeaf => Properties.Count == 0;
@@ -216,7 +216,7 @@ namespace UIEngine
 			Header = attr.Header;
 			Description = attr.Description;
 			Signature = methodInfo.GetParameters().Select(p => new Parameter(p.ParameterType)).ToList();
-			ReturnType = methodInfo.ReturnType;
+			Type = methodInfo.ReturnType;
 		}
 
 		public List<Parameter> Signature;

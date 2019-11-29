@@ -32,32 +32,33 @@ namespace ComponentLibrary
 		{
 			Start.DataContext = this;
 			Roots = Dashboard.Roots;
+			ObjectBox.SelectionChanged += (me, newNode) =>
+			{
+				me.Child?.RemoveSelf();
+				me.Child = newNode;
+			};
+			ObjectBox.ObjectBoxCreated += (me, newBox) =>
+			{
+				MainPanel.Children.Add(newBox);
+			};
+			ObjectBox.SelfDestroyed += me =>
+			{
+				MainPanel.Children.Remove(me as ObjectBox);
+			};
+			MethodBox.SelfDestroyed += me =>
+			{
+				MainPanel.Children.Remove(me as MethodBox);
+			};
 		}
 
 		private void Start_SelectionChanged(object sender, SelectionChangedEventArgs e)
 		{
 			var selection = e.AddedItems[0];
+			MainPanel.Children.Clear();
 			if (selection is ObjectNode)
 			{
 				var objectBox = new ObjectBox();
 				objectBox.ObjectNode = selection as ObjectNode;
-				ObjectBox.SelectionChanged += (me, newNode) =>
-				{
-					me.Child?.RemoveSelf();
-					me.Child = newNode;
-				};
-				ObjectBox.ObjectBoxCreated += (me, newBox) =>
-				{
-					MainPanel.Children.Add(newBox);
-				};
-				ObjectBox.SelfDestroyed += me =>
-				{
-					MainPanel.Children.Remove(me as ObjectBox);
-				};
-				MethodBox.SelfDestroyed += me =>
-				{
-					MainPanel.Children.Remove(me as MethodBox);
-				};
 
 				MainPanel.Children.Add(objectBox);
 			}
@@ -65,18 +66,6 @@ namespace ComponentLibrary
 			{
 				var methodBox = new MethodBox();
 				methodBox.MethodNode = selection as MethodNode;
-				ObjectBox.SelectionChanged += (me, newNode) =>
-				{
-					int index = MainPanel.Children.IndexOf(me);
-					while (index + 1 < MainPanel.Children.Count)
-					{
-						MainPanel.Children.RemoveAt(index + 1);
-					}
-				};
-				ObjectBox.ObjectBoxCreated += (me, newBox) =>
-				{
-					MainPanel.Children.Add(newBox);
-				};
 
 				MainPanel.Children.Add(methodBox);
 			}
