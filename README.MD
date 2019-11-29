@@ -23,7 +23,7 @@ Property Accessing (Reading and Writing)
 - [x] Read and load property information
 - [X] Display property value
 - [X] Write property value
-- [ ] Object collection (`IEnumerable<T>`) support
+- [X] Object collection (`IEnumerable<T>`) support
 
 ### Phase 2
 
