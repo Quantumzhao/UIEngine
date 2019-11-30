@@ -5,13 +5,25 @@ using UIEngine;
 
 namespace ComponentLibrary
 {
-	public delegate void ObjectBoxCreatedDelegate(ObjectBox sender, ObjectBox newObjectBox);
-	public delegate void SelectionChangedDelegate(ObjectBox sender, IBox newSelection);
-	public delegate void SelfDestroyedDelegate(IBox sender);
+	public delegate void CreatedHandler(IBox sender, IBox newBox);
+	public delegate void NewNodeSelectedHandler(ObjectBox sender, Node newSelection);
+	public delegate void RemovedHandler(IBox sender);
 
 	public static class Utility
 	{
-
+		internal static IBox CreateBox(Node node)
+		{
+			IBox box;
+			if (node is ObjectNode)
+			{
+				box = new ObjectBox() { ObjectNode = node as ObjectNode };
+			}
+			else
+			{
+				box = new MethodBox() { MethodNode = node as MethodNode };
+			}
+			return box;
+		}
 	}
 
 	public interface IBox

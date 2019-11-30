@@ -32,43 +32,30 @@ namespace ComponentLibrary
 		{
 			Start.DataContext = this;
 			Roots = Dashboard.Roots;
-			ObjectBox.SelectionChanged += (me, newNode) =>
+			ObjectBox.NewNodeSelected += (me, newNode) =>
 			{
 				me.Child?.RemoveSelf();
-				me.Child = newNode;
+				me.Child = Utility.CreateBox(newNode);
+				AddNewBox(me.Child);
 			};
-			ObjectBox.ObjectBoxCreated += (me, newBox) =>
-			{
-				MainPanel.Children.Add(newBox);
-			};
-			ObjectBox.SelfDestroyed += me =>
-			{
-				MainPanel.Children.Remove(me as ObjectBox);
-			};
-			MethodBox.SelfDestroyed += me =>
-			{
-				MainPanel.Children.Remove(me as MethodBox);
-			};
+			ObjectBox.Removed += me => RemoveOldBox(me);
+			MethodBox.Removed += me => RemoveOldBox(me);
 		}
 
 		private void Start_SelectionChanged(object sender, SelectionChangedEventArgs e)
 		{
-			var selection = e.AddedItems[0];
 			MainPanel.Children.Clear();
-			if (selection is ObjectNode)
-			{
-				var objectBox = new ObjectBox();
-				objectBox.ObjectNode = selection as ObjectNode;
+			AddNewBox(Utility.CreateBox(e.AddedItems[0] as Node));
+		}
 
-				MainPanel.Children.Add(objectBox);
-			}
-			else
-			{
-				var methodBox = new MethodBox();
-				methodBox.MethodNode = selection as MethodNode;
+		private void AddNewBox(IBox newBox)
+		{
+			MainPanel.Children.Add(newBox as UIElement);
+		}
 
-				MainPanel.Children.Add(methodBox);
-			}
+		private void RemoveOldBox(IBox oldBox)
+		{
+			MainPanel.Children.Remove(oldBox as ObjectBox);
 		}
 	}
 }

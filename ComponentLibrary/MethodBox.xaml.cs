@@ -21,7 +21,7 @@ namespace ComponentLibrary
 	/// </summary>
 	public partial class MethodBox : UserControl, IBox
 	{
-		public static event SelfDestroyedDelegate SelfDestroyed;
+		public static event RemovedHandler Removed;
 
 		public MethodNode _MethodNode = null;
 		public MethodNode MethodNode
@@ -134,7 +134,7 @@ namespace ComponentLibrary
 		public void RemoveSelf()
 		{
 			Child?.RemoveSelf();
-			SelfDestroyed?.Invoke(this);
+			Removed?.Invoke(this);
 		}
 	}
 }

@@ -28,9 +28,8 @@ namespace ComponentLibrary
 		public IBox Child { get; set; }
 
 		public event Action<object, ObjectNode> ContentChanged;
-		public static event SelectionChangedDelegate SelectionChanged;
-		public static event ObjectBoxCreatedDelegate ObjectBoxCreated;
-		public static event SelfDestroyedDelegate SelfDestroyed;
+		public static event NewNodeSelectedHandler NewNodeSelected;
+		public static event RemovedHandler Removed;
 
         public ObjectBox()
         {
@@ -80,11 +79,8 @@ namespace ComponentLibrary
 				{
 					comboBox.ItemsSource = ObjectNode.Properties;
 					comboBox.SelectionChanged += (sender, e) =>
-					{
-						SelectionChanged?.Invoke(this, e.AddedItems[0] as IBox);
-						var newBox = new ObjectBox() { ObjectNode = e.AddedItems[0] as ObjectNode };
-						Child = newBox;
-						ObjectBoxCreated?.Invoke(this, newBox);
+					{						
+						NewNodeSelected?.Invoke(this, e.AddedItems[0] as Node);
 					};
 				}
 				MainGrid.Children.Add(comboBox);
@@ -118,7 +114,7 @@ namespace ComponentLibrary
 		public void RemoveSelf()
 		{
 			Child?.RemoveSelf();
-			SelfDestroyed?.Invoke(this);
+			Removed?.Invoke(this);
 		}
 	}
 }
