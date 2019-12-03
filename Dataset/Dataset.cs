@@ -69,11 +69,11 @@ namespace Dataset
 
 	public class Person
 	{
-		//[Visible("GetByName")]
-		//public static Person Get(string name)
-		//{
-		//	return Dataset.People.Where(p => p.Name == name).FirstOrDefault();
-		//}
+		[Visible("GetByName")]
+		public static Person Get(string name)
+		{
+			return name == "Alice" ? Dataset.Alice : null;
+		}
 		[Visible("Add", Header = "Add")]
 		public static int Add([ParamInfo("num1")]int num1, [ParamInfo("num2")]int num2)
 		{
