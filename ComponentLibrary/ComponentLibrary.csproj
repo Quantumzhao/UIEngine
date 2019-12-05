@@ -49,6 +49,9 @@
     <Reference Include="PresentationFramework" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="CollectionBox.xaml.cs">
+      <DependentUpon>CollectionBox.xaml</DependentUpon>
+    </Compile>
     <Compile Include="MethodBox.xaml.cs">
       <DependentUpon>MethodBox.xaml</DependentUpon>
     </Compile>
@@ -56,6 +59,10 @@
       <DependentUpon>UIPanel.xaml</DependentUpon>
     </Compile>
     <Compile Include="Utilities.cs" />
+    <Page Include="CollectionBox.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
     <Page Include="MethodBox.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
