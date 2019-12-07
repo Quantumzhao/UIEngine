@@ -7,10 +7,19 @@ namespace UIEngine
 {
 	public abstract class Node
 	{
+		/// <summary>
+		///		The unique identifier that is going to be used inside the engine
+		/// </summary>
 		public string Name { get; set; }
+		/// <summary>
+		///		Name of this node that is to be shown to the users
+		/// </summary>
 		public string Header { get; set; }
 		public ObjectNode Parent { get; internal set; }
 		public string Description { get; set; }
+		/// <summary>
+		///		Type of the object inside object node
+		/// </summary>
 		public Type Type { get; protected set; }
 		protected string _Preview = "...";
 		protected abstract string Preview { get; set; }
@@ -25,14 +34,30 @@ namespace UIEngine
 
 	public class ObjectNode : Node
 	{
-		private ObjectNode(ObjectNode parent, Visible attribute)
+		internal static ObjectNode Create(ObjectNode parent, PropertyInfo propertyInfo)
+		{
+			if (typeof(ICollection).IsAssignableFrom(propertyInfo.PropertyType))
+			{
+				return new CollectionNode(parent, propertyInfo);
+			}
+			else
+			{
+				return new ObjectNode(parent, propertyInfo);
+			}
+		}
+		internal static ObjectNode Create(ObjectNode parent, object objectData, Visible attribute)
+		{
+			return new ObjectNode(parent, objectData, attribute);
+		}
+
+		protected ObjectNode(ObjectNode parent, Visible attribute)
 		{
 			Parent = parent;
 			PreviewExpression = attribute.PreviewExpression;
 			Description = attribute.Description;
 			ObjectDataLoaded += o => Preview = PreviewExpression?.Invoke(o);
 		}
-		internal ObjectNode(ObjectNode parent, PropertyInfo propertyInfo)
+		private ObjectNode(ObjectNode parent, PropertyInfo propertyInfo)
 			: this(parent, propertyInfo.GetCustomAttribute<Visible>())
 		{
 			Header = propertyInfo.GetCustomAttribute<Visible>().Header;
@@ -43,7 +68,7 @@ namespace UIEngine
 			Name = propertyInfo.Name;
 		}
 		// create object nodes from annonymous objects, like elements in a collection
-		internal ObjectNode(ObjectNode parent, object objectData, Visible attribute)
+		private ObjectNode(ObjectNode parent, object objectData, Visible attribute)
 			: this(parent, attribute)
 		{
 			propertyInfo = null;
@@ -61,11 +86,10 @@ namespace UIEngine
 			{
 				if (_Properties == null)
 				{
-					LoadProperties(ObjectData);
+					LoadProperties();
 				}
 				return _Properties;
 			}
-			set => _Properties = value;
 		}
 
 		private List<MethodNode> _Methods = null;
@@ -75,18 +99,17 @@ namespace UIEngine
 			{
 				if (_Methods == null)
 				{
-					LoadMethods(ObjectData);
+					LoadMethods();
 				}
 				return _Methods;
 			}
-			set => _Methods = value;
 		}
 		#region Object Data
 		private PropertyInfo propertyInfo;
 		public delegate void ObjectdataChangeDelegate(object data);
 		public event ObjectdataChangeDelegate ObjectDataLoaded;
 		private object _ObjectData;
-		public object ObjectData
+		internal object ObjectData
 		{
 			get
 			{
@@ -128,7 +151,7 @@ namespace UIEngine
 			}
 			else
 			{
-				return default;
+				throw new InvalidOperationException("Type Error");
 			}
 		}
 
@@ -173,42 +196,40 @@ namespace UIEngine
 			ObjectData = propertyInfo.GetValue(Parent?.ObjectData);
 		}
 
-		private void LoadProperties(object data)
+		private void LoadProperties()
 		{
-			if (data == null)
+			if (ObjectData is IEnumerable<object>)
 			{
-				LoadObject(propertyInfo);
-				data = ObjectData;
-			}
-
-			if (data is IEnumerable<object>)
-			{
-				Properties = (data as IEnumerable<object>)
+				_Properties = (ObjectData as IEnumerable<object>)
 					.Select(o => new ObjectNode(
 						this, o, propertyInfo.GetCustomAttribute<Visible>()
 					)).ToList();
 			}
 			else
 			{
-				Properties = data.GetType().GetVisibleProperties()
+				_Properties = ObjectData.GetType().GetVisibleProperties()
 					.Select(pi => new ObjectNode(this, pi)).ToList();
 			}
 		}
-		private void LoadMethods(object data)
+		private void LoadMethods()
 		{
-			if (data == null)
+			if (ObjectData == null)
 			{
 				LoadObject(propertyInfo);
-				data = ObjectData;
 			}
-			Methods = data.GetType().GetVisibleMethods()
-				.Select(mi => new MethodNode(this, mi)).ToList();
+			_Methods = Type.GetVisibleMethods()
+				.Select(mi => MethodNode.Create(this, mi)).ToList();
 		}
 	}
 
 	public class MethodNode : Node
 	{
-		public MethodNode(ObjectNode parent, MethodInfo methodInfo)
+		internal static MethodNode Create(ObjectNode parent, MethodInfo methodInfo)
+		{
+			return new MethodNode(parent, methodInfo);
+		}
+
+		private MethodNode(ObjectNode parent, MethodInfo methodInfo)
 		{
 			Parent = parent;
 			Body = methodInfo;
@@ -235,7 +256,7 @@ namespace UIEngine
 				Signature.Select(p => p.Data).ToArray()
 			);
 
-			return new ObjectNode(null, objectData, new Visible(Header, Description)) { CanWrite = false };
+			return ObjectNode.Create(null, objectData, new Visible(Header, Description));
 		}
 
 		/// <summary>
@@ -333,9 +354,10 @@ namespace UIEngine
 		public List<string> Headings { get; private set; } = new List<string>();
 		public List<object> FormattedData { get; private set; } = new List<object>();
 		public List<List<ObjectNode>> Elements { get; private set; } = new List<List<ObjectNode>>();
+		public Type CollectionType => ObjectData.GetType();
 
 		internal CollectionNode(ObjectNode parent, PropertyInfo propertyInfo)
-			: base(parent, propertyInfo) 
+			: base(parent, propertyInfo.GetCustomAttribute<Visible>())
 		{
 			ObjectDataLoaded += data => LoadFormattedData(data);
 		}
@@ -357,14 +379,14 @@ namespace UIEngine
 				Is_2D = true;
 				foreach (var key in (data as IDictionary).Keys)
 				{
-					list.Add(new ObjectNode(this, key, new Visible(Header, Description)));
+					list.Add(ObjectNode.Create(this, key, new Visible(Header, Description)));
 					Elements.Add(list);
 				}
 				var enumerator = Elements.GetEnumerator();
 				enumerator.MoveNext();
 				foreach (var value in (data as IDictionary).Values)
 				{
-					enumerator.Current.Add(new ObjectNode(this, value, new Visible(Header, Description)));
+					enumerator.Current.Add(ObjectNode.Create(this, value, new Visible(Header, Description)));
 					enumerator.MoveNext();
 				}
 			}
@@ -381,7 +403,7 @@ namespace UIEngine
 					var elementRow = new List<ObjectNode>();
 					foreach (var column in row as ICollection)
 					{
-						elementRow.Add(new ObjectNode(this, column, new Visible(Header, Description)));
+						elementRow.Add(ObjectNode.Create(this, column, new Visible(Header, Description)));
 					}
 					Elements.Add(elementRow);
 				}
@@ -392,7 +414,7 @@ namespace UIEngine
 				Is_2D = false;
 				foreach (var objectData in data as ICollection)
 				{
-					list.Add(new ObjectNode(this, objectData, new Visible(Header, Description)));
+					list.Add(ObjectNode.Create(this, objectData, new Visible(Header, Description)));
 					Elements.Add(list);
 				}
 			}

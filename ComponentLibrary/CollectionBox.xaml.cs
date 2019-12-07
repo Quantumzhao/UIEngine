@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -50,6 +51,22 @@ namespace ComponentLibrary
 		{
 			if (!CollectionNode.Is_2D)
 			{
+				int columns = (CollectionNode.FormattedData[0] as ICollection).Count;
+				for (int i = 1; i <= columns; i++)
+				{
+					var column = new DataGridTextColumn();
+					column.Header = i;
+					column.Binding = new Binding($"[{i.ToString()}]");
+					MainDataGrid.Columns.Add(column);
+				}
+			}
+			else if (CollectionNode.ObjectData is IDictionary)
+			{
+
+			}
+			else
+			{
+
 			}
 		}
 

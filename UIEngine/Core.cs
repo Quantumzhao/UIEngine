@@ -32,14 +32,14 @@ namespace UIEngine
 				// Load all static properties
 				foreach (var property in type.GetVisibleProperties(staticOnly: true))
 				{
-					ObjectNode node = new ObjectNode(null, property);
+					ObjectNode node = ObjectNode.Create(null, property);
 					Roots.Add(node);
 				}
 
 				// Load all static methods
 				foreach (var method in type.GetVisibleMethods(staticOnly: true))
 				{
-					MethodNode node = new MethodNode(null, method);
+					MethodNode node = MethodNode.Create(null, method);
 					Roots.Add(node);
 				}
 			}
