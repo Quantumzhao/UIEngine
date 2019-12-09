@@ -80,8 +80,17 @@ namespace Dataset
 			return num1 + num2;
 		}
 
+		private string _Name;
 		[Visible("Name")]
-		public string Name { get; set; }
+		public string Name
+		{
+			get => _Name;
+			set
+			{
+				_Name = value;
+				Dashboard.NotifyPropertyChanged(this, "Name", value);
+			}
+		}
 		[Visible("Phone")]
 		public string Phone { get; set; }
 		[Visible("Address")]

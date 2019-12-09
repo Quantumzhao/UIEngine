@@ -11,9 +11,9 @@ namespace UIEngine
 	public static class Dashboard
 	{
 		public static HashSet<Node> Roots { get; } = new HashSet<Node>();
-		public static HashSet<ObjectNode> GetGlobalObjects()
+		public static HashSet<ObjectNode> GetRootObjectNodes()
 			=> new HashSet<ObjectNode>(Roots.Where(n => n is ObjectNode).Select(n => n as ObjectNode));
-		public static HashSet<MethodNode> GetGlobalMethods()
+		public static HashSet<MethodNode> GetRootMethodNodes()
 			=> new HashSet<MethodNode>(Roots.Where(n => n is MethodNode).Select(n => n as MethodNode));
 
 		/// <summary>
@@ -43,6 +43,33 @@ namespace UIEngine
 					Roots.Add(node);
 				}
 			}
+		}
+
+		public static void RefreshAll()
+		{
+			foreach (var node in GetRootObjectNodes())
+			{
+				node.Refresh();
+			}
+		}
+
+		public static void NotifyPropertyChanged(object sender, string propertyName, object newValue)
+		{
+			(Find(sender)?.Properties.FirstOrDefault(n => n.Name == propertyName)).ObjectData = newValue;
+		}
+
+		public static ObjectNode Find(object objectData)
+		{
+			foreach (var objectNode in GetRootObjectNodes())
+			{
+				var ret = objectNode.FindDecendant(objectData);
+				if (ret != null)
+				{
+					return ret;
+				}
+			}
+
+			return null;
 		}
 	}
 

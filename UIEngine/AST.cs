@@ -20,7 +20,7 @@ namespace UIEngine
 		/// <summary>
 		///		Type of the object inside object node
 		/// </summary>
-		public Type Type { get; protected set; }
+		public Type ObjectDataType { get; protected set; }
 		protected string _Preview = "...";
 		protected abstract string Preview { get; set; }
 
@@ -55,15 +55,15 @@ namespace UIEngine
 			Parent = parent;
 			PreviewExpression = attribute.PreviewExpression;
 			Description = attribute.Description;
-			ObjectDataLoaded += o => Preview = PreviewExpression?.Invoke(o);
 		}
 		private ObjectNode(ObjectNode parent, PropertyInfo propertyInfo)
 			: this(parent, propertyInfo.GetCustomAttribute<Visible>())
 		{
 			Header = propertyInfo.GetCustomAttribute<Visible>().Header;
 			this.propertyInfo = propertyInfo;
+			_SourceReferenceType = SourceReferenceType.Property;
 			var setter = propertyInfo.SetMethod;
-			Type = propertyInfo.PropertyType;
+			ObjectDataType = propertyInfo.PropertyType;
 			//CanWrite = setter.IsPublic && (setter.GetCustomAttribute<Visible>()?.IsEnabled ?? true);
 			Name = propertyInfo.Name;
 		}
@@ -72,12 +72,14 @@ namespace UIEngine
 			: this(parent, attribute)
 		{
 			propertyInfo = null;
+			_SourceReferenceType = SourceReferenceType.Indexer;
 			Name = "N/A";
 			Header = objectData.ToString();
-			ObjectData = objectData;
-			Type = objectData.GetType();
+			LoadObjectData(objectData);
+			ObjectDataType = objectData.GetType();
 		}
-		public bool CanWrite { get; internal set; } = false;
+		internal readonly SourceReferenceType _SourceReferenceType;
+		public bool CanWrite { get; internal set; } = true;
 		public bool IsLeaf => Properties.Count == 0;
 		private List<ObjectNode> _Properties = null;
 		public List<ObjectNode> Properties
@@ -107,25 +109,26 @@ namespace UIEngine
 		#region Object Data
 		private PropertyInfo propertyInfo;
 		public delegate void ObjectdataChangeDelegate(object data);
-		public event ObjectdataChangeDelegate ObjectDataLoaded;
+		// public event ObjectdataChangeDelegate ObjectDataLoaded;
 		private object _ObjectData;
-		internal object ObjectData
+		public object ObjectData
 		{
 			get
 			{
 				if (_ObjectData == null)
 				{
-					LoadObject(propertyInfo);
+					LoadObjectData(propertyInfo);
 				}
 
 				return _ObjectData;
 			}
 			set
 			{
-				if (value != _ObjectData)
+				if (CanWrite && value != _ObjectData)
 				{
 					_ObjectData = value;
-					ObjectDataLoaded(value);
+					propertyInfo.SetValue(Parent.ObjectData, value);
+					// ObjectDataLoaded(value);
 				}
 			}
 		}
@@ -143,9 +146,9 @@ namespace UIEngine
 		/// <returns>
 		///		A reference to object of the object node. Strongly suggest not to modify it. 
 		/// </returns>
-		public T GetValue<T>()
+		public T GetObjectData<T>()
 		{
-			if (ObjectData is T)
+			if (typeof(T).IsAssignableFrom(ObjectDataType))
 			{
 				return (T)ObjectData;
 			}
@@ -155,34 +158,6 @@ namespace UIEngine
 			}
 		}
 
-		/// <summary>
-		///		Set the object data
-		/// </summary>
-		/// <param name="value"></param>
-		/// <returns>
-		///		false if this property is read only 
-		///		or there is an exception when setting property value
-		/// </returns>
-		public bool SetValue(object value)
-		{
-			if (CanWrite)
-			{
-				try
-				{
-					propertyInfo.SetValue(Parent.ObjectData, value);
-				}
-				catch
-				{
-					return false;
-				}
-
-				ObjectData = value;
-
-				return true;
-			}
-
-			return false;
-		}
 		#endregion
 
 		protected override string Preview
@@ -191,9 +166,14 @@ namespace UIEngine
 			set => _Preview = value;
 		}
 
-		private void LoadObject(PropertyInfo propertyInfo)
+		protected virtual void LoadObjectData(PropertyInfo propertyInfo)
 		{
-			ObjectData = propertyInfo.GetValue(Parent?.ObjectData);
+			_ObjectData = propertyInfo.GetValue(Parent?.ObjectData);
+			// Preview = PreviewExpression?.Invoke(ObjectData);
+		}
+		private void LoadObjectData(object objectData)
+		{
+			_ObjectData = objectData;
 		}
 
 		private void LoadProperties()
@@ -215,10 +195,52 @@ namespace UIEngine
 		{
 			if (ObjectData == null)
 			{
-				LoadObject(propertyInfo);
+				LoadObjectData(propertyInfo);
 			}
-			_Methods = Type.GetVisibleMethods()
+			_Methods = ObjectDataType.GetVisibleMethods()
 				.Select(mi => MethodNode.Create(this, mi)).ToList();
+		}
+
+		internal ObjectNode FindDecendant(object objectData)
+		{
+			if (objectData.Equals(_ObjectData))
+			{
+				return this;
+			}
+			else if (_Properties.Count != 0)
+			{
+				foreach (var property in _Properties)
+				{
+					var ret = property.FindDecendant(objectData);
+					if (ret != null)
+					{
+						return ret;
+					}
+				}
+
+				return null;
+			}
+			else
+			{
+				return null;
+			}
+		}
+
+		internal ObjectNode GetChild()
+		{
+			throw new NotImplementedException();
+		}
+
+		internal void Refresh()
+		{
+			throw new NotImplementedException();
+		}
+
+		public enum SourceReferenceType
+		{
+			Property,
+			Indexer,
+			ReturnValue
 		}
 	}
 
@@ -232,16 +254,17 @@ namespace UIEngine
 		private MethodNode(ObjectNode parent, MethodInfo methodInfo)
 		{
 			Parent = parent;
-			Body = methodInfo;
+			_Body = methodInfo;
 			var attr = methodInfo.GetCustomAttribute<Visible>();
 			Header = attr.Header;
 			Description = attr.Description;
 			Signatures = methodInfo.GetParameters().Select(p => new Parameter(p.ParameterType)).ToList();
-			Type = methodInfo.ReturnType;
+			ObjectDataType = methodInfo.ReturnType;
 		}
 
+		public Type ReturnType => _Body.ReturnType;
 		public List<Parameter> Signatures { get; set; }
-		private MethodInfo Body;
+		private MethodInfo _Body;
 
 		protected override string Preview
 		{
@@ -251,7 +274,7 @@ namespace UIEngine
 
 		public ObjectNode Invoke()
 		{
-			var objectData = Body.Invoke(
+			var objectData = _Body.Invoke(
 				Parent?.ObjectData,
 				Signatures.Select(p => p.Data).ToArray()
 			);
@@ -354,12 +377,14 @@ namespace UIEngine
 		public List<string> Headings { get; private set; } = new List<string>();
 		public List<object> FormattedData { get; private set; } = new List<object>();
 		public List<List<ObjectNode>> Elements { get; private set; } = new List<List<ObjectNode>>();
-		public Type CollectionType => ObjectData.GetType();
 
 		internal CollectionNode(ObjectNode parent, PropertyInfo propertyInfo)
-			: base(parent, propertyInfo.GetCustomAttribute<Visible>())
+			: base(parent, propertyInfo.GetCustomAttribute<Visible>()) { }
+
+		protected override void LoadObjectData(PropertyInfo propertyInfo)
 		{
-			ObjectDataLoaded += data => LoadFormattedData(data);
+			base.LoadObjectData(propertyInfo);
+			LoadFormattedData(ObjectData);
 		}
 
 		private void LoadFormattedData(object data)
