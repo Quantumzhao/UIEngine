@@ -60,7 +60,7 @@ namespace ComponentLibrary
 					MainDataGrid.Columns.Add(column);
 				}
 			}
-			else if (CollectionNode.GetValue<object>() is IDictionary)
+			else if (CollectionNode.GetObjectData<object>() is IDictionary)
 			{
 
 			}

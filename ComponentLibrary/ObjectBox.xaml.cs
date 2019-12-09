@@ -4,6 +4,8 @@ using System.Windows;
 using UIEngine;
 using System;
 using System.Collections;
+using System.Windows.Input;
+
 namespace ComponentLibrary
 {
 	/// <summary>
@@ -11,7 +13,18 @@ namespace ComponentLibrary
 	/// </summary>
 	public partial class ObjectBox : UserControl, IBox
     {
-		private ObjectNode _ObjectNode;
+        public ObjectBox()
+        {
+            InitializeComponent();
+			AllowDrop = true;
+
+			this.ContentChanged += (me, newNode) => Initialize();
+			this.MouseMove += ObjectBox_MouseMove;
+			this.DragEnter += ObjectBox_DragEnter;
+			this.Drop += ObjectBox_Drop;
+        }
+
+		private ObjectNode _ObjectNode = null;
 		public ObjectNode ObjectNode
 		{
 			get => _ObjectNode;
@@ -31,18 +44,12 @@ namespace ComponentLibrary
 		public static event NewNodeSelectedHandler NewNodeSelected;
 		public static event RemovedHandler Removed;
 
-        public ObjectBox()
-        {
-            InitializeComponent();
-			
-			ContentChanged += (me, newNode) => Initialize();
-        }
-
 		private void Initialize()
 		{
 			DataContext = ObjectNode;
+			Child?.RemoveSelf();
 
-			var data = ObjectNode?.GetValue<object>();
+			var data = ObjectNode?.GetObjectData<object>();
 			if (data is int || data is string || data is double)
 			{
 				var textBox = new TextBox();
@@ -58,7 +65,7 @@ namespace ComponentLibrary
 					}
 					else if (data is string)
 					{
-						textBox.LostFocus += (ts, te) => ObjectNode.SetValue((ts as TextBox).Text);
+						textBox.LostFocus += (ts, te) => ObjectNode.ObjectData = (ts as TextBox).Text;
 					}
 				}
 				MainGrid.Children.Add(textBox);
@@ -97,7 +104,7 @@ namespace ComponentLibrary
 		{
 			if (int.TryParse((sender as TextBox).Text, out int result))
 			{
-				ObjectNode.SetValue(result);
+				ObjectNode.ObjectData = result;
 			}
 			else
 			{
@@ -109,7 +116,7 @@ namespace ComponentLibrary
 		{
 			if (double.TryParse((sender as TextBox).Text, out double result))
 			{
-				ObjectNode.SetValue(result);
+				ObjectNode.ObjectData = result;
 			}
 			else
 			{
@@ -121,6 +128,27 @@ namespace ComponentLibrary
 		{
 			Child?.RemoveSelf();
 			Removed?.Invoke(this);
+		}
+
+		private void ObjectBox_MouseMove(object sender, MouseEventArgs e)
+		{
+			DragDrop.DoDragDrop(this, new DataObject(typeof(ObjectNode), ObjectNode), DragDropEffects.Copy);
+		}
+
+		private void ObjectBox_DragEnter(object sender, DragEventArgs e)
+		{
+			if (!e.Data.GetDataPresent(typeof(ObjectNode)))
+			{
+				e.Effects = DragDropEffects.None;
+			}
+		}
+
+		private void ObjectBox_Drop(object sender, DragEventArgs e)
+		{
+			if (e.Data.GetDataPresent(typeof(ObjectNode)))
+			{
+				ObjectNode = e.Data.GetData(typeof(ObjectNode)) as ObjectNode;
+			}
 		}
 	}
 }
