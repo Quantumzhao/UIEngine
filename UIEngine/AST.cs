@@ -235,13 +235,6 @@ namespace UIEngine
 		{
 			throw new NotImplementedException();
 		}
-
-		public enum SourceReferenceType
-		{
-			Property,
-			Indexer,
-			ReturnValue
-		}
 	}
 
 	public class MethodNode : Node

@@ -80,10 +80,10 @@ namespace UIEngine
 		///		Initializing the visibility tag. Any member marked with "Visible" can be accessed via front end
 		/// </summary>
 		/// <param name="header">
-		///		The name of the member that is to be displayed
-		///		<para>
-		///			The easiest way to do this: nameof([member name])
-		///		</para>
+		///		Name of the member. It has to be the exact name of the member, i.e.
+		///		<code>
+		///			nameof(member)
+		///		</code>
 		/// </param>
 		/// <param name="description">
 		///		Some description (optional)
@@ -147,6 +147,16 @@ namespace UIEngine
 				list.Add(enumerator.Current);
 			}
 			return list;
+		}
+	}
+
+	public class DomainModel
+	{
+		public enum SourceReferenceType
+		{
+			Property,
+			Indexer,
+			ReturnValue
 		}
 	}
 }

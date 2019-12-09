@@ -69,26 +69,26 @@ namespace Dataset
 
 	public class Person
 	{
-		[Visible("GetByName")]
+		[Visible(nameof(Get))]
 		public static Person Get(string name)
 		{
 			return name == "Alice" ? Dataset.Alice : null;
 		}
-		[Visible("Add", Header = "Add")]
+		[Visible(nameof(Add), Header = "Add")]
 		public static int Add([ParamInfo("num1")]int num1, [ParamInfo("num2")]int num2)
 		{
 			return num1 + num2;
 		}
 
 		private string _Name;
-		[Visible("Name")]
+		[Visible(nameof(Name))]
 		public string Name
 		{
 			get => _Name;
 			set
 			{
 				_Name = value;
-				Dashboard.NotifyPropertyChanged(this, "Name", value);
+				Dashboard.NotifyPropertyChanged(this, nameof(Name), value);
 			}
 		}
 		[Visible("Phone")]
