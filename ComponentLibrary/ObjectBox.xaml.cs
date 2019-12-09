@@ -34,6 +34,7 @@ namespace ComponentLibrary
         public ObjectBox()
         {
             InitializeComponent();
+			
 			ContentChanged += (me, newNode) => Initialize();
         }
 
@@ -41,7 +42,7 @@ namespace ComponentLibrary
 		{
 			DataContext = ObjectNode;
 
-			var data = ObjectNode.GetValue<object>();
+			var data = ObjectNode?.GetValue<object>();
 			if (data is int || data is string || data is double)
 			{
 				var textBox = new TextBox();
@@ -77,6 +78,11 @@ namespace ComponentLibrary
 			{
 				var comboBox = new ComboBox();
 				{
+					if (data == null)
+					{
+						comboBox.IsEditable = true;
+					}
+
 					comboBox.ItemsSource = ObjectNode.Properties;
 					comboBox.SelectionChanged += (sender, e) =>
 					{						

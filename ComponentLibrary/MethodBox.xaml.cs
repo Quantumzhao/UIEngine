@@ -46,43 +46,43 @@ namespace ComponentLibrary
 
 		private void _Initialize()
 		{
-			foreach (var arg in MethodNode.Signature)
+			for (int i = 0; i < MethodNode.Signatures.Count; i++)
 			{
-				if (arg.Type.IsAssignableFrom(typeof(int)) ||
-					arg.Type.IsAssignableFrom(typeof(double)) ||
-					arg.Type.IsAssignableFrom(typeof(string)))
-				{
-					var textBox = new TextBox();
-					{
-						textBox.MinWidth = 50;
-						textBox.DataContext = arg;
-						if (arg.Type.IsAssignableFrom(typeof(int)))
-						{
-							textBox.TextChanged += (sender, e) => ChangeArg_Int(sender, arg);
-						}
-						else if (arg.Type.IsAssignableFrom(typeof(double)))
-						{
-							textBox.TextChanged += (sender, e) => ChangeArg_Double(sender, arg);
-						}
-						else if (arg.Type.IsAssignableFrom(typeof(string)))
-						{
-							textBox.TextChanged += (ts, te) => arg.Data = (ts as TextBox).Text;
-						}
-						textBox.TextChanged += (sender, e) =>
-						{
-							if (MethodNode.Signature.TrueForAll(s => s.Data != null))
-							{
-								Execute.IsEnabled = true;
-							}
-						};
-					}
-					ParaPanel.Children.Add(textBox);
-				}
-				else
-				{
-					throw new NotImplementedException();
-				}
-
+				//if (arg.Type.IsAssignableFrom(typeof(int)) ||
+				//	arg.Type.IsAssignableFrom(typeof(double)) ||
+				//	arg.Type.IsAssignableFrom(typeof(string)))
+				//{
+				//	var textBox = new TextBox();
+				//	{
+				//		textBox.MinWidth = 50;
+				//		textBox.DataContext = arg;
+				//		if (arg.Type.IsAssignableFrom(typeof(int)))
+				//		{
+				//			textBox.TextChanged += (sender, e) => ChangeArg_Int(sender, arg);
+				//		}
+				//		else if (arg.Type.IsAssignableFrom(typeof(double)))
+				//		{
+				//			textBox.TextChanged += (sender, e) => ChangeArg_Double(sender, arg);
+				//		}
+				//		else if (arg.Type.IsAssignableFrom(typeof(string)))
+				//		{
+				//			textBox.TextChanged += (ts, te) => arg.Data = (ts as TextBox).Text;
+				//		}
+				//		textBox.TextChanged += (sender, e) =>
+				//		{
+				//			if (MethodNode.Signature.TrueForAll(s => s.Data != null))
+				//			{
+				//				Execute.IsEnabled = true;
+				//			}
+				//		};
+				//	}
+				//	ParaPanel.Children.Add(textBox);
+				//}
+				//else
+				//{
+				//	throw new NotImplementedException();
+				//}
+				ParaPanel.Children.Add(new ObjectBox());
 				ParaPanel.Children.Add(new TextBlock() { Text = ", " });
 			}
 			if (ParaPanel.Children.Count > 0)
