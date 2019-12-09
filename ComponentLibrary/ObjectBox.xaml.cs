@@ -41,7 +41,7 @@ namespace ComponentLibrary
 		{
 			DataContext = ObjectNode;
 
-			var data = ObjectNode.ObjectData;
+			var data = ObjectNode.GetValue<object>();
 			if (data is int || data is string || data is double)
 			{
 				var textBox = new TextBox();
