@@ -236,11 +236,11 @@ namespace UIEngine
 			var attr = methodInfo.GetCustomAttribute<Visible>();
 			Header = attr.Header;
 			Description = attr.Description;
-			Signature = methodInfo.GetParameters().Select(p => new Parameter(p.ParameterType)).ToList();
+			Signatures = methodInfo.GetParameters().Select(p => new Parameter(p.ParameterType)).ToList();
 			Type = methodInfo.ReturnType;
 		}
 
-		public List<Parameter> Signature;
+		public List<Parameter> Signatures { get; set; }
 		private MethodInfo Body;
 
 		protected override string Preview
@@ -253,7 +253,7 @@ namespace UIEngine
 		{
 			var objectData = Body.Invoke(
 				Parent?.ObjectData,
-				Signature.Select(p => p.Data).ToArray()
+				Signatures.Select(p => p.Data).ToArray()
 			);
 
 			return ObjectNode.Create(null, objectData, new Visible(Header, Description));
@@ -267,7 +267,7 @@ namespace UIEngine
 		/// </param>
 		public bool CanAssignArgument(object argument, int index)
 		{
-			return CanAssignArgument(argument, Signature[index]);
+			return CanAssignArgument(argument, Signatures[index]);
 		}
 		public bool CanAssignArgument(object argument, Parameter parameter)
 		{
@@ -285,7 +285,7 @@ namespace UIEngine
 		}
 		public bool SetParameter(object argument, int index)
 		{
-			return SetParameter(argument, Signature[index]);
+			return SetParameter(argument, Signatures[index]);
 		}
 
 		/// <summary>
