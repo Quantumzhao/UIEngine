@@ -20,7 +20,6 @@ namespace UIEngine
 		/// <summary>
 		///		Type of the object inside object node
 		/// </summary>
-		public Type ObjectDataType { get; protected set; }
 		protected string _Preview = "...";
 		protected abstract string Preview { get; set; }
 
@@ -60,25 +59,30 @@ namespace UIEngine
 			: this(parent, propertyInfo.GetCustomAttribute<Visible>())
 		{
 			Header = propertyInfo.GetCustomAttribute<Visible>().Header;
-			this.propertyInfo = propertyInfo;
-			_SourceReferenceType = SourceReferenceType.Property;
+			_SourceObjectInfo = new DomainModelReferenceInfo(propertyInfo, SourceReferenceType.Property);
 			var setter = propertyInfo.SetMethod;
-			ObjectDataType = propertyInfo.PropertyType;
+			_SourceObjectInfo.ObjectDataType = propertyInfo.PropertyType;
 			//CanWrite = setter.IsPublic && (setter.GetCustomAttribute<Visible>()?.IsEnabled ?? true);
 			Name = propertyInfo.Name;
 		}
-		// create object nodes from annonymous objects, like elements in a collection
+		// create object nodes from annonymous objects
 		private ObjectNode(ObjectNode parent, object objectData, Visible attribute)
 			: this(parent, attribute)
 		{
-			propertyInfo = null;
-			_SourceReferenceType = SourceReferenceType.Indexer;
+			if (parent is CollectionNode)
+			{
+				_SourceObjectInfo = new DomainModelReferenceInfo(null, SourceReferenceType.Indexer);
+			}
+			else
+			{
+				_SourceObjectInfo = new DomainModelReferenceInfo(null, SourceReferenceType.ReturnValue);
+			}
 			Name = "N/A";
 			Header = objectData.ToString();
-			LoadObjectData(objectData);
-			ObjectDataType = objectData.GetType();
+			_ObjectData = objectData;
+			_SourceObjectInfo.ObjectDataType = objectData.GetType();
 		}
-		internal readonly SourceReferenceType _SourceReferenceType;
+		internal readonly DomainModelReferenceInfo _SourceObjectInfo;
 		public bool CanWrite { get; internal set; } = true;
 		public bool IsLeaf => Properties.Count == 0;
 		private List<ObjectNode> _Properties = null;
@@ -107,7 +111,7 @@ namespace UIEngine
 			}
 		}
 		#region Object Data
-		private PropertyInfo propertyInfo;
+		// private PropertyInfo propertyInfo;
 		public delegate void ObjectdataChangeDelegate(object data);
 		// public event ObjectdataChangeDelegate ObjectDataLoaded;
 		private object _ObjectData;
@@ -117,7 +121,7 @@ namespace UIEngine
 			{
 				if (_ObjectData == null)
 				{
-					LoadObjectData(propertyInfo);
+					LoadObjectData(_SourceObjectInfo.PropertyInfo);
 				}
 
 				return _ObjectData;
@@ -127,7 +131,7 @@ namespace UIEngine
 				if (CanWrite && value != _ObjectData)
 				{
 					_ObjectData = value;
-					propertyInfo.SetValue(Parent.ObjectData, value);
+					SetValueToDomainModel();
 					// ObjectDataLoaded(value);
 				}
 			}
@@ -148,7 +152,7 @@ namespace UIEngine
 		/// </returns>
 		public T GetObjectData<T>()
 		{
-			if (typeof(T).IsAssignableFrom(ObjectDataType))
+			if (typeof(T).IsAssignableFrom(_SourceObjectInfo.ObjectDataType))
 			{
 				return (T)ObjectData;
 			}
@@ -166,14 +170,26 @@ namespace UIEngine
 			set => _Preview = value;
 		}
 
-		protected virtual void LoadObjectData(PropertyInfo propertyInfo)
-		{
-			_ObjectData = propertyInfo.GetValue(Parent?.ObjectData);
-			// Preview = PreviewExpression?.Invoke(ObjectData);
-		}
 		private void LoadObjectData(object objectData)
 		{
 			_ObjectData = objectData;
+		}
+		protected virtual void LoadObjectData()
+		{
+			if (_SourceObjectInfo.SourceReferenceType == SourceReferenceType.Property)
+			{
+				_ObjectData = _SourceObjectInfo.PropertyInfo.GetValue(Parent?.ObjectData);
+				// Preview = PreviewExpression?.Invoke(ObjectData);
+			}
+			else if (_SourceObjectInfo.SourceReferenceType == SourceReferenceType.Indexer)
+			{
+				throw new NotImplementedException();
+			}
+		}
+		protected virtual void SetValueToDomainModel()
+		{
+			_SourceObjectInfo.PropertyInfo.SetValue(Parent.ObjectData, ObjectData);
+			throw new NotImplementedException();
 		}
 
 		private void LoadProperties()
@@ -182,7 +198,7 @@ namespace UIEngine
 			{
 				_Properties = (ObjectData as IEnumerable<object>)
 					.Select(o => new ObjectNode(
-						this, o, propertyInfo.GetCustomAttribute<Visible>()
+						this, o, _SourceObjectInfo.PropertyInfo.GetCustomAttribute<Visible>()
 					)).ToList();
 			}
 			else
@@ -195,9 +211,9 @@ namespace UIEngine
 		{
 			if (ObjectData == null)
 			{
-				LoadObjectData(propertyInfo);
+				LoadObjectData(_SourceObjectInfo.PropertyInfo);
 			}
-			_Methods = ObjectDataType.GetVisibleMethods()
+			_Methods = _SourceObjectInfo.ObjectDataType.GetVisibleMethods()
 				.Select(mi => MethodNode.Create(this, mi)).ToList();
 		}
 
@@ -226,14 +242,10 @@ namespace UIEngine
 			}
 		}
 
-		internal ObjectNode GetChild()
-		{
-			throw new NotImplementedException();
-		}
-
 		internal void Refresh()
 		{
-			throw new NotImplementedException();
+			LoadObjectData();
+			LoadProperties();
 		}
 	}
 
@@ -252,7 +264,6 @@ namespace UIEngine
 			Header = attr.Header;
 			Description = attr.Description;
 			Signatures = methodInfo.GetParameters().Select(p => new Parameter(p.ParameterType)).ToList();
-			ObjectDataType = methodInfo.ReturnType;
 		}
 
 		public Type ReturnType => _Body.ReturnType;
@@ -374,9 +385,9 @@ namespace UIEngine
 		internal CollectionNode(ObjectNode parent, PropertyInfo propertyInfo)
 			: base(parent, propertyInfo.GetCustomAttribute<Visible>()) { }
 
-		protected override void LoadObjectData(PropertyInfo propertyInfo)
+		protected override void LoadObjectData()
 		{
-			base.LoadObjectData(propertyInfo);
+			base.LoadObjectData();
 			LoadFormattedData(ObjectData);
 		}
 

@@ -150,13 +150,22 @@ namespace UIEngine
 		}
 	}
 
-	public class DomainModel
+	internal class DomainModelReferenceInfo
 	{
-		public enum SourceReferenceType
+		public DomainModelReferenceInfo(PropertyInfo propertyInfo, SourceReferenceType sourceReferenceType)
 		{
-			Property,
-			Indexer,
-			ReturnValue
+			PropertyInfo = propertyInfo;
+			SourceReferenceType = sourceReferenceType;
 		}
+
+		public readonly PropertyInfo PropertyInfo;
+		public readonly SourceReferenceType SourceReferenceType;
+		public Type ObjectDataType;
+	}
+	internal enum SourceReferenceType
+	{
+		Property,
+		Indexer,
+		ReturnValue
 	}
 }
