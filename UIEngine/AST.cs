@@ -33,6 +33,12 @@ namespace UIEngine
 
 	public class ObjectNode : Node
 	{
+		/// <summary>
+		///		Create from property
+		/// </summary>
+		/// <param name="parent"></param>
+		/// <param name="propertyInfo"></param>
+		/// <returns></returns>
 		internal static ObjectNode Create(ObjectNode parent, PropertyInfo propertyInfo)
 		{
 			if (typeof(ICollection).IsAssignableFrom(propertyInfo.PropertyType))
@@ -44,11 +50,23 @@ namespace UIEngine
 				return new ObjectNode(parent, propertyInfo);
 			}
 		}
+		/// <summary>
+		///		Create from anonymous object. i.e. elements in a collection or return value
+		/// </summary>
+		/// <param name="parent"></param>
+		/// <param name="objectData"></param>
+		/// <param name="attribute"></param>
+		/// <returns></returns>
 		internal static ObjectNode Create(ObjectNode parent, object objectData, Visible attribute)
 		{
 			return new ObjectNode(parent, objectData, attribute);
 		}
 
+		/// <summary>
+		///		A template for other ctors
+		/// </summary>
+		/// <param name="parent"></param>
+		/// <param name="attribute"></param>
 		protected ObjectNode(ObjectNode parent, Visible attribute)
 		{
 			Parent = parent;
@@ -65,7 +83,6 @@ namespace UIEngine
 			//CanWrite = setter.IsPublic && (setter.GetCustomAttribute<Visible>()?.IsEnabled ?? true);
 			Name = propertyInfo.Name;
 		}
-		// create object nodes from annonymous objects
 		private ObjectNode(ObjectNode parent, object objectData, Visible attribute)
 			: this(parent, attribute)
 		{
@@ -77,7 +94,7 @@ namespace UIEngine
 			{
 				_SourceObjectInfo = new DomainModelReferenceInfo(null, SourceReferenceType.ReturnValue);
 			}
-			Name = "N/A";
+			Name = "anonymous";
 			Header = objectData.ToString();
 			_ObjectData = objectData;
 			_SourceObjectInfo.ObjectDataType = objectData.GetType();
@@ -131,7 +148,7 @@ namespace UIEngine
 				if (CanWrite && value != _ObjectData)
 				{
 					_ObjectData = value;
-					SetValueToDomainModel();
+					SetValueToSourceObject();
 					// ObjectDataLoaded(value);
 				}
 			}
@@ -186,8 +203,23 @@ namespace UIEngine
 				throw new NotImplementedException();
 			}
 		}
-		protected virtual void SetValueToDomainModel()
+		protected virtual void SetValueToSourceObject()
 		{
+			switch (_SourceObjectInfo.SourceReferenceType)
+			{
+				case SourceReferenceType.Property:
+					_SourceObjectInfo.PropertyInfo.SetValue(Parent.ObjectData, ObjectData);
+					break;
+
+				case SourceReferenceType.Indexer:
+					break;
+
+				case SourceReferenceType.ReturnValue:
+					throw new InvalidOperationException("return value is read only");
+
+				default:
+					return;
+			}
 			_SourceObjectInfo.PropertyInfo.SetValue(Parent.ObjectData, ObjectData);
 			throw new NotImplementedException();
 		}
@@ -374,6 +406,9 @@ namespace UIEngine
 	//		: base(parent, propertyInfo) { }
 	//}
 
+	/// <summary>
+	///		The collection that is used to generate this node should not be an element of another collection
+	/// </summary>
 	public class CollectionNode : ObjectNode
 	{
 		public bool Is_2D { get; private set; }
@@ -447,6 +482,12 @@ namespace UIEngine
 					Elements.Add(list);
 				}
 			}
+		}
+
+		// assume the collection object is not an element of another collection
+		internal void SetValueToSourceCollectionElement(object oldValue, object newValue)
+		{
+			throw new NotImplementedException();
 		}
 
 		public ObjectNode this[int row, int column]
