@@ -443,14 +443,14 @@ namespace UIEngine
 				Is_2D = true;
 				foreach (var key in (data as IDictionary).Keys)
 				{
-					list.Add(ObjectNode.Create(this, key, new Visible(Header, Description)));
+					list.Add(Create(this, key, new Visible(Header, Description)));
 					Elements.Add(list);
 				}
 				var enumerator = Elements.GetEnumerator();
 				enumerator.MoveNext();
 				foreach (var value in (data as IDictionary).Values)
 				{
-					enumerator.Current.Add(ObjectNode.Create(this, value, new Visible(Header, Description)));
+					enumerator.Current.Add(Create(this, value, new Visible(Header, Description)));
 					enumerator.MoveNext();
 				}
 			}
@@ -467,7 +467,7 @@ namespace UIEngine
 					var elementRow = new List<ObjectNode>();
 					foreach (var column in row as ICollection)
 					{
-						elementRow.Add(ObjectNode.Create(this, column, new Visible(Header, Description)));
+						elementRow.Add(Create(this, column, new Visible(Header, Description)));
 					}
 					Elements.Add(elementRow);
 				}
