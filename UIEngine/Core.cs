@@ -55,7 +55,11 @@ namespace UIEngine
 
 		public static void NotifyPropertyChanged(object sender, string propertyName, object newValue)
 		{
-			(Find(sender)?.Properties.FirstOrDefault(n => n.Name == propertyName)).ObjectData = newValue;
+			ObjectNode objectNode = Find(sender);
+			if (objectNode != null)
+			{
+				(objectNode.Properties.FirstOrDefault(n => n.Name == propertyName)).ObjectData = newValue;
+			}
 		}
 
 		public static ObjectNode Find(object objectData)

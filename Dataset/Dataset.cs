@@ -91,9 +91,9 @@ namespace Dataset
 				Dashboard.NotifyPropertyChanged(this, nameof(Name), value);
 			}
 		}
-		[Visible("Phone")]
+		[Visible(nameof(Phone))]
 		public string Phone { get; set; }
-		[Visible("Address")]
+		[Visible(nameof(Address))]
 		public Address Address { get; set; }
 		public override string ToString()
 		{

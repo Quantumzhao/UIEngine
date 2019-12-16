@@ -19,11 +19,9 @@ namespace ComponentLibrary
 			AllowDrop = true;
 
 			this.ContentChanged += (me, newNode) => Initialize();
-			this.MouseMove += ObjectBox_MouseMove;
-			this.DragEnter += ObjectBox_DragEnter;
-			this.Drop += ObjectBox_Drop;
         }
 
+		private Point _StartPoint;
 		private ObjectNode _ObjectNode = null;
 		public ObjectNode ObjectNode
 		{
@@ -68,14 +66,14 @@ namespace ComponentLibrary
 						textBox.LostFocus += (ts, te) => ObjectNode.ObjectData = (ts as TextBox).Text;
 					}
 				}
-				MainGrid.Children.Add(textBox);
+				MainPanel.Children.Add(textBox);
 			}
 			else if (data is bool)
 			{
 				var checkbox = new CheckBox();
 				checkbox.Content = ObjectNode.Header;
 				checkbox.IsChecked = (bool)data;
-				MainGrid.Children.Add(checkbox);
+				MainPanel.Children.Add(checkbox);
 			}
 			else if (data is IEnumerable)
 			{
@@ -96,8 +94,18 @@ namespace ComponentLibrary
 						NewNodeSelected?.Invoke(this, e.AddedItems[0] as Node);
 					};
 				}
-				MainGrid.Children.Add(comboBox);
+				MainPanel.Children.Add(comboBox);
 			}
+
+			var button = new Button();
+			{
+				button.Content = "Drag";
+				button.MouseMove += ObjectBox_MouseMove;
+				button.DragEnter += ObjectBox_DragEnter;
+				button.Drop += ObjectBox_Drop;
+				button.MouseLeftButtonDown += ObjectBox_MouseLeftButtonDown;
+			}
+			MainPanel.Children.Add(button);
 		}
 
 		private void ChangeObjectData_Int(object sender, RoutedEventArgs e)
@@ -130,9 +138,20 @@ namespace ComponentLibrary
 			Removed?.Invoke(this);
 		}
 
+		private void ObjectBox_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+		{
+			_StartPoint = e.GetPosition(null);			
+		}
+
 		private void ObjectBox_MouseMove(object sender, MouseEventArgs e)
 		{
-			DragDrop.DoDragDrop(this, new DataObject(typeof(ObjectNode), ObjectNode), DragDropEffects.Copy);
+			Vector diff = _StartPoint - e.GetPosition(null);
+			if (e.LeftButton == MouseButtonState.Pressed &&
+				(Math.Abs(diff.X) > SystemParameters.MinimumHorizontalDragDistance ||
+				Math.Abs(diff.Y) > SystemParameters.MinimumVerticalDragDistance))
+			{
+				DragDrop.DoDragDrop(this, new DataObject(typeof(ObjectNode), ObjectNode), DragDropEffects.Copy);
+			}
 		}
 
 		private void ObjectBox_DragEnter(object sender, DragEventArgs e)

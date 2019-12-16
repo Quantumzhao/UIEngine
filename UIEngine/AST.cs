@@ -198,10 +198,6 @@ namespace UIEngine
 				_ObjectData = _SourceObjectInfo.PropertyInfo.GetValue(Parent?.ObjectData);
 				// Preview = PreviewExpression?.Invoke(ObjectData);
 			}
-			else if (_SourceObjectInfo.SourceReferenceType == SourceReferenceType.Indexer)
-			{
-				throw new NotImplementedException();
-			}
 		}
 		protected virtual void SetValueToSourceObject()
 		{
@@ -211,7 +207,16 @@ namespace UIEngine
 					_SourceObjectInfo.PropertyInfo.SetValue(Parent.ObjectData, ObjectData);
 					break;
 
-				case SourceReferenceType.Indexer:
+				case SourceReferenceType.Indexer:					
+					if (Parent.ObjectData is IList)
+					{
+						var collection = Parent.ObjectData as IList;
+						collection[collection.IndexOf(ObjectData)] = ObjectData;
+					}
+					else
+					{
+						throw new NotImplementedException();
+					}
 					break;
 
 				case SourceReferenceType.ReturnValue:
@@ -221,7 +226,6 @@ namespace UIEngine
 					return;
 			}
 			_SourceObjectInfo.PropertyInfo.SetValue(Parent.ObjectData, ObjectData);
-			throw new NotImplementedException();
 		}
 
 		private void LoadProperties()
