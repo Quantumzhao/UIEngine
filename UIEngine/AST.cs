@@ -5,6 +5,9 @@ using System.Linq;
 using System.Reflection;
 namespace UIEngine
 {
+	/* For current stage, UI Engine only supports int, double, string, bool, object and collection
+	 * 
+	 */
 	public abstract class Node
 	{
 		/// <summary>
@@ -31,7 +34,16 @@ namespace UIEngine
 		public override string ToString() => Header;
 	}
 
-	public class ObjectNode : Node
+	/// <summary>
+	///		This class is for implicit type inference. 
+	///		e.g., parameter and LINQ local variables
+	/// </summary>
+	public class AbstractObjectNode : Node
+	{
+		protected override string Preview { get => throw new NotImplementedException(); set => throw new NotImplementedException(); }
+	}
+
+	public class ObjectNode : AbstractObjectNode
 	{
 		/// <summary>
 		///		Create from property
@@ -77,9 +89,8 @@ namespace UIEngine
 			: this(parent, propertyInfo.GetCustomAttribute<Visible>())
 		{
 			Header = propertyInfo.GetCustomAttribute<Visible>().Header;
-			_SourceObjectInfo = new DomainModelReferenceInfo(propertyInfo, SourceReferenceType.Property);
+			SourceObjectInfo = new DomainModelReferenceInfo(propertyInfo, SourceReferenceType.Property);
 			var setter = propertyInfo.SetMethod;
-			_SourceObjectInfo.ObjectDataType = propertyInfo.PropertyType;
 			//CanWrite = setter.IsPublic && (setter.GetCustomAttribute<Visible>()?.IsEnabled ?? true);
 			Name = propertyInfo.Name;
 		}
@@ -88,18 +99,17 @@ namespace UIEngine
 		{
 			if (parent is CollectionNode)
 			{
-				_SourceObjectInfo = new DomainModelReferenceInfo(null, SourceReferenceType.Indexer);
+				SourceObjectInfo = new DomainModelReferenceInfo(objectData.GetType(), SourceReferenceType.Indexer);
 			}
 			else
 			{
-				_SourceObjectInfo = new DomainModelReferenceInfo(null, SourceReferenceType.ReturnValue);
+				SourceObjectInfo = new DomainModelReferenceInfo(objectData.GetType(), SourceReferenceType.ReturnValue);
 			}
 			Name = "anonymous";
 			Header = objectData.ToString();
 			_ObjectData = objectData;
-			_SourceObjectInfo.ObjectDataType = objectData.GetType();
 		}
-		internal readonly DomainModelReferenceInfo _SourceObjectInfo;
+		internal readonly DomainModelReferenceInfo SourceObjectInfo;
 		public bool CanWrite { get; internal set; } = true;
 		public bool IsLeaf => Properties.Count == 0;
 		private List<ObjectNode> _Properties = null;
@@ -138,7 +148,7 @@ namespace UIEngine
 			{
 				if (_ObjectData == null)
 				{
-					LoadObjectData(_SourceObjectInfo.PropertyInfo);
+					LoadObjectData();
 				}
 
 				return _ObjectData;
@@ -167,17 +177,7 @@ namespace UIEngine
 		/// <returns>
 		///		A reference to object of the object node. Strongly suggest not to modify it. 
 		/// </returns>
-		public T GetObjectData<T>()
-		{
-			if (typeof(T).IsAssignableFrom(_SourceObjectInfo.ObjectDataType))
-			{
-				return (T)ObjectData;
-			}
-			else
-			{
-				throw new InvalidOperationException("Type Error");
-			}
-		}
+		public T GetObjectData<T>() => (T)ObjectData;
 
 		#endregion
 
@@ -187,24 +187,24 @@ namespace UIEngine
 			set => _Preview = value;
 		}
 
-		private void LoadObjectData(object objectData)
-		{
-			_ObjectData = objectData;
-		}
+		//private void LoadObjectData(object objectData)
+		//{
+		//	_ObjectData = objectData;
+		//}
 		protected virtual void LoadObjectData()
 		{
-			if (_SourceObjectInfo.SourceReferenceType == SourceReferenceType.Property)
+			if (SourceObjectInfo.SourceReferenceType == SourceReferenceType.Property)
 			{
-				_ObjectData = _SourceObjectInfo.PropertyInfo.GetValue(Parent?.ObjectData);
+				_ObjectData = SourceObjectInfo.PropertyInfo.GetValue(Parent?.ObjectData);
 				// Preview = PreviewExpression?.Invoke(ObjectData);
 			}
 		}
 		protected virtual void SetValueToSourceObject()
 		{
-			switch (_SourceObjectInfo.SourceReferenceType)
+			switch (SourceObjectInfo.SourceReferenceType)
 			{
 				case SourceReferenceType.Property:
-					_SourceObjectInfo.PropertyInfo.SetValue(Parent.ObjectData, ObjectData);
+					SourceObjectInfo.PropertyInfo.SetValue(Parent.ObjectData, ObjectData);
 					break;
 
 				case SourceReferenceType.Indexer:					
@@ -225,7 +225,7 @@ namespace UIEngine
 				default:
 					return;
 			}
-			_SourceObjectInfo.PropertyInfo.SetValue(Parent.ObjectData, ObjectData);
+			SourceObjectInfo.PropertyInfo.SetValue(Parent.ObjectData, ObjectData);
 		}
 
 		private void LoadProperties()
@@ -234,7 +234,7 @@ namespace UIEngine
 			{
 				_Properties = (ObjectData as IEnumerable<object>)
 					.Select(o => new ObjectNode(
-						this, o, _SourceObjectInfo.PropertyInfo.GetCustomAttribute<Visible>()
+						this, o, SourceObjectInfo.PropertyInfo.GetCustomAttribute<Visible>()
 					)).ToList();
 			}
 			else
@@ -247,9 +247,9 @@ namespace UIEngine
 		{
 			if (ObjectData == null)
 			{
-				LoadObjectData(_SourceObjectInfo.PropertyInfo);
+				LoadObjectData();
 			}
-			_Methods = _SourceObjectInfo.ObjectDataType.GetVisibleMethods()
+			_Methods = SourceObjectInfo.ObjectDataType.ReflectedType.GetVisibleMethods()
 				.Select(mi => MethodNode.Create(this, mi)).ToList();
 		}
 
@@ -376,11 +376,11 @@ namespace UIEngine
 		{
 			public Parameter(Type type, object data = null)
 			{
-				Type = type;
+				Type = type.ToValidType();
 				Data = data;
 			}
 
-			public Type Type { get; private set; }
+			public TypeSystem Type { get; private set; }
 
 			private object _Data = null;
 			public object Data

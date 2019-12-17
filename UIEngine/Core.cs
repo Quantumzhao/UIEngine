@@ -132,14 +132,12 @@ namespace UIEngine
 
 		public static IEnumerable<MethodInfo> GetVisibleMethods(this Type type, bool staticOnly = false)
 		{
-			return (
-				staticOnly ? type.GetMethods(BindingFlags.Static | BindingFlags.Public) : type.GetMethods())
+			return (staticOnly ? type.GetMethods(BindingFlags.Static | BindingFlags.Public) : type.GetMethods())
 				.Where(m =>
 				{
 					var attr = m.GetCustomAttribute<Visible>();
 					return attr != null && attr.IsEnabled;
-				}
-			);
+				});
 		}
 
 		public static List<object> ToObjectList(this IEnumerable collection)
@@ -152,24 +150,148 @@ namespace UIEngine
 			}
 			return list;
 		}
+
+		public static TypeSystem ToValidType(this Type type) => TypeSystem.ToRestrictedType(type);
 	}
 
 	internal class DomainModelReferenceInfo
 	{
 		public DomainModelReferenceInfo(PropertyInfo propertyInfo, SourceReferenceType sourceReferenceType)
+			: this(propertyInfo.PropertyType, sourceReferenceType)
 		{
 			PropertyInfo = propertyInfo;
+		}
+		public DomainModelReferenceInfo(Type type, SourceReferenceType sourceReferenceType)
+		{
 			SourceReferenceType = sourceReferenceType;
+			ObjectDataType = type.ToValidType();
 		}
 
 		public readonly PropertyInfo PropertyInfo;
 		public readonly SourceReferenceType SourceReferenceType;
-		public Type ObjectDataType;
+		public readonly TypeSystem ObjectDataType;
 	}
 	internal enum SourceReferenceType
 	{
 		Property,
 		Indexer,
 		ReturnValue
+	}
+	public class TypeSystem
+	{
+		public static TypeSystem ToRestrictedType(Type type)
+		{
+			if (type.Equals(typeof(bool)))
+			{
+				return Bool;
+			}
+			else if (type.Equals(typeof(string)))
+			{
+				return String;
+			}
+			else if (type.Equals(typeof(double)))
+			{
+				return Double;
+			}
+			else if (type.Equals(typeof(int)))
+			{
+				return Int;
+			}
+			else if (typeof(ICollection).IsAssignableFrom(type))
+			{
+				return new TypeSystem(type);
+			}
+			else if (typeof(object).IsAssignableFrom(type))
+			{
+				return new TypeSystem(type);
+			}
+			else
+			{
+				throw new ArgumentException("Not a valid type");
+			}
+		}
+		private TypeSystem(Type type)
+		{
+			ReflectedType = type;
+			if (type.IsAssignableFrom(typeof(ICollection)))
+			{
+				RestrictedType = Types.Collection;
+			}
+			else
+			{
+				RestrictedType = Types.Object;
+			}
+		}
+		private TypeSystem(Types restrictedType)
+		{
+			RestrictedType = restrictedType;
+			switch (restrictedType)
+			{
+				case Types.Bool:
+					ReflectedType = typeof(bool);
+					break;
+				case Types.Collection:
+					ReflectedType = null;
+					break;
+				case Types.Double:
+					ReflectedType = typeof(double);
+					break;
+				case Types.Int:
+					ReflectedType = typeof(int);
+					break;
+				case Types.String:
+					ReflectedType = typeof(string);
+					break;
+				case Types.Object:
+					ReflectedType = null;
+					break;
+			}
+		}
+
+		public static readonly TypeSystem Bool = new TypeSystem(Types.Bool);
+		public static readonly TypeSystem Collection = new TypeSystem(Types.Collection);
+		public static readonly TypeSystem Double = new TypeSystem(Types.Double);
+		public static readonly TypeSystem Int = new TypeSystem(Types.Int);
+		public static readonly TypeSystem String = new TypeSystem(Types.String);
+		public static readonly TypeSystem Object = new TypeSystem(Types.Object);
+
+		internal readonly Type ReflectedType;
+		public readonly Types RestrictedType;
+
+		public bool IsSame(TypeSystem type)
+		{
+			if (type.RestrictedType == Types.Collection || type.RestrictedType == Types.Object)
+			{
+				return this.ReflectedType.Equals(type.ReflectedType);
+			}
+			else
+			{
+				return this.Equals(type);
+			}
+		}
+
+		public bool IsDerivedFrom(Type type)
+		{
+			if (RestrictedType == Types.Collection || RestrictedType == Types.Object)
+			{
+				return type.IsAssignableFrom(ReflectedType);
+			}
+			else
+			{
+				return ReflectedType.Equals(type);
+			}
+		}
+		public bool IsDerivedFrom(TypeSystem type) => IsDerivedFrom(type.ReflectedType);
+		public bool IsAssignableFrom(Type type) => ReflectedType.IsAssignableFrom(type);
+
+		public enum Types
+		{
+			Bool,
+			Collection,
+			Double,
+			Int,
+			String,
+			Object
+		}
 	}
 }
