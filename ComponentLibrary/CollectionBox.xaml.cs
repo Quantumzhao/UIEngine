@@ -39,7 +39,7 @@ namespace ComponentLibrary
 			get => _CollectionNode;
 			set
 			{
-				CollectionNode = value;
+				_CollectionNode = value;
 				if (value != null)
 				{
 					ContentChanged?.Invoke(this, value);

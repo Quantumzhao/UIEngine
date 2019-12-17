@@ -6,6 +6,10 @@ using System;
 using System.Collections;
 using System.Windows.Input;
 
+/* A base case is needed. i.e. Object box needs to behave normally even if the object data value is null. 
+ * This is for Method Box and drag and drop functionality
+ * Drag and drop functionality can be suspended for a little bit until I finish method box
+ */
 namespace ComponentLibrary
 {
 	/// <summary>
@@ -20,6 +24,14 @@ namespace ComponentLibrary
 
 			this.ContentChanged += (me, newNode) => Initialize();
         }
+
+		public ObjectBox(Type type) : base()
+		{
+			if (type.IsAssignableFrom(typeof(int)))
+			{
+
+			}
+		}
 
 		private Point _StartPoint;
 		private ObjectNode _ObjectNode = null;
@@ -50,30 +62,11 @@ namespace ComponentLibrary
 			var data = ObjectNode?.GetObjectData<object>();
 			if (data is int || data is string || data is double)
 			{
-				var textBox = new TextBox();
-				{
-					textBox.SetBinding(TextBox.TextProperty, "ObjectData");
-					if (data is int)
-					{
-						textBox.LostFocus += ChangeObjectData_Int;
-					}
-					else if (data is double)
-					{
-						textBox.LostFocus += ChangeObjectData_Double;
-					}
-					else if (data is string)
-					{
-						textBox.LostFocus += (ts, te) => ObjectNode.ObjectData = (ts as TextBox).Text;
-					}
-				}
-				MainPanel.Children.Add(textBox);
+				ToTextBox(data.GetType());
 			}
 			else if (data is bool)
 			{
-				var checkbox = new CheckBox();
-				checkbox.Content = ObjectNode.Header;
-				checkbox.IsChecked = (bool)data;
-				MainPanel.Children.Add(checkbox);
+				ToCheckBox(data.GetType());
 			}
 			else if (data is IEnumerable)
 			{
@@ -81,24 +74,12 @@ namespace ComponentLibrary
 			}
 			else
 			{
-				var comboBox = new ComboBox();
-				{
-					if (data == null)
-					{
-						comboBox.IsEditable = true;
-					}
-
-					comboBox.ItemsSource = ObjectNode.Properties;
-					comboBox.SelectionChanged += (sender, e) =>
-					{						
-						NewNodeSelected?.Invoke(this, e.AddedItems[0] as Node);
-					};
-				}
-				MainPanel.Children.Add(comboBox);
+				ToDropBox(data.GetType());
 			}
 
 			var button = new Button();
 			{
+				button.Visibility = Visibility.Collapsed;
 				button.Content = "Drag";
 				button.MouseMove += ObjectBox_MouseMove;
 				button.DragEnter += ObjectBox_DragEnter;
@@ -130,6 +111,51 @@ namespace ComponentLibrary
 			{
 				throw new ArgumentException("Invalid double");
 			}
+		}
+
+		private void ToTextBox(Type type)
+		{
+			var textBox = new TextBox();
+			{
+				textBox.SetBinding(TextBox.TextProperty, "ObjectData");
+				if (type.Equals(typeof(int)))
+				{
+					textBox.LostFocus += ChangeObjectData_Int;
+				}
+				else if (type.Equals(typeof(double)))
+				{
+					textBox.LostFocus += ChangeObjectData_Double;
+				}
+				else if (type.Equals(typeof(string)))
+				{
+					textBox.LostFocus += (ts, te) => ObjectNode.ObjectData = (ts as TextBox).Text;
+				}
+			}
+			MainPanel.Children.Add(textBox);
+		}
+		private void ToCheckBox(Type type)
+		{
+			var checkbox = new CheckBox();
+			checkbox.Content = ObjectNode.Header;
+			// checkbox.IsChecked = (bool)data;
+			MainPanel.Children.Add(checkbox);
+		}
+		private void ToDropBox(Type type)
+		{
+			var comboBox = new ComboBox();
+			{
+				//if (data == null)
+				//{
+				//	comboBox.IsEditable = true;
+				//}
+
+				comboBox.ItemsSource = ObjectNode.Properties;
+				comboBox.SelectionChanged += (sender, e) =>
+				{
+					NewNodeSelected?.Invoke(this, e.AddedItems[0] as Node);
+				};
+			}
+			MainPanel.Children.Add(comboBox);
 		}
 
 		public void RemoveSelf()
