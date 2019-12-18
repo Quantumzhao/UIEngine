@@ -13,13 +13,13 @@ namespace UIEngine
 		/// <summary>
 		///		The unique identifier that is going to be used inside the engine
 		/// </summary>
-		public string Name { get; set; }
+		public string Name { get; set; } = string.Empty;
 		/// <summary>
 		///		Name of this node that is to be shown to the users
 		/// </summary>
-		public string Header { get; set; }
+		public string Header { get; set; } = string.Empty;
 		public ObjectNode Parent { get; internal set; }
-		public string Description { get; set; }
+		public string Description { get; set; } = string.Empty;
 		/// <summary>
 		///		Type of the object inside object node
 		/// </summary>
@@ -34,17 +34,10 @@ namespace UIEngine
 		public override string ToString() => Header;
 	}
 
-	/// <summary>
-	///		This class is for implicit type inference. 
-	///		e.g., parameter and LINQ local variables
-	/// </summary>
-	public class AbstractObjectNode : Node
+	public class ObjectNode : Node
 	{
-		protected override string Preview { get => throw new NotImplementedException(); set => throw new NotImplementedException(); }
-	}
+		public static ObjectNode CreateEmptyObjectNode(TypeSystem type) => Create(type.ReflectedType);
 
-	public class ObjectNode : AbstractObjectNode
-	{
 		/// <summary>
 		///		Create from property
 		/// </summary>
@@ -59,7 +52,13 @@ namespace UIEngine
 			}
 			else
 			{
-				return new ObjectNode(parent, propertyInfo);
+				var objectNode = new ObjectNode(parent, propertyInfo.GetCustomAttribute<Visible>());
+				objectNode.SourceObjectInfo = new DomainModelReferenceInfo(propertyInfo, SourceReferenceType.Property);
+				//var setter = propertyInfo.SetMethod;
+				//CanWrite = setter.IsPublic && (setter.GetCustomAttribute<Visible>()?.IsEnabled ?? true);
+				objectNode.Name = propertyInfo.Name;
+
+				return objectNode;
 			}
 		}
 		/// <summary>
@@ -71,45 +70,49 @@ namespace UIEngine
 		/// <returns></returns>
 		internal static ObjectNode Create(ObjectNode parent, object objectData, Visible attribute)
 		{
-			return new ObjectNode(parent, objectData, attribute);
-		}
-
-		/// <summary>
-		///		A template for other ctors
-		/// </summary>
-		/// <param name="parent"></param>
-		/// <param name="attribute"></param>
-		protected ObjectNode(ObjectNode parent, Visible attribute)
-		{
-			Parent = parent;
-			PreviewExpression = attribute.PreviewExpression;
-			Description = attribute.Description;
-		}
-		private ObjectNode(ObjectNode parent, PropertyInfo propertyInfo)
-			: this(parent, propertyInfo.GetCustomAttribute<Visible>())
-		{
-			Header = propertyInfo.GetCustomAttribute<Visible>().Header;
-			SourceObjectInfo = new DomainModelReferenceInfo(propertyInfo, SourceReferenceType.Property);
-			var setter = propertyInfo.SetMethod;
-			//CanWrite = setter.IsPublic && (setter.GetCustomAttribute<Visible>()?.IsEnabled ?? true);
-			Name = propertyInfo.Name;
-		}
-		private ObjectNode(ObjectNode parent, object objectData, Visible attribute)
-			: this(parent, attribute)
-		{
+			var objectNode = new ObjectNode(parent, attribute);
 			if (parent is CollectionNode)
 			{
-				SourceObjectInfo = new DomainModelReferenceInfo(objectData.GetType(), SourceReferenceType.Indexer);
+				objectNode.SourceObjectInfo = new DomainModelReferenceInfo(objectData.GetType(), SourceReferenceType.Indexer);
 			}
 			else
 			{
-				SourceObjectInfo = new DomainModelReferenceInfo(objectData.GetType(), SourceReferenceType.ReturnValue);
+				objectNode.SourceObjectInfo = new DomainModelReferenceInfo(objectData.GetType(), SourceReferenceType.ReturnValue);
 			}
-			Name = "anonymous";
-			Header = objectData.ToString();
-			_ObjectData = objectData;
+			objectNode.Name = "anonymous";
+			objectNode.Header = objectData.ToString();
+			objectNode._ObjectData = objectData;
+
+			return objectNode;
 		}
-		internal readonly DomainModelReferenceInfo SourceObjectInfo;
+		/// <summary>
+		///		Create from class template. Just a typed placeholder. e.g. parameter and in LINQ local variables
+		/// </summary>
+		/// <param name="type"></param>
+		internal static ObjectNode Create(Type type)
+		{
+			var objectNode = new ObjectNode(null, null);
+			objectNode.SourceObjectInfo = new DomainModelReferenceInfo(type, SourceReferenceType.ReturnValue);
+			objectNode.IsEmpty = true;
+			return objectNode;
+		}
+
+		// The basic ctor
+		protected ObjectNode(ObjectNode parent, Visible attribute)
+		{
+			Parent = parent;
+			if (attribute != null)
+			{
+				Header = attribute.Header;
+				PreviewExpression = attribute.PreviewExpression;
+				Description = attribute.Description;
+			}
+		}
+
+		public TypeSystem Type => SourceObjectInfo.ObjectDataType;
+		public bool IsValueType => SourceObjectInfo.ObjectDataType.IsValueType;
+		internal bool IsEmpty { get; private set; } = false;
+		internal DomainModelReferenceInfo SourceObjectInfo { get; private set; }
 		public bool CanWrite { get; internal set; } = true;
 		public bool IsLeaf => Properties.Count == 0;
 		private List<ObjectNode> _Properties = null;
@@ -141,7 +144,7 @@ namespace UIEngine
 		// private PropertyInfo propertyInfo;
 		public delegate void ObjectdataChangeDelegate(object data);
 		// public event ObjectdataChangeDelegate ObjectDataLoaded;
-		private object _ObjectData;
+		private object _ObjectData = null;
 		public object ObjectData
 		{
 			get
@@ -187,16 +190,16 @@ namespace UIEngine
 			set => _Preview = value;
 		}
 
-		//private void LoadObjectData(object objectData)
-		//{
-		//	_ObjectData = objectData;
-		//}
 		protected virtual void LoadObjectData()
 		{
 			if (SourceObjectInfo.SourceReferenceType == SourceReferenceType.Property)
 			{
-				_ObjectData = SourceObjectInfo.PropertyInfo.GetValue(Parent?.ObjectData);
-				// Preview = PreviewExpression?.Invoke(ObjectData);
+				// if property info is null, then it's an abstract object, don't load object data
+				if (SourceObjectInfo.PropertyInfo != null)
+				{
+					_ObjectData = SourceObjectInfo.PropertyInfo.GetValue(Parent?.ObjectData);
+					// Preview = PreviewExpression?.Invoke(ObjectData);
+				}
 			}
 		}
 		protected virtual void SetValueToSourceObject()
@@ -233,14 +236,14 @@ namespace UIEngine
 			if (ObjectData is IEnumerable<object>)
 			{
 				_Properties = (ObjectData as IEnumerable<object>)
-					.Select(o => new ObjectNode(
+					.Select(o => Create(
 						this, o, SourceObjectInfo.PropertyInfo.GetCustomAttribute<Visible>()
 					)).ToList();
 			}
 			else
 			{
 				_Properties = ObjectData.GetType().GetVisibleProperties()
-					.Select(pi => new ObjectNode(this, pi)).ToList();
+					.Select(pi => Create(this, pi)).ToList();
 			}
 		}
 		private void LoadMethods()
@@ -289,21 +292,20 @@ namespace UIEngine
 	{
 		internal static MethodNode Create(ObjectNode parent, MethodInfo methodInfo)
 		{
-			return new MethodNode(parent, methodInfo);
-		}
-
-		private MethodNode(ObjectNode parent, MethodInfo methodInfo)
-		{
-			Parent = parent;
-			_Body = methodInfo;
+			var methodNode = new MethodNode();
+			methodNode.Parent = parent;
+			methodNode._Body = methodInfo;
 			var attr = methodInfo.GetCustomAttribute<Visible>();
-			Header = attr.Header;
-			Description = attr.Description;
-			Signatures = methodInfo.GetParameters().Select(p => new Parameter(p.ParameterType)).ToList();
+			methodNode.Header = attr.Header;
+			methodNode.Description = attr.Description;
+			methodNode.Signatures = methodInfo.GetParameters().Select(p => ObjectNode.Create(p.ParameterType)).ToList();
+			methodNode.ReturnNode = ObjectNode.Create(methodInfo.ReturnType);
+
+			return methodNode;
 		}
 
-		public Type ReturnType => _Body.ReturnType;
-		public List<Parameter> Signatures { get; set; }
+		public ObjectNode ReturnNode { get; private set; }
+		public List<ObjectNode> Signatures { get; set; }
 		private MethodInfo _Body;
 
 		protected override string Preview
@@ -312,14 +314,20 @@ namespace UIEngine
 			set => _Preview = value;
 		}
 
+		/// <summary>
+		///		Invoke and store return object to return node
+		/// </summary>
+		/// <returns>return object</returns>
 		public ObjectNode Invoke()
 		{
 			var objectData = _Body.Invoke(
 				Parent?.ObjectData,
-				Signatures.Select(p => p.Data).ToArray()
+				Signatures.Select(p => p.ObjectData).ToArray()
 			);
 
-			return ObjectNode.Create(null, objectData, new Visible(Header, Description));
+			ReturnNode.ObjectData = objectData;
+
+			return ReturnNode;
 		}
 
 		/// <summary>
@@ -332,16 +340,16 @@ namespace UIEngine
 		{
 			return CanAssignArgument(argument, Signatures[index]);
 		}
-		public bool CanAssignArgument(object argument, Parameter parameter)
+		public bool CanAssignArgument(object argument, ObjectNode parameter)
 		{
-			return parameter.Type.IsAssignableFrom(argument.GetType());
+			return parameter.SourceObjectInfo.ObjectDataType.IsAssignableFrom(argument.GetType());
 		}
 
-		public bool SetParameter(object argument, Parameter parameter)
+		public bool SetParameter(object argument, ObjectNode parameter)
 		{
 			if (CanAssignArgument(argument, parameter))
 			{
-				parameter.Data = argument;
+				parameter.ObjectData = argument;
 				return true;
 			}
 			return false;
@@ -372,6 +380,7 @@ namespace UIEngine
 			return candidates;
 		}
 
+		/*
 		public class Parameter
 		{
 			public Parameter(Type type, object data = null)
@@ -401,14 +410,8 @@ namespace UIEngine
 					}
 				}
 			}
-		}
+		}*/
 	}
-
-	//public class ValueNode : ObjectNode
-	//{
-	//	internal ValueNode(ObjectNode parent, PropertyInfo propertyInfo)
-	//		: base(parent, propertyInfo) { }
-	//}
 
 	/// <summary>
 	///		The collection that is used to generate this node should not be an element of another collection

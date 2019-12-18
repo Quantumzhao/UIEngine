@@ -154,6 +154,9 @@ namespace UIEngine
 		public static TypeSystem ToValidType(this Type type) => TypeSystem.ToRestrictedType(type);
 	}
 
+	/* If the target object is retrieved from property, then property info is not null. 
+	 * vice versa
+	 */
 	internal class DomainModelReferenceInfo
 	{
 		public DomainModelReferenceInfo(PropertyInfo propertyInfo, SourceReferenceType sourceReferenceType)
@@ -231,7 +234,7 @@ namespace UIEngine
 					ReflectedType = typeof(bool);
 					break;
 				case Types.Collection:
-					ReflectedType = null;
+					ReflectedType = typeof(ICollection);
 					break;
 				case Types.Double:
 					ReflectedType = typeof(double);
@@ -249,6 +252,9 @@ namespace UIEngine
 		}
 
 		public static readonly TypeSystem Bool = new TypeSystem(Types.Bool);
+		/// <summary>
+		///		A shortcut for <c>ICollection</c>. To wrap a <c>System.Type</c>, use <c>ToRestrictedType()</c>
+		/// </summary>
 		public static readonly TypeSystem Collection = new TypeSystem(Types.Collection);
 		public static readonly TypeSystem Double = new TypeSystem(Types.Double);
 		public static readonly TypeSystem Int = new TypeSystem(Types.Int);
@@ -260,7 +266,7 @@ namespace UIEngine
 
 		public bool IsSame(TypeSystem type)
 		{
-			if (type.RestrictedType == Types.Collection || type.RestrictedType == Types.Object)
+			if ((RestrictedType & (Types.Collection | Types.Object)) != 0)
 			{
 				return this.ReflectedType.Equals(type.ReflectedType);
 			}
@@ -272,7 +278,7 @@ namespace UIEngine
 
 		public bool IsDerivedFrom(Type type)
 		{
-			if (RestrictedType == Types.Collection || RestrictedType == Types.Object)
+			if ((RestrictedType & (Types.Collection | Types.Object)) != 0)
 			{
 				return type.IsAssignableFrom(ReflectedType);
 			}
@@ -283,15 +289,16 @@ namespace UIEngine
 		}
 		public bool IsDerivedFrom(TypeSystem type) => IsDerivedFrom(type.ReflectedType);
 		public bool IsAssignableFrom(Type type) => ReflectedType.IsAssignableFrom(type);
+		public bool IsValueType => (RestrictedType & (Types.Int | Types.Double | Types.Bool | Types.String)) != 0;
 
 		public enum Types
 		{
-			Bool,
-			Collection,
-			Double,
-			Int,
-			String,
-			Object
+			Bool = 1,
+			Double = 2,
+			Int = 4,
+			String = 8,
+			Collection = 16,
+			Object = 32
 		}
 	}
 }
