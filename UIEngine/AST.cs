@@ -92,7 +92,7 @@ namespace UIEngine
 		internal static ObjectNode Create(Type type)
 		{
 			var objectNode = new ObjectNode(null, null);
-			objectNode.SourceObjectInfo = new DomainModelReferenceInfo(type, SourceReferenceType.ReturnValue);
+			objectNode.SourceObjectInfo = new DomainModelReferenceInfo(type, SourceReferenceType.parameter);
 			objectNode.IsEmpty = true;
 			return objectNode;
 		}
@@ -225,10 +225,12 @@ namespace UIEngine
 				case SourceReferenceType.ReturnValue:
 					throw new InvalidOperationException("return value is read only");
 
+				case SourceReferenceType.parameter:
+					break;
+
 				default:
 					return;
 			}
-			SourceObjectInfo.PropertyInfo.SetValue(Parent.ObjectData, ObjectData);
 		}
 
 		private void LoadProperties()

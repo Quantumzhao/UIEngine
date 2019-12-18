@@ -178,7 +178,8 @@ namespace UIEngine
 	{
 		Property,
 		Indexer,
-		ReturnValue
+		ReturnValue,
+		parameter
 	}
 	public class TypeSystem
 	{
