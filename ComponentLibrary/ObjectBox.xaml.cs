@@ -17,43 +17,68 @@ namespace ComponentLibrary
 	/// </summary>
 	public partial class ObjectBox : UserControl, IBox
     {
-        public ObjectBox()
+        public ObjectBox(TypeSystem type)
         {
             InitializeComponent();
 			AllowDrop = true;
 
-			this.ContentChanged += (me, newNode) => Initialize();
-        }
+			// this.ContentChanged += (me, newNode) => Initialize();
 
-		public ObjectBox(Type type) : base()
-		{
-			if (type.IsAssignableFrom(typeof(int)))
+			ObjectNode = ObjectNode.CreateEmptyObjectNode(type);
+			DataContext = ObjectNode;
+			Child?.RemoveSelf();
+
+			var data = ObjectNode.Type;
+			if (data.IsSame(TypeSystem.Bool))
 			{
-
+				ToCheckBox();
 			}
+			else if (data.IsValueType)
+			{
+				ToTextBox(data);
+			}
+			else if (data.IsDerivedFrom(TypeSystem.Collection))
+			{
+				throw new NotImplementedException();
+			}
+			else
+			{
+				ToDropBox();
+			}
+
+			//var button = new Button();
+			//{
+			//	button.Visibility = Visibility.Collapsed;
+			//	button.Content = "Drag";
+			//	button.MouseMove += ObjectBox_MouseMove;
+			//	button.DragEnter += ObjectBox_DragEnter;
+			//	button.Drop += ObjectBox_Drop;
+			//	button.MouseLeftButtonDown += ObjectBox_MouseLeftButtonDown;
+			//}
+			//MainPanel.Children.Add(button);
+		}
+
+		public ObjectBox(object objectData) : this(objectData.GetType().ToValidType())
+		{
+			ObjectNode.ObjectData = objectData;
 		}
 
 		private Point _StartPoint;
-		private ObjectNode _ObjectNode = null;
-		public ObjectNode ObjectNode
-		{
-			get => _ObjectNode;
-			set
-			{
-				_ObjectNode = value;
-				if (value != null)
-				{
-					ContentChanged?.Invoke(this, value);
-				}
-			}
-		}
+
+		public ObjectNode ObjectNode { get; set; }
 
 		public IBox Child { get; set; }
 
-		public event Action<object, ObjectNode> ContentChanged;
+		public event Action<object, ObjectNode> ObjectNodeChanged;
 		public static event NewNodeSelectedHandler NewNodeSelected;
 		public static event RemovedHandler Removed;
 
+		private void Initialize()
+		{
+
+		}
+
+		/*
 		private void Initialize()
 		{
 			DataContext = ObjectNode;
@@ -62,11 +87,11 @@ namespace ComponentLibrary
 			var data = ObjectNode?.GetObjectData<object>();
 			if (data is int || data is string || data is double)
 			{
-				ToTextBox(data.GetType());
+				ToTextBox(data);
 			}
 			else if (data is bool)
 			{
-				ToCheckBox(data.GetType());
+				ToCheckBox();
 			}
 			else if (data is IEnumerable)
 			{
@@ -74,7 +99,7 @@ namespace ComponentLibrary
 			}
 			else
 			{
-				ToDropBox(data.GetType());
+				ToDropBox();
 			}
 
 			var button = new Button();
@@ -87,7 +112,7 @@ namespace ComponentLibrary
 				button.MouseLeftButtonDown += ObjectBox_MouseLeftButtonDown;
 			}
 			MainPanel.Children.Add(button);
-		}
+		}*/
 
 		private void ChangeObjectData_Int(object sender, RoutedEventArgs e)
 		{
@@ -113,34 +138,34 @@ namespace ComponentLibrary
 			}
 		}
 
-		private void ToTextBox(Type type)
+		private void ToTextBox(TypeSystem type)
 		{
 			var textBox = new TextBox();
 			{
 				textBox.SetBinding(TextBox.TextProperty, "ObjectData");
-				if (type.Equals(typeof(int)))
+				if (type.IsSame(TypeSystem.Int))
 				{
 					textBox.LostFocus += ChangeObjectData_Int;
 				}
-				else if (type.Equals(typeof(double)))
+				else if (type.IsSame(TypeSystem.Double))
 				{
 					textBox.LostFocus += ChangeObjectData_Double;
 				}
-				else if (type.Equals(typeof(string)))
+				else if (type.IsSame(TypeSystem.String))
 				{
 					textBox.LostFocus += (ts, te) => ObjectNode.ObjectData = (ts as TextBox).Text;
 				}
 			}
 			MainPanel.Children.Add(textBox);
 		}
-		private void ToCheckBox(Type type)
+		private void ToCheckBox()
 		{
 			var checkbox = new CheckBox();
 			checkbox.Content = ObjectNode.Header;
 			// checkbox.IsChecked = (bool)data;
 			MainPanel.Children.Add(checkbox);
 		}
-		private void ToDropBox(Type type)
+		private void ToDropBox()
 		{
 			var comboBox = new ComboBox();
 			{

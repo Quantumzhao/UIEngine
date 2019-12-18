@@ -82,7 +82,7 @@ namespace ComponentLibrary
 				//{
 				//	throw new NotImplementedException();
 				//}
-				ParaPanel.Children.Add(new ObjectBox());
+				ParaPanel.Children.Add(new ObjectBox(MethodNode.Signatures[i].Type));
 				ParaPanel.Children.Add(new TextBlock() { Text = ", " });
 			}
 			if (ParaPanel.Children.Count > 0)
@@ -91,11 +91,11 @@ namespace ComponentLibrary
 			}
 		}
 
-		private void ChangeArg_Int(object sender, MethodNode.Parameter arg)
+		private void ChangeArg_Int(object sender, ObjectNode arg)
 		{
 			if (int.TryParse((sender as TextBox).Text, out int result))
 			{
-				arg.Data = result;
+				arg.ObjectData = result;
 			}
 			else
 			{
@@ -103,11 +103,11 @@ namespace ComponentLibrary
 			}
 		}
 
-		private void ChangeArg_Double(object sender, MethodNode.Parameter arg)
+		private void ChangeArg_Double(object sender, ObjectNode arg)
 		{
 			if (double.TryParse((sender as TextBox).Text, out double result))
 			{
-				arg.Data = result;
+				arg.ObjectData = result;
 			}
 			else
 			{
@@ -123,7 +123,7 @@ namespace ComponentLibrary
 				MainPanel.Children.Remove(control);
 			}
 
-			var objectBox = new ObjectBox();
+			var objectBox = new ObjectBox(MethodNode.ReturnNode.Type);
 			objectBox.ObjectNode = MethodNode.Invoke();
 			if (objectBox != null)
 			{
