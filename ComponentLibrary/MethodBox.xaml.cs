@@ -82,7 +82,7 @@ namespace ComponentLibrary
 				//{
 				//	throw new NotImplementedException();
 				//}
-				ParaPanel.Children.Add(new ObjectBox(MethodNode.Signatures[i].Type));
+				ParaPanel.Children.Add(Utility.CreateBox(MethodNode.Signatures[i]) as UIElement);
 				ParaPanel.Children.Add(new TextBlock() { Text = ", " });
 			}
 			if (ParaPanel.Children.Count > 0)
@@ -123,8 +123,7 @@ namespace ComponentLibrary
 				MainPanel.Children.Remove(control);
 			}
 
-			var objectBox = new ObjectBox(MethodNode.ReturnNode.Type);
-			objectBox.ObjectNode = MethodNode.Invoke();
+			var objectBox = Utility.CreateBox(MethodNode.Invoke()) as ObjectBox;
 			if (objectBox != null)
 			{
 				MainPanel.Children.Add(objectBox);

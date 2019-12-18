@@ -16,28 +16,52 @@ namespace ComponentLibrary
 	/// Interaction logic for UserControl1.xaml
 	/// </summary>
 	public partial class ObjectBox : UserControl, IBox
-    {
-        public ObjectBox(TypeSystem type)
-        {
-            InitializeComponent();
+	{
+		public ObjectBox()
+		{
+			InitializeComponent();
 			AllowDrop = true;
+		}
 
+		private Point _StartPoint;
+
+		private ObjectNode _ObjectNode;
+		public ObjectNode ObjectNode 
+		{ 
+			get => _ObjectNode;
+			set
+			{
+				if (_ObjectNode != value)
+				{
+					_ObjectNode = value;
+					Initialize();
+				}
+			}
+		}
+
+		public IBox Child { get; set; }
+
+		//public event Action<object, ObjectNode> ObjectNodeChanged;
+		public static event NewNodeSelectedHandler NewNodeSelected;
+		public static event RemovedHandler Removed;
+
+		private void Initialize()
+		{
 			// this.ContentChanged += (me, newNode) => Initialize();
 
-			ObjectNode = ObjectNode.CreateEmptyObjectNode(type);
 			DataContext = ObjectNode;
 			Child?.RemoveSelf();
 
-			var data = ObjectNode.Type;
-			if (data.IsSame(TypeSystem.Bool))
+			var type = ObjectNode.Type;
+			if (type.IsSame(TypeSystem.Bool))
 			{
 				ToCheckBox();
 			}
-			else if (data.IsValueType)
+			else if (type.IsValueType)
 			{
-				ToTextBox(data);
+				ToTextBox(type);
 			}
-			else if (data.IsDerivedFrom(TypeSystem.Collection))
+			else if (type.IsDerivedFrom(TypeSystem.Collection))
 			{
 				throw new NotImplementedException();
 			}
@@ -57,62 +81,6 @@ namespace ComponentLibrary
 			//}
 			//MainPanel.Children.Add(button);
 		}
-
-		public ObjectBox(object objectData) : this(objectData.GetType().ToValidType())
-		{
-			ObjectNode.ObjectData = objectData;
-		}
-
-		private Point _StartPoint;
-
-		public ObjectNode ObjectNode { get; set; }
-
-		public IBox Child { get; set; }
-
-		public event Action<object, ObjectNode> ObjectNodeChanged;
-		public static event NewNodeSelectedHandler NewNodeSelected;
-		public static event RemovedHandler Removed;
-
-		private void Initialize()
-		{
-
-		}
-
-		/*
-		private void Initialize()
-		{
-			DataContext = ObjectNode;
-			Child?.RemoveSelf();
-
-			var data = ObjectNode?.GetObjectData<object>();
-			if (data is int || data is string || data is double)
-			{
-				ToTextBox(data);
-			}
-			else if (data is bool)
-			{
-				ToCheckBox();
-			}
-			else if (data is IEnumerable)
-			{
-				throw new NotImplementedException();
-			}
-			else
-			{
-				ToDropBox();
-			}
-
-			var button = new Button();
-			{
-				button.Visibility = Visibility.Collapsed;
-				button.Content = "Drag";
-				button.MouseMove += ObjectBox_MouseMove;
-				button.DragEnter += ObjectBox_DragEnter;
-				button.Drop += ObjectBox_Drop;
-				button.MouseLeftButtonDown += ObjectBox_MouseLeftButtonDown;
-			}
-			MainPanel.Children.Add(button);
-		}*/
 
 		private void ChangeObjectData_Int(object sender, RoutedEventArgs e)
 		{
@@ -191,7 +159,7 @@ namespace ComponentLibrary
 
 		private void ObjectBox_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
 		{
-			_StartPoint = e.GetPosition(null);			
+			_StartPoint = e.GetPosition(null);
 		}
 
 		private void ObjectBox_MouseMove(object sender, MouseEventArgs e)

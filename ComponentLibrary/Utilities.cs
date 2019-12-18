@@ -16,7 +16,7 @@ namespace ComponentLibrary
 			IBox box;
 			if (node is ObjectNode)
 			{
-				box = new ObjectBox(node);
+				box = new ObjectBox() { ObjectNode = node as ObjectNode };
 			}
 			else
 			{

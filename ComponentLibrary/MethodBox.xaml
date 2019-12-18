@@ -12,6 +12,6 @@
 			
 		</StackPanel>
 		<TextBlock Text=")"></TextBlock>
-		<Button x:Name="Execute" Content="Execute" Click="Execute_Click" IsEnabled="False"></Button>
+		<Button x:Name="Execute" Content="Execute" Click="Execute_Click" IsEnabled="true"></Button>
     </StackPanel>
 </UserControl>
