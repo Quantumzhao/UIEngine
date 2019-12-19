@@ -14,7 +14,11 @@ namespace ComponentLibrary
 		internal static IBox CreateBox(Node node)
 		{
 			IBox box;
-			if (node is ObjectNode)
+			if (node is CollectionNode)
+			{
+				box = new CollectionBox() { CollectionNode = node as CollectionNode };
+			}
+			else if (node is ObjectNode)
 			{
 				box = new ObjectBox() { ObjectNode = node as ObjectNode };
 			}

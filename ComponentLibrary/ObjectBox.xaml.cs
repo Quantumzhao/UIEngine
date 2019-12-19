@@ -6,9 +6,7 @@ using System;
 using System.Collections;
 using System.Windows.Input;
 
-/* A base case is needed. i.e. Object box needs to behave normally even if the object data value is null. 
- * This is for Method Box and drag and drop functionality
- * Drag and drop functionality can be suspended for a little bit until I finish method box
+/* Drag and drop functionality can be suspended for a little bit until I finish method box
  */
 namespace ComponentLibrary
 {
@@ -25,15 +23,15 @@ namespace ComponentLibrary
 
 		private Point _StartPoint;
 
-		private ObjectNode _ObjectNode;
+		public static readonly DependencyProperty ObjectNodeProperty = DependencyProperty.Register("ObjectNode", typeof(ObjectNode), typeof(ObjectBox));
 		public ObjectNode ObjectNode 
 		{ 
-			get => _ObjectNode;
+			get => GetValue(ObjectNodeProperty) as ObjectNode;
 			set
 			{
-				if (_ObjectNode != value)
+				if (ObjectNode != value)
 				{
-					_ObjectNode = value;
+					SetValue(ObjectNodeProperty, value);
 					Initialize();
 				}
 			}
