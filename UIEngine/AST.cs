@@ -6,7 +6,6 @@ using System.Reflection;
 namespace UIEngine
 {
 	/* For current stage, UI Engine only supports int, double, string, bool, object and collection
-	 * 
 	 */
 	public abstract class Node
 	{
@@ -36,7 +35,7 @@ namespace UIEngine
 
 	public class ObjectNode : Node
 	{
-		public static ObjectNode CreateEmptyObjectNode(TypeSystem type) => Create(type.ReflectedType);
+		//public static ObjectNode CreateEmptyObjectNode(TypeSystem type) => Create(type.ReflectedType);
 
 		/// <summary>
 		///		Create from property
@@ -48,7 +47,7 @@ namespace UIEngine
 		{
 			if (typeof(ICollection).IsAssignableFrom(propertyInfo.PropertyType))
 			{
-				return new CollectionNode(parent, propertyInfo);
+				return CollectionNode.Create(parent, propertyInfo);
 			}
 			else
 			{
@@ -79,7 +78,6 @@ namespace UIEngine
 			{
 				objectNode.SourceObjectInfo = new DomainModelReferenceInfo(objectData.GetType(), SourceReferenceType.ReturnValue);
 			}
-			objectNode.Name = "anonymous";
 			objectNode.Header = objectData.ToString();
 			objectNode._ObjectData = objectData;
 
@@ -106,13 +104,14 @@ namespace UIEngine
 				Header = attribute.Header;
 				PreviewExpression = attribute.PreviewExpression;
 				Description = attribute.Description;
+				Name = attribute.Name;
 			}
 		}
 
 		public TypeSystem Type => SourceObjectInfo.ObjectDataType;
 		public bool IsValueType => SourceObjectInfo.ObjectDataType.IsValueType;
-		internal bool IsEmpty { get; private set; } = false;
-		internal DomainModelReferenceInfo SourceObjectInfo { get; private set; }
+		internal bool IsEmpty { get; set; } = false;
+		internal DomainModelReferenceInfo SourceObjectInfo { get; set; }
 		public bool CanWrite { get; internal set; } = true;
 		public bool IsLeaf => Properties.Count == 0;
 		private List<ObjectNode> _Properties = null;
@@ -298,6 +297,7 @@ namespace UIEngine
 			methodNode.Parent = parent;
 			methodNode._Body = methodInfo;
 			var attr = methodInfo.GetCustomAttribute<Visible>();
+			methodNode.Name = methodNode.Name;
 			methodNode.Header = attr.Header;
 			methodNode.Description = attr.Description;
 			methodNode.Signatures = methodInfo.GetParameters().Select(p => ObjectNode.Create(p.ParameterType)).ToList();
@@ -381,38 +381,6 @@ namespace UIEngine
 			}
 			return candidates;
 		}
-
-		/*
-		public class Parameter
-		{
-			public Parameter(Type type, object data = null)
-			{
-				Type = type.ToValidType();
-				Data = data;
-			}
-
-			public TypeSystem Type { get; private set; }
-
-			private object _Data = null;
-			public object Data
-			{
-				get => _Data;
-				set
-				{
-					if (value != null)
-					{
-						if (Type.IsAssignableFrom(value.GetType()))
-						{
-							_Data = value;
-						}
-						else
-						{
-							throw new ArgumentException();
-						}
-					}
-				}
-			}
-		}*/
 	}
 
 	/// <summary>
@@ -423,41 +391,58 @@ namespace UIEngine
 		public bool Is_2D { get; private set; }
 		public bool DisplayPropertiesAsHeadings { get; set; } = false;
 		public List<string> Headings { get; private set; } = new List<string>();
-		public List<object> FormattedData { get; private set; } = new List<object>();
 		public List<List<ObjectNode>> Elements { get; private set; } = new List<List<ObjectNode>>();
 
-		internal CollectionNode(ObjectNode parent, PropertyInfo propertyInfo)
-			: base(parent, propertyInfo.GetCustomAttribute<Visible>()) { }
+		/// <summary>
+		///		2D data structure functionalities will be implemented later
+		/// </summary>
+		/// <param name="parent"></param>
+		/// <param name="propertyInfo"></param>
+		/// <returns></returns>
+		internal static new CollectionNode Create(ObjectNode parent, PropertyInfo propertyInfo)
+		{
+			return new CollectionNode(parent, propertyInfo);
+		}
+		internal static new CollectionNode Create(Type type)
+		{
+			return new CollectionNode(type);
+		}
+		private CollectionNode(ObjectNode parent, PropertyInfo propertyInfo)
+			: base(parent, propertyInfo.GetCustomAttribute<Visible>())
+		{
+			SourceObjectInfo = new DomainModelReferenceInfo(propertyInfo, SourceReferenceType.Property);
+		}
+		private CollectionNode(Type type) : base(null, null)
+		{
+			IsEmpty = true;
+			SourceObjectInfo = new DomainModelReferenceInfo(type, SourceReferenceType.parameter);
+		}
 
 		protected override void LoadObjectData()
 		{
 			base.LoadObjectData();
-			LoadFormattedData(ObjectData);
+			LoadFormattedData();
 		}
 
-		private void LoadFormattedData(object data)
+		private void LoadFormattedData()
 		{
-			if (data == null)
-			{
-				data = ObjectData;
-			}
-
-			var preFormattedData = (data as ICollection).ToObjectList();
+			var preFormattedData = (ObjectData as ICollection).ToObjectList();
+			var formattedData = new List<object>();
 			var list = new List<ObjectNode>();
 			// If it is a dictionary
-			if (data.GetType().IsAssignableFrom(typeof(IDictionary)))
+			if (SourceObjectInfo.ObjectDataType.IsDerivedFrom(typeof(IDictionary)))
 			{
 				Headings.Add("Key");
 				Headings.Add("Value");
 				Is_2D = true;
-				foreach (var key in (data as IDictionary).Keys)
+				foreach (var key in (ObjectData as IDictionary).Keys)
 				{
 					list.Add(Create(this, key, new Visible(Header, Description)));
 					Elements.Add(list);
 				}
 				var enumerator = Elements.GetEnumerator();
 				enumerator.MoveNext();
-				foreach (var value in (data as IDictionary).Values)
+				foreach (var value in (ObjectData as IDictionary).Values)
 				{
 					enumerator.Current.Add(Create(this, value, new Visible(Header, Description)));
 					enumerator.MoveNext();
@@ -469,9 +454,9 @@ namespace UIEngine
 				Is_2D = true;
 				foreach (var element in preFormattedData)
 				{
-					FormattedData.Add((element as ICollection).ToObjectList());
+					formattedData.Add((element as ICollection).ToObjectList());
 				}
-				foreach (var row in FormattedData)
+				foreach (var row in formattedData)
 				{
 					var elementRow = new List<ObjectNode>();
 					foreach (var column in row as ICollection)
@@ -485,10 +470,11 @@ namespace UIEngine
 			else
 			{
 				Is_2D = false;
-				foreach (var objectData in data as ICollection)
+				foreach (var objectData in ObjectData as ICollection)
 				{
-					list.Add(ObjectNode.Create(this, objectData, new Visible(Header, Description)));
-					Elements.Add(list);
+					var row = new List<ObjectNode>();
+					row.Add(ObjectNode.Create(this, objectData, new Visible(Header, Description)));
+					Elements.Add(row);
 				}
 			}
 		}
@@ -501,7 +487,25 @@ namespace UIEngine
 
 		public ObjectNode this[int row, int column]
 		{
-			get => Elements[row][column];
+			get
+			{
+				if (Elements.Count == 0)
+				{
+					LoadObjectData();
+				}
+				return Elements[row][column];
+			}
+		}
+		public List<ObjectNode> this[int row]
+		{
+			get
+			{
+				if (Elements.Count == 0)
+				{
+					LoadObjectData();
+				}
+				return Elements[row];
+			}
 		}
 	}
 

@@ -92,11 +92,13 @@ namespace UIEngine
 		/// <param name="description">
 		///		Some description (optional)
 		/// </param>
-		public Visible(string header = "", string description = "")
+		public Visible(string name = "", string header = "", string description = "")
 		{
-			Header = header;
+			Header = header == "" ? name : header;
 			Description = description;
+			Name = name;
 		}
+		public string Name { get; set; }
 		public string Header { get; set; }
 		public string Description { get; set; }
 		public bool IsEnabled { get; set; } = true;
@@ -140,15 +142,11 @@ namespace UIEngine
 				});
 		}
 
-		public static List<object> ToObjectList(this IEnumerable collection)
+		public static List<object> ToObjectList(this ICollection collection)
 		{
-			var enumerator = collection.GetEnumerator();
-			var list = new List<object>();
-			while (enumerator.MoveNext())
-			{
-				list.Add(enumerator.Current);
-			}
-			return list;
+			var array = new object[collection.Count];
+			collection.CopyTo(array, 0);
+			return array.ToList();
 		}
 
 		public static TypeSystem ToValidType(this Type type) => TypeSystem.ToRestrictedType(type);
