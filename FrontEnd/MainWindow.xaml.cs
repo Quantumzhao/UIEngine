@@ -16,13 +16,17 @@ namespace FrontEnd
 		public MainWindow()
 		{
 			InitializeComponent();
-			Dataset.Dataset.Init();
-			Dashboard.ImportEntryObjects(typeof(Dataset.Dataset), typeof(Dataset.Person));
 		}
 
 		private void Add_Click(object sender, RoutedEventArgs e)
 		{
 			MainPanel.Children.Add(new UIPanel());
+		}
+
+		private void Window_Loaded(object sender, RoutedEventArgs e)
+		{
+			Dataset.Dataset.Init();
+			Dashboard.ImportEntryObjects(typeof(Dataset.Dataset), typeof(Dataset.Person));
 		}
 	}
 }
