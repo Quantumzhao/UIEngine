@@ -23,12 +23,11 @@ namespace ComponentLibrary
 	public partial class CollectionBox : UserControl, IBox
 	{
 		public static event RemovedHandler Removed;
-		public event Action<object, CollectionNode> ContentChanged;
+		//public event Action<object, CollectionNode> ContentChanged;
 
 		public CollectionBox()
 		{
 			InitializeComponent();
-			ContentChanged += (me, newNode) => Initialize();
 		}
 
 		public IBox Child { get; set; }
@@ -42,7 +41,7 @@ namespace ComponentLibrary
 				_CollectionNode = value;
 				if (value != null)
 				{
-					ContentChanged?.Invoke(this, value);
+					Initialize();
 				}
 			}
 		}
@@ -51,14 +50,15 @@ namespace ComponentLibrary
 		{
 			if (!CollectionNode.Is_2D)
 			{
-				int columns = (CollectionNode.FormattedData[0] as ICollection).Count;
+				int columns = (CollectionNode[0] as ICollection).Count;
 				for (int i = 1; i <= columns; i++)
 				{
-					var column = new DataGridTextColumn();
+					var column = new DataGridTemplateColumn();
 					column.Header = i;
-					column.Binding = new Binding($"[{i.ToString()}]");
+					column.CellTemplate = FindResource("Template") as DataTemplate;
 					MainDataGrid.Columns.Add(column);
 				}
+				MainDataGrid.ItemsSource = _CollectionNode.Elements;
 			}
 			else if (CollectionNode.GetObjectData<object>() is IDictionary)
 			{

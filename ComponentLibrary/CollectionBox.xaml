@@ -6,7 +6,14 @@
              xmlns:local="clr-namespace:ComponentLibrary"
              mc:Ignorable="d" 
              d:DesignHeight="450" d:DesignWidth="800">
-    <Grid>
-		<DataGrid x:Name="MainDataGrid"></DataGrid>
-    </Grid>
+	<UserControl.Resources>
+		<DataTemplate x:Key="Template">
+			<local:ObjectBox ObjectNode="{ Binding }"></local:ObjectBox>
+		</DataTemplate>
+	</UserControl.Resources>
+    <StackPanel Orientation="Vertical">
+		<DataGrid x:Name="MainDataGrid" AutoGenerateColumns="False" CanUserAddRows="False">
+		</DataGrid>
+		<local:ObjectBox></local:ObjectBox>
+    </StackPanel>
 </UserControl>
