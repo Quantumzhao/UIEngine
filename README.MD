@@ -32,7 +32,7 @@ Method/Function Accessing and invoking
 - [X] Read and load function information
 - [X] load function signature and return type
 - [X] Implement function parameters and their initialization
-- [ ] Integrate function return value into the property accessing system
+- [X] Integrate function return value into the property accessing system
 
 ### Phase 3
 
