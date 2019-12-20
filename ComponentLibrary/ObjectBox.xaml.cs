@@ -5,6 +5,7 @@ using UIEngine;
 using System;
 using System.Collections;
 using System.Windows.Input;
+using System.ComponentModel;
 
 /* Drag and drop functionality can be suspended for a little bit until I finish method box
  */
@@ -23,18 +24,11 @@ namespace ComponentLibrary
 
 		private Point _StartPoint;
 
-		public static readonly DependencyProperty ObjectNodeProperty = DependencyProperty.Register("ObjectNode", typeof(ObjectNode), typeof(ObjectBox));
+		public static readonly DependencyProperty ObjectNodeProperty = DependencyProperty.Register("ObjectNode", typeof(ObjectNode), typeof(ObjectBox), new PropertyMetadata(Initialize));
 		public ObjectNode ObjectNode 
 		{ 
 			get => GetValue(ObjectNodeProperty) as ObjectNode;
-			set
-			{
-				if (ObjectNode != value)
-				{
-					SetValue(ObjectNodeProperty, value);
-					Initialize();
-				}
-			}
+			set => SetValue(ObjectNodeProperty, value);
 		}
 
 		public IBox Child { get; set; }
@@ -43,11 +37,10 @@ namespace ComponentLibrary
 		public static event NewNodeSelectedHandler NewNodeSelected;
 		public static event RemovedHandler Removed;
 
-		private void Initialize()
+		private static void Initialize(DependencyObject d, DependencyPropertyChangedEventArgs e)
 		{
-			// this.ContentChanged += (me, newNode) => Initialize();
+			ObjectNode node = 
 
-			DataContext = ObjectNode;
 			Child?.RemoveSelf();
 
 			var type = ObjectNode.Type;

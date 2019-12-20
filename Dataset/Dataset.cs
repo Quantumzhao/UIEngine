@@ -40,7 +40,7 @@ namespace Dataset
 
 	public static class Dataset
 	{
-#if TEST_COLLECTION
+#if !TEST_COLLECTION
 		[Visible("Alice")]
 		public static Person Alice { get; set; }
 		public static void Init()
