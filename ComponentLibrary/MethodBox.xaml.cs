@@ -1,17 +1,6 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
-using System.Windows.Data;
-using System.Windows.Documents;
-using System.Windows.Input;
-using System.Windows.Media;
-using System.Windows.Media.Imaging;
-using System.Windows.Navigation;
-using System.Windows.Shapes;
 using UIEngine;
 
 namespace ComponentLibrary
@@ -48,40 +37,6 @@ namespace ComponentLibrary
 		{
 			for (int i = 0; i < MethodNode.Signatures.Count; i++)
 			{
-				//if (arg.Type.IsAssignableFrom(typeof(int)) ||
-				//	arg.Type.IsAssignableFrom(typeof(double)) ||
-				//	arg.Type.IsAssignableFrom(typeof(string)))
-				//{
-				//	var textBox = new TextBox();
-				//	{
-				//		textBox.MinWidth = 50;
-				//		textBox.DataContext = arg;
-				//		if (arg.Type.IsAssignableFrom(typeof(int)))
-				//		{
-				//			textBox.TextChanged += (sender, e) => ChangeArg_Int(sender, arg);
-				//		}
-				//		else if (arg.Type.IsAssignableFrom(typeof(double)))
-				//		{
-				//			textBox.TextChanged += (sender, e) => ChangeArg_Double(sender, arg);
-				//		}
-				//		else if (arg.Type.IsAssignableFrom(typeof(string)))
-				//		{
-				//			textBox.TextChanged += (ts, te) => arg.Data = (ts as TextBox).Text;
-				//		}
-				//		textBox.TextChanged += (sender, e) =>
-				//		{
-				//			if (MethodNode.Signature.TrueForAll(s => s.Data != null))
-				//			{
-				//				Execute.IsEnabled = true;
-				//			}
-				//		};
-				//	}
-				//	ParaPanel.Children.Add(textBox);
-				//}
-				//else
-				//{
-				//	throw new NotImplementedException();
-				//}
 				ParaPanel.Children.Add(Utility.CreateBox(MethodNode.Signatures[i]) as UIElement);
 				ParaPanel.Children.Add(new TextBlock() { Text = ", " });
 			}

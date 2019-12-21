@@ -20,7 +20,8 @@ namespace ComponentLibrary
 			}
 			else if (node is ObjectNode)
 			{
-				box = new ObjectBox() { ObjectNode = node as ObjectNode };
+				box = new ObjectBox();
+				(box as ObjectBox).SetValue(ObjectBox.ObjectNodeProperty, node);
 			}
 			else
 			{
