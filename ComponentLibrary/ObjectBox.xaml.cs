@@ -1,11 +1,9 @@
 ﻿using System.Windows.Controls;
+using System.Windows.Input;
 using System.Windows.Data;
 using System.Windows;
 using UIEngine;
 using System;
-using System.Collections;
-using System.Windows.Input;
-using System.ComponentModel;
 
 /* Drag and drop functionality can be suspended for a little bit until I finish method box
  */
@@ -20,6 +18,7 @@ namespace ComponentLibrary
 		{
 			InitializeComponent();
 			AllowDrop = true;
+			VerticalAlignment = VerticalAlignment.Top;
 		}
 
 		private Point _StartPoint;
@@ -39,18 +38,18 @@ namespace ComponentLibrary
 
 		private static void Initialize(DependencyObject d, DependencyPropertyChangedEventArgs e)
 		{
-			ObjectNode node = 
+			ObjectBox box = d as ObjectBox;
 
-			Child?.RemoveSelf();
+			box.Child?.RemoveSelf();
 
-			var type = ObjectNode.Type;
+			var type = box.ObjectNode.Type;
 			if (type.IsSame(TypeSystem.Bool))
 			{
-				ToCheckBox();
+				box.ToCheckBox();
 			}
 			else if (type.IsValueType)
 			{
-				ToTextBox(type);
+				box.ToTextBox(type);
 			}
 			else if (type.IsDerivedFrom(TypeSystem.Collection))
 			{
@@ -58,19 +57,18 @@ namespace ComponentLibrary
 			}
 			else
 			{
-				ToDropBox();
+				box.ToDropBox();
 			}
 
-			//var button = new Button();
-			//{
-			//	button.Visibility = Visibility.Collapsed;
-			//	button.Content = "Drag";
-			//	button.MouseMove += ObjectBox_MouseMove;
-			//	button.DragEnter += ObjectBox_DragEnter;
-			//	button.Drop += ObjectBox_Drop;
-			//	button.MouseLeftButtonDown += ObjectBox_MouseLeftButtonDown;
-			//}
-			//MainPanel.Children.Add(button);
+			var label = new Label();
+			{
+				label.Content = "Drag";
+				//button.MouseMove += box.ObjectBox_MouseMove;
+				//button.DragEnter += box.ObjectBox_DragEnter;
+				label.Drop += box.ObjectBox_Drop;
+				label.MouseLeftButtonDown += box.ObjectBox_MouseLeftButtonDown;
+			}
+			box.MainPanel.Children.Add(label);
 		}
 
 		private void ChangeObjectData_Int(object sender, RoutedEventArgs e)
@@ -101,7 +99,7 @@ namespace ComponentLibrary
 		{
 			var textBox = new TextBox();
 			{
-				textBox.SetBinding(TextBox.TextProperty, "ObjectData");
+				textBox.SetBinding(TextBox.TextProperty, new Binding("ObjectData") { Source = ObjectNode });
 				if (type.IsSame(TypeSystem.Int))
 				{
 					textBox.LostFocus += ChangeObjectData_Int;
@@ -133,6 +131,10 @@ namespace ComponentLibrary
 				//	comboBox.IsEditable = true;
 				//}
 
+				//comboBox.Drop += ObjectBox_Drop;
+				//comboBox.MouseLeftButtonDown += ObjectBox_MouseLeftButtonDown;
+
+
 				comboBox.ItemsSource = ObjectNode.Properties;
 				comboBox.SelectionChanged += (sender, e) =>
 				{
@@ -150,7 +152,9 @@ namespace ComponentLibrary
 
 		private void ObjectBox_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
 		{
-			_StartPoint = e.GetPosition(null);
+			ObjectBox box = this;
+			DragDrop.DoDragDrop(box, box.ObjectNode, DragDropEffects.Link);
+			//_StartPoint = e.GetPosition(null);
 		}
 
 		private void ObjectBox_MouseMove(object sender, MouseEventArgs e)
