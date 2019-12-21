@@ -8,7 +8,7 @@
 		Loaded="Window_Loaded"
         Title="MainWindow" Height="450" Width="800">
 	<Grid>
-		<StackPanel x:Name="MainPanel" Orientation="Horizontal" Height="Auto" VerticalAlignment="Top">
+		<StackPanel x:Name="MainPanel" Orientation="Vertical" Height="Auto" VerticalAlignment="Top">
 		</StackPanel>
 		<Button x:Name="Add" Content="Add" HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="0,0,10,10.5" Click="Add_Click"></Button>
 	</Grid>
