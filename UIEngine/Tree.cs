@@ -509,7 +509,29 @@ namespace UIEngine
 		}
 	}
 
-	public class LinqNode
+	public class LinqNode : Node
 	{
+		internal CollectionNode Collection { get; set; }
+		protected override string Preview { get => throw new NotImplementedException(); set => throw new NotImplementedException(); }
+	}
+
+	public class ForEachNode : LinqNode
+	{
+
+	}
+
+	public class WhereNode : LinqNode
+	{
+
+	}
+
+	public class SelectNode : LinqNode
+	{
+
+	}
+
+	public class SortNode : LinqNode
+	{
+
 	}
 }
