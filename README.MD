@@ -56,6 +56,6 @@ Finalization and Optimization
 #### An Implementation Using *WPF*
 
 - [X] Components for `ObjectNode`
-- [ ] Components for Collections (`IEnumerable<T>`)
+- [X] Components for Collections (`IColection`)
 - [X] Components for Methods/Functions
 - [ ] Components for LINQ
