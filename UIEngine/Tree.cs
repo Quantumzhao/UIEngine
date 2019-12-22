@@ -1,4 +1,9 @@
-﻿using System;
+﻿/* “这个世界上还有很多我不懂的东西。
+ * 敬畏它们。
+ * 比如高效的垃圾回收。”
+ * ———我说的
+ */
+using System;
 using System.Collections.Generic;
 using System.Collections;
 using System.Linq;
@@ -30,9 +35,19 @@ namespace UIEngine
 		/// </summary>
 		public Func<object, string> PreviewExpression { get; set; } = o => o.ToString();
 
+		/// <summary>
+		///		The currently selected node. 
+		///		It can be (instance) method node or object node
+		/// </summary>
+		internal virtual Node SelectedNode { get; set; } = null;
+
 		public override string ToString() => Header;
 	}
 
+	// Object nodes should never be created or replaced via external assemblies. 
+	// Object nodes MUST always maintain a tree data structure.
+	// Thus, if an object node wants to point to another object node (not talking about setting another node as child), 
+	// it should actually point to the object data wrapped by that node
 	public class ObjectNode : Node
 	{
 		//public static ObjectNode CreateEmptyObjectNode(TypeSystem type) => Create(type.ReflectedType);
@@ -91,7 +106,6 @@ namespace UIEngine
 		{
 			var objectNode = new ObjectNode(null, null);
 			objectNode.SourceObjectInfo = new DomainModelReferenceInfo(type, SourceReferenceType.parameter);
-			objectNode.IsEmpty = true;
 			return objectNode;
 		}
 
@@ -110,7 +124,7 @@ namespace UIEngine
 
 		public TypeSystem Type => SourceObjectInfo.ObjectDataType;
 		public bool IsValueType => SourceObjectInfo.ObjectDataType.IsValueType;
-		internal bool IsEmpty { get; set; } = false;
+		internal bool IsEmpty => _ObjectData == null;
 		internal DomainModelReferenceInfo SourceObjectInfo { get; set; }
 		public bool CanWrite { get; internal set; } = true;
 		public bool IsLeaf => Properties.Count == 0;
@@ -140,9 +154,7 @@ namespace UIEngine
 			}
 		}
 		#region Object Data
-		// private PropertyInfo propertyInfo;
 		public delegate void ObjectdataChangeDelegate(object data);
-		// public event ObjectdataChangeDelegate ObjectDataLoaded;
 		private object _ObjectData = null;
 		public object ObjectData
 		{
@@ -151,6 +163,10 @@ namespace UIEngine
 				if (_ObjectData == null)
 				{
 					LoadObjectData();
+					if (Parent != null)
+					{
+						Parent.SelectedNode = this;
+					}
 				}
 
 				return _ObjectData;
@@ -161,7 +177,6 @@ namespace UIEngine
 				{
 					_ObjectData = value;
 					SetValueToSourceObject();
-					// ObjectDataLoaded(value);
 				}
 			}
 		}
@@ -197,7 +212,7 @@ namespace UIEngine
 				if (SourceObjectInfo.PropertyInfo != null)
 				{
 					_ObjectData = SourceObjectInfo.PropertyInfo.GetValue(Parent?.ObjectData);
-					// Preview = PreviewExpression?.Invoke(ObjectData);
+					//Preview = PreviewExpression?.Invoke(ObjectData);
 				}
 			}
 		}
@@ -287,6 +302,15 @@ namespace UIEngine
 			LoadObjectData();
 			LoadProperties();
 		}
+
+		/// <summary>
+		///		A syntactic sugar for making an object node point to another node
+		/// </summary>
+		/// <param name="objectNode"></param>
+		internal void SetReferenceTo(ObjectNode objectNode)
+		{
+			ObjectData = objectNode.ObjectData;
+		}
 	}
 
 	public class MethodNode : Node
@@ -302,12 +326,14 @@ namespace UIEngine
 			methodNode.Description = attr.Description;
 			methodNode.Signatures = methodInfo.GetParameters().Select(p => ObjectNode.Create(p.ParameterType)).ToList();
 			methodNode.ReturnNode = ObjectNode.Create(methodInfo.ReturnType);
+			parent.SelectedNode = methodNode;
 
 			return methodNode;
 		}
 
 		public ObjectNode ReturnNode { get; private set; }
 		public List<ObjectNode> Signatures { get; set; }
+		internal override Node SelectedNode => ReturnNode;
 		private MethodInfo _Body;
 
 		protected override string Preview
@@ -393,6 +419,13 @@ namespace UIEngine
 		public List<string> Headings { get; private set; } = new List<string>();
 		public List<List<ObjectNode>> Elements { get; private set; } = new List<List<ObjectNode>>();
 
+		#region LINQ Functionalities
+		public ForEachNode ForEachExpression { get; private set; }
+		public SelectNode SelectExpression { get; private set; }
+		public SortNode SortExpression { get; private set; }
+		public WhereNode WhereExpression { get; set; }
+		#endregion
+
 		/// <summary>
 		///		2D data structure functionalities will be implemented later
 		/// </summary>
@@ -414,8 +447,8 @@ namespace UIEngine
 		}
 		private CollectionNode(Type type) : base(null, null)
 		{
-			IsEmpty = true;
 			SourceObjectInfo = new DomainModelReferenceInfo(type, SourceReferenceType.parameter);
+			ForEachExpression = ForEachNode.Create(this);
 		}
 
 		protected override void LoadObjectData()
@@ -493,7 +526,8 @@ namespace UIEngine
 				{
 					LoadObjectData();
 				}
-				return Elements[row][column];
+				SelectedNode = Elements[row][column];
+				return SelectedNode as ObjectNode;
 			}
 		}
 		public List<ObjectNode> this[int row]
@@ -509,29 +543,78 @@ namespace UIEngine
 		}
 	}
 
-	public class LinqNode : Node
+	// nested Linq expression should not be allowed. 
+	// i.e. c0.Select(c1 => c1.Where(c2 => c2.p0).First());
+	public abstract class LinqNode : Node
 	{
-		internal CollectionNode Collection { get; set; }
+		internal protected LinqNode(CollectionNode collection)
+		{
+			Collection = collection;
+		}
+
+		public CollectionNode Collection { get; private set; }
+		internal protected ObjectNode Enumerator { get; set; }
+		public CollectionNode ReturnCollectionNode { get; private set; }
+		// It is actually the root node of the predicate tree
+		public ObjectNode Predicate { get; set; }
 		protected override string Preview { get => throw new NotImplementedException(); set => throw new NotImplementedException(); }
+		internal abstract CollectionNode Execute();
+		internal abstract bool IsSatisfySignature { get; }
 	}
 
 	public class ForEachNode : LinqNode
 	{
+		public static ForEachNode Create(CollectionNode collection) => new ForEachNode(collection);
 
-	}
+		private ForEachNode(CollectionNode collection) : base(collection) { }
+
+		internal override bool IsSatisfySignature => throw new NotImplementedException();
+
+		internal override CollectionNode Execute()
+		{
+			throw new NotImplementedException();
+		}
+	} 
 
 	public class WhereNode : LinqNode
 	{
+		public static WhereNode Create(CollectionNode collection) => new WhereNode(collection);
 
+		private WhereNode(CollectionNode collection) : base(collection) { }
+
+		internal override bool IsSatisfySignature => throw new NotImplementedException();
+
+		internal override CollectionNode Execute()
+		{
+			throw new NotImplementedException();
+		}
 	}
 
 	public class SelectNode : LinqNode
 	{
+		public static SelectNode Create(CollectionNode collection) => new SelectNode(collection);
 
+		private SelectNode(CollectionNode collection) : base(collection) { }
+
+		internal override bool IsSatisfySignature => throw new NotImplementedException();
+
+		internal override CollectionNode Execute()
+		{
+			throw new NotImplementedException();
+		}
 	}
 
 	public class SortNode : LinqNode
 	{
+		public static SortNode Create(CollectionNode collection) => new SortNode(collection);
 
+		private SortNode(CollectionNode collection) : base(collection) { }
+
+		internal override bool IsSatisfySignature => throw new NotImplementedException();
+
+		internal override CollectionNode Execute()
+		{
+			throw new NotImplementedException();
+		}
 	}
 }
