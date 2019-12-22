@@ -13,7 +13,7 @@ The project is still under development.
  Design and Planning
 
 - [x] Architecture design
-- [x] Front end and back end interoperability
+- [x] UI component layer and domain model layer interoperability
 
 ### Phase 1
 
@@ -38,9 +38,8 @@ Method/Function Accessing and invoking
 
 LINQ Accessing and invoking
 
-- [ ] LINQ expression Parser
+- [X] LINQ expression Tree
 - [ ] Integration with method and property accessing system
-- [ ] Others...
 
 ### Phase 4
 
