@@ -21,8 +21,6 @@ namespace ComponentLibrary
 			VerticalAlignment = VerticalAlignment.Top;
 		}
 
-		private Point _StartPoint;
-
 		public static readonly DependencyProperty ObjectNodeProperty = DependencyProperty.Register("ObjectNode", typeof(ObjectNode), typeof(ObjectBox), new PropertyMetadata(Initialize));
 		public ObjectNode ObjectNode 
 		{ 
@@ -41,6 +39,7 @@ namespace ComponentLibrary
 			ObjectBox box = d as ObjectBox;
 
 			box.Child?.RemoveSelf();
+			box.MainPanel.Children.Clear();
 
 			var type = box.ObjectNode.Type;
 			if (type.IsSame(TypeSystem.Bool))
@@ -50,10 +49,6 @@ namespace ComponentLibrary
 			else if (type.IsValueType)
 			{
 				box.ToTextBox(type);
-			}
-			else if (type.IsDerivedFrom(TypeSystem.Collection))
-			{
-				throw new NotImplementedException();
 			}
 			else
 			{
@@ -119,22 +114,13 @@ namespace ComponentLibrary
 		{
 			var checkbox = new CheckBox();
 			checkbox.Content = ObjectNode.Header;
-			// checkbox.IsChecked = (bool)data;
+			//checkbox.IsChecked = (bool)data;
 			MainPanel.Children.Add(checkbox);
 		}
 		private void ToDropBox()
 		{
 			var comboBox = new ComboBox();
 			{
-				//if (data == null)
-				//{
-				//	comboBox.IsEditable = true;
-				//}
-
-				//comboBox.Drop += ObjectBox_Drop;
-				//comboBox.MouseLeftButtonDown += ObjectBox_MouseLeftButtonDown;
-
-
 				comboBox.ItemsSource = ObjectNode.Properties;
 				comboBox.SelectionChanged += (sender, e) =>
 				{
@@ -154,26 +140,6 @@ namespace ComponentLibrary
 		{
 			ObjectBox box = this;
 			DragDrop.DoDragDrop(box, box.ObjectNode, DragDropEffects.Link);
-			//_StartPoint = e.GetPosition(null);
-		}
-
-		private void ObjectBox_MouseMove(object sender, MouseEventArgs e)
-		{
-			Vector diff = _StartPoint - e.GetPosition(null);
-			if (e.LeftButton == MouseButtonState.Pressed &&
-				(Math.Abs(diff.X) > SystemParameters.MinimumHorizontalDragDistance ||
-				Math.Abs(diff.Y) > SystemParameters.MinimumVerticalDragDistance))
-			{
-				DragDrop.DoDragDrop(this, new DataObject(typeof(ObjectNode), ObjectNode), DragDropEffects.Copy);
-			}
-		}
-
-		private void ObjectBox_DragEnter(object sender, DragEventArgs e)
-		{
-			if (!e.Data.GetDataPresent(typeof(ObjectNode)))
-			{
-				e.Effects = DragDropEffects.None;
-			}
 		}
 
 		private void ObjectBox_Drop(object sender, DragEventArgs e)
