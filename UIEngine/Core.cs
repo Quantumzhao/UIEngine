@@ -7,6 +7,7 @@ using System.Reflection;
 namespace UIEngine
 {
 	public delegate void NodeOperationsDelegate(Node node);
+	public delegate void WarningMessageDelegate(Node source, string message);
 
 	public static class Dashboard
 	{
@@ -15,6 +16,7 @@ namespace UIEngine
 			=> new HashSet<ObjectNode>(Roots.Where(n => n is ObjectNode).Select(n => n as ObjectNode));
 		public static HashSet<MethodNode> GetRootMethodNodes()
 			=> new HashSet<MethodNode>(Roots.Where(n => n is MethodNode).Select(n => n as MethodNode));
+		public static event WarningMessageDelegate WarningMessageHandler;
 
 		/// <summary>
 		///		Put all static objects into global objects collection.
@@ -74,6 +76,11 @@ namespace UIEngine
 			}
 
 			return null;
+		}
+
+		internal static void OnWarningMessageHappen(Node source, string message)
+		{
+			WarningMessageHandler?.Invoke(source, message);
 		}
 	}
 

@@ -10,8 +10,7 @@ using System.Linq;
 using System.Reflection;
 namespace UIEngine
 {
-	/* For current stage, UI Engine only supports int, double, string, bool, object and collection
-	 */
+	// For current stage, UI Engine only supports int, double, string, bool, object and collection
 	public abstract class Node
 	{
 		/// <summary>
@@ -38,10 +37,16 @@ namespace UIEngine
 		/// <summary>
 		///		The currently selected node. 
 		///		It can be (instance) method node or object node
+		/// 	This property is for LINQ node
 		/// </summary>
-		internal virtual Node SelectedNode { get; set; } = null;
+		internal virtual Node SelectedNode { get; private set; } = null;
 
 		public override string ToString() => Header;
+
+		internal virtual void SetSelectedNode(Node node)
+		{
+			SelectedNode = node;
+		}
 	}
 
 	// Object nodes should never be created or replaced via external assemblies. 
@@ -50,8 +55,6 @@ namespace UIEngine
 	// it should actually point to the object data wrapped by that node
 	public class ObjectNode : Node
 	{
-		//public static ObjectNode CreateEmptyObjectNode(TypeSystem type) => Create(type.ReflectedType);
-
 		/// <summary>
 		///		Create from property
 		/// </summary>
@@ -165,7 +168,7 @@ namespace UIEngine
 					LoadObjectData();
 					if (Parent != null)
 					{
-						Parent.SelectedNode = this;
+						Parent?.SetSelectedNode(this);
 					}
 				}
 
@@ -326,7 +329,10 @@ namespace UIEngine
 			methodNode.Description = attr.Description;
 			methodNode.Signatures = methodInfo.GetParameters().Select(p => ObjectNode.Create(p.ParameterType)).ToList();
 			methodNode.ReturnNode = ObjectNode.Create(methodInfo.ReturnType);
-			parent.SelectedNode = methodNode;
+			if (parent != null)
+			{
+				parent?.SetSelectedNode(methodNode);
+			}
 
 			return methodNode;
 		}
@@ -414,6 +420,7 @@ namespace UIEngine
 	/// </summary>
 	public class CollectionNode : ObjectNode
 	{
+		private const string _INVALID_OPERATION_WARNING = "LINQ expression does not support collection node";
 		public bool Is_2D { get; private set; }
 		public bool DisplayPropertiesAsHeadings { get; set; } = false;
 		public List<string> Headings { get; private set; } = new List<string>();
@@ -526,7 +533,7 @@ namespace UIEngine
 				{
 					LoadObjectData();
 				}
-				SelectedNode = Elements[row][column];
+				SetSelectedNode(Elements[row][column]);
 				return SelectedNode as ObjectNode;
 			}
 		}
@@ -540,6 +547,12 @@ namespace UIEngine
 				}
 				return Elements[row];
 			}
+		}
+
+		internal override void SetSelectedNode(Node node)
+		{
+			base.SetSelectedNode(node);			
+			Dashboard.OnWarningMessageHappen(this, _INVALID_OPERATION_WARNING);
 		}
 	}
 
@@ -568,11 +581,24 @@ namespace UIEngine
 
 		private ForEachNode(CollectionNode collection) : base(collection) { }
 
-		internal override bool IsSatisfySignature => throw new NotImplementedException();
+		internal override bool IsSatisfySignature => true;
 
 		internal override CollectionNode Execute()
 		{
-			throw new NotImplementedException();
+			foreach (var list in Collection.Elements)
+			{
+				foreach (var element in list)
+				{
+					Node tracer = element;
+					while (tracer != null)
+					{
+						tracer = tracer.SelectedNode;
+					}
+				}
+			}
+			
+
+			return null;
 		}
 	} 
 
