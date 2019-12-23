@@ -30,7 +30,6 @@ namespace ComponentLibrary
 
 		public IBox Child { get; set; }
 
-		//public event Action<object, ObjectNode> ObjectNodeChanged;
 		public static event NewNodeSelectedHandler NewNodeSelected;
 		public static event RemovedHandler Removed;
 
@@ -58,8 +57,6 @@ namespace ComponentLibrary
 			var label = new Label();
 			{
 				label.Content = "Drag";
-				//button.MouseMove += box.ObjectBox_MouseMove;
-				//button.DragEnter += box.ObjectBox_DragEnter;
 				label.Drop += box.ObjectBox_Drop;
 				label.MouseLeftButtonDown += box.ObjectBox_MouseLeftButtonDown;
 			}

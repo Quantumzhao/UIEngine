@@ -11,7 +11,6 @@ namespace ComponentLibrary
 	public partial class CollectionBox : UserControl, IBox
 	{
 		public static event RemovedHandler Removed;
-		//public event Action<object, CollectionNode> ContentChanged;
 
 		public CollectionBox()
 		{
