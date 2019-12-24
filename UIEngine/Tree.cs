@@ -39,20 +39,18 @@ namespace UIEngine
 		///		It can be (instance) method node or object node
 		/// 	This property is for LINQ node
 		/// </summary>
-		internal virtual Node SelectedNode { get; private set; } = null;
 
 		public override string ToString() => Header;
 
-		internal virtual void SetSelectedNode(Node node)
-		{
-			SelectedNode = node;
-		}
+		/// <summary>Transform the succession from a template to an instantiated node</summary>
+		/// <returns>Object node is the tail node of the syntax tree</returns>
+		internal abstract ObjectNode InstantiateSuccession();
 	}
 
-	// Object nodes should never be created or replaced via external assemblies. 
-	// Object nodes MUST always maintain a tree data structure.
-	// Thus, if an object node wants to point to another object node (not talking about setting another node as child), 
-	// it should actually point to the object data wrapped by that node
+	/* object nodes should never be created or replaced via external assemblies.
+	 * object nodes must always maintain a tree data structure.
+	 * thus, if an object node wants to point to another object node(not talking about setting another node as child), 
+	 * it should actually point to the object data wrapped by that node */
 	public class ObjectNode : Node
 	{
 		/// <summary>
@@ -125,6 +123,10 @@ namespace UIEngine
 			}
 		}
 
+		/* the next node in the syntax tree
+		 * The succession should be an empty (but not null) node when first assigned. 
+		 * It should be instantiated by InstantiateSuccession method */
+		internal Node Succession { get; set; }
 		public TypeSystem Type => SourceObjectInfo.ObjectDataType;
 		public bool IsValueType => SourceObjectInfo.ObjectDataType.IsValueType;
 		internal bool IsEmpty => _ObjectData == null;
@@ -168,7 +170,7 @@ namespace UIEngine
 					LoadObjectData();
 					if (Parent != null)
 					{
-						Parent?.SetSelectedNode(this);
+						Parent.Succession = this;
 					}
 				}
 
@@ -314,6 +316,18 @@ namespace UIEngine
 		{
 			ObjectData = objectNode.ObjectData;
 		}
+
+		internal override ObjectNode InstantiateSuccession()
+		{
+			// if succession is an object node, load and return it
+			if (Succession is ObjectNode)
+			{
+				(Succession as ObjectNode).LoadObjectData();
+			}
+			// if succession is a method node, just return the method node
+			// if it has no succession, return this
+			return Succession?.InstantiateSuccession() ?? this;
+		}
 	}
 
 	public class MethodNode : Node
@@ -331,7 +345,7 @@ namespace UIEngine
 			methodNode.ReturnNode = ObjectNode.Create(methodInfo.ReturnType);
 			if (parent != null)
 			{
-				parent?.SetSelectedNode(methodNode);
+				parent.Succession = methodNode;
 			}
 
 			return methodNode;
@@ -339,7 +353,6 @@ namespace UIEngine
 
 		public ObjectNode ReturnNode { get; private set; }
 		public List<ObjectNode> Signatures { get; set; }
-		internal override Node SelectedNode => ReturnNode;
 		private MethodInfo _Body;
 
 		protected override string Preview
@@ -354,9 +367,16 @@ namespace UIEngine
 		/// <returns>return object</returns>
 		public ObjectNode Invoke()
 		{
+			// check if any parameter is empty
+			if (!Signatures.All(n => !n.IsEmpty))
+			{
+				var message = "Some parameters are empty";
+				Dashboard.OnWarningMessageHappen(this, message);
+				throw new InvalidOperationException(message);
+			}
 			var objectData = _Body.Invoke(
 				Parent?.ObjectData,
-				Signatures.Select(p => p.ObjectData).ToArray()
+				Signatures.Select(p => p.InstantiateSuccession().ObjectData).ToArray()
 			);
 
 			ReturnNode.ObjectData = objectData;
@@ -413,6 +433,18 @@ namespace UIEngine
 			}
 			return candidates;
 		}
+
+		internal override ObjectNode InstantiateSuccession()
+		{
+			if (ReturnNode.Type.ReflectedType.Equals(typeof(void)))
+			{
+				return ReturnNode;
+			}
+			else
+			{
+				return ReturnNode.InstantiateSuccession();
+			}
+		}
 	}
 
 	/// <summary>
@@ -420,7 +452,7 @@ namespace UIEngine
 	/// </summary>
 	public class CollectionNode : ObjectNode
 	{
-		private const string _INVALID_OPERATION_WARNING = "LINQ expression does not support collection node";
+		private const string _INVALID_OPERATION_WARNING = "Collection node is not supported in a LINQ expression";
 		public bool Is_2D { get; private set; }
 		public bool DisplayPropertiesAsHeadings { get; set; } = false;
 		public List<string> Headings { get; private set; } = new List<string>();
@@ -446,6 +478,22 @@ namespace UIEngine
 		internal static new CollectionNode Create(Type type)
 		{
 			return new CollectionNode(type);
+		}
+		/// <summary>
+		///		For LINQ expression generated collection
+		/// </summary>
+		/// <param name="collection"></param>
+		/// <returns></returns>
+		internal static CollectionNode Create(List<ObjectNode> collection)
+		{
+			var collectionNode = new CollectionNode(typeof(List<ObjectNode>));
+			foreach (var element in collection)
+			{
+				var list = new List<ObjectNode>();
+				list.Add(element);
+				collectionNode.Elements.Add(list);
+			}
+			return collectionNode;
 		}
 		private CollectionNode(ObjectNode parent, PropertyInfo propertyInfo)
 			: base(parent, propertyInfo.GetCustomAttribute<Visible>())
@@ -533,8 +581,8 @@ namespace UIEngine
 				{
 					LoadObjectData();
 				}
-				SetSelectedNode(Elements[row][column]);
-				return SelectedNode as ObjectNode;
+				Succession = Elements[row][column];
+				return Succession as ObjectNode;
 			}
 		}
 		public List<ObjectNode> this[int row]
@@ -549,10 +597,10 @@ namespace UIEngine
 			}
 		}
 
-		internal override void SetSelectedNode(Node node)
+		internal override ObjectNode InstantiateSuccession()
 		{
-			base.SetSelectedNode(node);			
 			Dashboard.OnWarningMessageHappen(this, _INVALID_OPERATION_WARNING);
+			return null;
 		}
 	}
 
@@ -560,6 +608,7 @@ namespace UIEngine
 	// i.e. c0.Select(c1 => c1.Where(c2 => c2.p0).First());
 	public abstract class LinqNode : Node
 	{
+		private const string _INVALID_OPERATION_WARNING = "LINQ nodes do not have succession";
 		internal protected LinqNode(CollectionNode collection)
 		{
 			Collection = collection;
@@ -573,6 +622,11 @@ namespace UIEngine
 		protected override string Preview { get => throw new NotImplementedException(); set => throw new NotImplementedException(); }
 		internal abstract CollectionNode Execute();
 		internal abstract bool IsSatisfySignature { get; }
+		internal override ObjectNode InstantiateSuccession()
+		{
+			Dashboard.OnWarningMessageHappen(this, _INVALID_OPERATION_WARNING);
+			return null;
+		}
 	}
 
 	public class ForEachNode : LinqNode
@@ -589,14 +643,10 @@ namespace UIEngine
 			{
 				foreach (var element in list)
 				{
-					Node tracer = element;
-					while (tracer != null)
-					{
-						tracer = tracer.SelectedNode;
-					}
+					Predicate.SetReferenceTo(element);
+					Predicate.InstantiateSuccession();
 				}
-			}
-			
+			}			
 
 			return null;
 		}
@@ -605,14 +655,88 @@ namespace UIEngine
 	public class WhereNode : LinqNode
 	{
 		public static WhereNode Create(CollectionNode collection) => new WhereNode(collection);
-
 		private WhereNode(CollectionNode collection) : base(collection) { }
+
+		private static readonly Func<bool, bool, bool> And = (left, right) => left && right;
+		private static readonly Func<bool, bool, bool> Or = (left, right) => left || right;
+		private static readonly Func<bool, bool> Not = value => !value;
 
 		internal override bool IsSatisfySignature => throw new NotImplementedException();
 
+		private Queue<KeyValuePair<int, object>> _Conditions = new Queue<KeyValuePair<int, object>>();
+
 		internal override CollectionNode Execute()
 		{
-			throw new NotImplementedException();
+			var ret = new List<ObjectNode>();
+			foreach (var list in Collection.Elements)
+			{
+				foreach (var element in list)
+				{
+					while (Parser.IsReadyToBeParsed(_Conditions.Peek()))
+					{
+						var pair = _Conditions.Dequeue();
+						Predicate.SetReferenceTo(pair.Value as ObjectNode);
+						bool result = (bool)Predicate.InstantiateSuccession().ObjectData;
+						_Conditions.Enqueue(new KeyValuePair<int, object>(pair.Key, result));
+					}
+					if (Parser.Execute(_Conditions))
+					{
+						ret.Add(element);
+					}
+				}
+			}
+			return CollectionNode.Create(ret);
+		}
+
+		public void AddCondition(ObjectNode predicate)
+		{
+			_Conditions.Enqueue(new KeyValuePair<int, object>(3, predicate));
+		}
+
+		public void AddOperator(LogicOperators logicOperator)
+		{
+			switch (logicOperator)
+			{
+				case LogicOperators.Add:
+					_Conditions.Enqueue(new KeyValuePair<int, object>(0, And));
+					break;
+				case LogicOperators.Or:
+					_Conditions.Enqueue(new KeyValuePair<int, object>(1, Or));
+					break;
+				case LogicOperators.Not:
+					_Conditions.Enqueue(new KeyValuePair<int, object>(2, Not));
+					break;
+				default:
+					break;
+			}
+		}
+
+		public enum LogicOperators
+		{
+			Add = 0, 
+			Or = 1, 
+			Not = 2
+			// "Condition" has an implicit value of 3
+		}
+
+		private static class Parser
+		{
+			internal static bool Execute(Queue<KeyValuePair<int, object>> conditions)
+			{
+				throw new NotImplementedException();
+			}
+
+			internal static bool IsReadyToBeParsed(KeyValuePair<int, object> condition)
+			{
+				if (condition.Key != 3)
+				{
+					return true;
+				}
+				else
+				{
+					return condition.Value is bool;
+				}
+			}
 		}
 	}
 
