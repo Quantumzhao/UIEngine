@@ -764,31 +764,11 @@ namespace UIEngine
 		{
 			internal static bool Execute(Queue<KeyValuePair<int, object>> conditions)
 			{
-				bool left;
-				while (conditions.Count != 0)
-				{
-					var pair = conditions.Dequeue();
-					switch (pair.Key)
-					{
-						case 0:
-
-							break;
-
-						case 1:
-							break;
-
-						case 2:
-							break;
-
-						case 3:
-							left = (bool)pair.Value;
-							break;
-
-						default:
-							break;
-					}
-				}
+				int i = 0;
+				var expression = new FunctionBuilder();
+				expression.AddVariable<bool>();
 				throw new NotImplementedException();
+
 			}
 
 			internal static bool IsReadyToBeParsed(KeyValuePair<int, object> condition)
