@@ -88,11 +88,13 @@ namespace UIEngine
 			var objectNode = new ObjectNode(parent, attribute);
 			if (parent is CollectionNode)
 			{
-				objectNode.SourceObjectInfo = new DomainModelReferenceInfo(objectData.GetType(), SourceReferenceType.Indexer);
+				objectNode.SourceObjectInfo = new DomainModelReferenceInfo(objectData.GetType(), 
+					SourceReferenceType.Indexer);
 			}
 			else
 			{
-				objectNode.SourceObjectInfo = new DomainModelReferenceInfo(objectData.GetType(), SourceReferenceType.ReturnValue);
+				objectNode.SourceObjectInfo = new DomainModelReferenceInfo(objectData.GetType(), 
+					SourceReferenceType.ReturnValue);
 			}
 			objectNode.Header = objectData.ToString();
 			objectNode._ObjectData = objectData;
@@ -341,7 +343,8 @@ namespace UIEngine
 			methodNode.Name = methodNode.Name;
 			methodNode.Header = attr.Header;
 			methodNode.Description = attr.Description;
-			methodNode.Signatures = methodInfo.GetParameters().Select(p => ObjectNode.Create(p.ParameterType)).ToList();
+			methodNode.Signatures = methodInfo.GetParameters()
+				.Select(p => ObjectNode.Create(p.ParameterType)).ToList();
 			methodNode.ReturnNode = ObjectNode.Create(methodInfo.ReturnType);
 			if (parent != null)
 			{
@@ -448,15 +451,19 @@ namespace UIEngine
 	}
 
 	/// <summary>
-	///		The collection that is used to generate this node should not be an element of another collection
+	///		The collection that is used to generate.
+	///		this node should not be an element of another collection. 
+	///		Only <c>IList</c> is supported at current stage
 	/// </summary>
 	public class CollectionNode : ObjectNode
 	{
-		private const string _INVALID_OPERATION_WARNING = "Collection node is not supported in a LINQ expression";
+		private const string _INVALID_OPERATION_WARNING = 
+			"Collection node is not supported in a LINQ expression";
 		public bool Is_2D { get; private set; }
 		public bool DisplayPropertiesAsHeadings { get; set; } = false;
 		public List<string> Headings { get; private set; } = new List<string>();
 		public List<List<ObjectNode>> Elements { get; private set; } = new List<List<ObjectNode>>();
+		public TypeSystem ElementType { get; private set; }
 
 		#region LINQ Functionalities
 		public ForEachNode ForEachExpression { get; private set; }
@@ -489,8 +496,7 @@ namespace UIEngine
 			var collectionNode = new CollectionNode(typeof(List<ObjectNode>));
 			foreach (var element in collection)
 			{
-				var list = new List<ObjectNode>();
-				list.Add(element);
+				var list = new List<ObjectNode> { element };
 				collectionNode.Elements.Add(list);
 			}
 			return collectionNode;
@@ -499,11 +505,20 @@ namespace UIEngine
 			: base(parent, propertyInfo.GetCustomAttribute<Visible>())
 		{
 			SourceObjectInfo = new DomainModelReferenceInfo(propertyInfo, SourceReferenceType.Property);
+			Initialize();
 		}
 		private CollectionNode(Type type) : base(null, null)
 		{
 			SourceObjectInfo = new DomainModelReferenceInfo(type, SourceReferenceType.parameter);
+			Initialize();
+		}
+		private void Initialize()
+		{
+			ElementType = TypeSystem.ToRestrictedType(SourceObjectInfo.ObjectDataType.ReflectedType.GenericTypeArguments[0]);
 			ForEachExpression = ForEachNode.Create(this);
+			SelectExpression = SelectNode.Create(this);
+			SortExpression = SortNode.Create(this);
+			WhereExpression = WhereNode.Create(this);
 		}
 
 		protected override void LoadObjectData()
@@ -617,9 +632,8 @@ namespace UIEngine
 		public CollectionNode Collection { get; private set; }
 		internal protected ObjectNode Enumerator { get; set; }
 		public CollectionNode ReturnCollectionNode { get; private set; }
-		// It is actually the root node of the predicate tree
-		public ObjectNode Predicate { get; set; }
-		protected override string Preview { get => throw new NotImplementedException(); set => throw new NotImplementedException(); }
+		protected override string Preview { get => throw new NotImplementedException(); 
+			set => throw new NotImplementedException(); }
 		internal abstract CollectionNode Execute();
 		internal abstract bool IsSatisfySignature { get; }
 		internal override ObjectNode InstantiateSuccession()
@@ -627,13 +641,20 @@ namespace UIEngine
 			Dashboard.OnWarningMessageHappen(this, _INVALID_OPERATION_WARNING);
 			return null;
 		}
+		public abstract void AddPredicate(ObjectNode predicate);
 	}
 
 	public class ForEachNode : LinqNode
 	{
+		private const string _SINGLE_PREDICATE_WARNING = "For each node has only one predicate";
 		public static ForEachNode Create(CollectionNode collection) => new ForEachNode(collection);
+		private List<ObjectNode> _Predicate { get; } = new List<ObjectNode>();
 
-		private ForEachNode(CollectionNode collection) : base(collection) { }
+		private ForEachNode(CollectionNode collection) : base(collection) 
+		{
+			// For each only has one predicate
+			_Predicate.Add(ObjectNode.Create(collection.ElementType.ReflectedType));
+		}
 
 		internal override bool IsSatisfySignature => true;
 
@@ -641,19 +662,26 @@ namespace UIEngine
 		{
 			foreach (var list in Collection.Elements)
 			{
-				foreach (var element in list)
+				foreach (var enumerator in list)
 				{
-					Predicate.SetReferenceTo(element);
-					Predicate.InstantiateSuccession();
+					_Predicate[0].SetReferenceTo(enumerator);
+					_Predicate[0].InstantiateSuccession();
 				}
-			}			
+			}
 
 			return null;
+		}
+
+		public override void AddPredicate(ObjectNode predicate)
+		{
+			Dashboard.OnWarningMessageHappen(this, _SINGLE_PREDICATE_WARNING);
+			throw new InvalidOperationException(_SINGLE_PREDICATE_WARNING);
 		}
 	} 
 
 	public class WhereNode : LinqNode
 	{
+		private const string _INVALID_RETURN_TYPE = "Current expression does not qualify return type requirement";
 		public static WhereNode Create(CollectionNode collection) => new WhereNode(collection);
 		private WhereNode(CollectionNode collection) : base(collection) { }
 
@@ -663,34 +691,47 @@ namespace UIEngine
 
 		internal override bool IsSatisfySignature => throw new NotImplementedException();
 
-		private Queue<KeyValuePair<int, object>> _Conditions = new Queue<KeyValuePair<int, object>>();
-
+		/* The set of conditions that the where predicate describes.
+		 * They are connected by logic operators, e.g. cond1 AND cond2 OR NOT cond3. 
+		 * The initial (template) conditions are syntax trees of object nodes, once the root nodes (i.e. during execution) are assigned,
+		 * the parser will give off their return value and replace themselves in the key value pairs*/
+		private readonly Queue<KeyValuePair<int, object>> _Predicates = new Queue<KeyValuePair<int, object>>();
+		/// <summary>
+		///		Execute the predicate
+		/// </summary>
+		/// <returns>If the expression is invalid, it will give off a warning and just return the collection itself</returns>
 		internal override CollectionNode Execute()
 		{
+			if (!IsSatisfySignature)
+			{
+				Dashboard.OnWarningMessageHappen(this, _INVALID_RETURN_TYPE);
+				return Collection;
+			}
 			var ret = new List<ObjectNode>();
 			foreach (var list in Collection.Elements)
 			{
-				foreach (var element in list)
+				foreach (var enumerator in list)
 				{
-					while (Parser.IsReadyToBeParsed(_Conditions.Peek()))
+					while (Parser.IsReadyToBeParsed(_Predicates.Peek()))
 					{
-						var pair = _Conditions.Dequeue();
-						Predicate.SetReferenceTo(pair.Value as ObjectNode);
-						bool result = (bool)Predicate.InstantiateSuccession().ObjectData;
-						_Conditions.Enqueue(new KeyValuePair<int, object>(pair.Key, result));
+						var pair = _Predicates.Dequeue();
+						ObjectNode condition = pair.Value as ObjectNode;
+						condition.SetReferenceTo(enumerator);
+						bool result = (bool)condition.InstantiateSuccession().ObjectData;
+						_Predicates.Enqueue(new KeyValuePair<int, object>(pair.Key, result));
 					}
-					if (Parser.Execute(_Conditions))
+					if (Parser.Execute(_Predicates))
 					{
-						ret.Add(element);
+						ret.Add(enumerator);
 					}
 				}
 			}
 			return CollectionNode.Create(ret);
 		}
 
-		public void AddCondition(ObjectNode predicate)
+		public override void AddPredicate(ObjectNode predicate)
 		{
-			_Conditions.Enqueue(new KeyValuePair<int, object>(3, predicate));
+			_Predicates.Enqueue(new KeyValuePair<int, object>(3, predicate));
 		}
 
 		public void AddOperator(LogicOperators logicOperator)
@@ -698,13 +739,13 @@ namespace UIEngine
 			switch (logicOperator)
 			{
 				case LogicOperators.Add:
-					_Conditions.Enqueue(new KeyValuePair<int, object>(0, And));
+					_Predicates.Enqueue(new KeyValuePair<int, object>(0, And));
 					break;
 				case LogicOperators.Or:
-					_Conditions.Enqueue(new KeyValuePair<int, object>(1, Or));
+					_Predicates.Enqueue(new KeyValuePair<int, object>(1, Or));
 					break;
 				case LogicOperators.Not:
-					_Conditions.Enqueue(new KeyValuePair<int, object>(2, Not));
+					_Predicates.Enqueue(new KeyValuePair<int, object>(2, Not));
 					break;
 				default:
 					break;
@@ -723,6 +764,30 @@ namespace UIEngine
 		{
 			internal static bool Execute(Queue<KeyValuePair<int, object>> conditions)
 			{
+				bool left;
+				while (conditions.Count != 0)
+				{
+					var pair = conditions.Dequeue();
+					switch (pair.Key)
+					{
+						case 0:
+
+							break;
+
+						case 1:
+							break;
+
+						case 2:
+							break;
+
+						case 3:
+							left = (bool)pair.Value;
+							break;
+
+						default:
+							break;
+					}
+				}
 				throw new NotImplementedException();
 			}
 
@@ -752,6 +817,11 @@ namespace UIEngine
 		{
 			throw new NotImplementedException();
 		}
+
+		public override void AddPredicate(ObjectNode predicate)
+		{
+			throw new NotImplementedException();
+		}
 	}
 
 	public class SortNode : LinqNode
@@ -763,6 +833,11 @@ namespace UIEngine
 		internal override bool IsSatisfySignature => throw new NotImplementedException();
 
 		internal override CollectionNode Execute()
+		{
+			throw new NotImplementedException();
+		}
+
+		public override void AddPredicate(ObjectNode predicate)
 		{
 			throw new NotImplementedException();
 		}
