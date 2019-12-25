@@ -1,49 +1,15 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
 
-namespace UIEngine
+namespace CustomFunctionBuilder
 {
-	class FunctionBuilder
+	internal class FunctionBuilder
 	{
-		private TypedDictionary tempVariables = new TypedDictionary();
+		private readonly Dictionary<string, object> _Variables = new Dictionary<string, object>();
 
-		private Dictionary<string, object> executionSequence =
-			new Dictionary<string, object>();
-
-		public FunctionBuilder() { }
-		public FunctionBuilder(
-			TypedDictionary parameters,
-			KeyValuePair<string, Func<object>> function = new KeyValuePair<string, Func<object>>())
-		{
-			AddVariable(parameters);
-			if (function.Value != null)
-			{
-				AddFunction(function.Key, function.Value);
-			}
-		}
-		public FunctionBuilder(
-			TypedDictionary parameters,
-			KeyValuePair<string, Action> function = new KeyValuePair<string, Action>())
-		{
-			AddVariable(parameters);
-			if (function.Value != null)
-			{
-				AddFunction(function.Key, function.Value);
-			}
-		}
-		public FunctionBuilder(
-			TypedDictionary parameters,
-			KeyValuePair<string, FunctionBuilder> function
-			= new KeyValuePair<string, FunctionBuilder>())
-		{
-			AddVariable(parameters);
-			if (function.Value != null)
-			{
-				AddFunction(function.Key, function.Value);
-			}
-		}
+		private readonly LinkedList<KeyValuePair<string, object>> _ExecutionSequence =
+			new LinkedList<KeyValuePair<string, object>>();
 
 		/// <summary>
 		///		Add one local variable to the wrapped function
@@ -51,17 +17,25 @@ namespace UIEngine
 		/// <param name="name"> Name of the parameter</param>
 		/// <param name="data"> The object data of the parameter</param>
 		/// <typeparam name="T"></typeparam>
-		public void AddVariable<T>(string name, T data)
-			=> tempVariables.Add(name, data);
-
-		/// <summary>
-		///		Add multiple variables at once to the wrapped function
-		/// </summary>
-		/// <param name="parameters">
-		///		The variable list, containing names and data of each variable respectively
-		///	</param>
-		public void AddVariable(TypedDictionary parameters)
-			=> tempVariables.Concat(parameters);
+		public bool AddVariable(string name, object data)
+		{
+			if (VariablesCount < MaximumVariablesCount)
+			{
+				if (_Variables.ContainsKey(name))
+				{
+					_Variables[name] = data;
+				}
+				else
+				{
+					_Variables.Add(name, data);
+				}				
+				return true;
+			}
+			else
+			{
+				return false;
+			}
+		}
 
 		/// <summary>
 		///		Add one subprocedure or function to the wrapped function
@@ -71,17 +45,27 @@ namespace UIEngine
 		///		<para>
 		///			NOTE: If the function has a return value, 
 		///			the return value will be stored inside the 
-		///			<code>CustomizedFunctionWrapper</code> typed instance, 
+		///			<para>Func</para> typed instance, 
 		///			and its name is the same as the function. 
 		///		</para>
 		/// </param>
-		/// <param name="method"></param>
-		public void AddFunction(string name, Func<object> function)
-			=> executionSequence.Add(name, function);
-		public void AddFunction(string name, Action function)
-			=> executionSequence.Add(name, function);
-		public void AddFunction(string name, FunctionBuilder function)
-			=> executionSequence.Add(name, function);
+		/// <param name="function"></param>
+		/// <param name="isAtBeginnning">
+		///		Indicates whether the new function call is prior to other existing ones
+		///	</param>
+		public void AddFunction(string name, Delegate function, bool isAtBeginnning = false)
+			=> AddFunction(name, (object)function, isAtBeginnning);
+		public void AddFunction(string name, FunctionBuilder function, bool isAtBeginnning = false)
+			=> AddFunction(name, (object)function, isAtBeginnning);
+		private void AddFunction(string name, object function, bool isAtBeginnning)
+		{
+			var pair = new KeyValuePair<string, object>(name, function);
+			if (isAtBeginnning) _ExecutionSequence.AddFirst(pair);
+			else _ExecutionSequence.AddLast(pair);
+		}
+
+		public int VariablesCount => _Variables.Count;
+		public int MaximumVariablesCount { get; set; } = int.MaxValue;
 
 		/// <summary>
 		///		To invoke the wrapped function
@@ -94,45 +78,27 @@ namespace UIEngine
 		{
 			KeyValuePair<string, object> tempResult = new KeyValuePair<string, object>();
 
-			foreach (KeyValuePair<string, object> function in executionSequence)
+			while (_ExecutionSequence.Count != 0)
 			{
+				var functionPair = _ExecutionSequence.First.Value;
+				_ExecutionSequence.RemoveFirst();
 				tempResult = new KeyValuePair<string, object>
 				(
-					function.Key,
-					function
+					functionPair.Key,
+					functionPair
 						.Value
 						.GetType()
 						.GetMethod("Invoke")
-						.Invoke
-						(
-							function.Value,
-							new object[] { }
-						)
+						.Invoke(functionPair.Value, new object[] { })
 				);
 
 				if (tempResult.Value != null)
-					tempVariables.Add(tempResult.Key, tempResult.Value);
+					_Variables.Add(tempResult.Key, tempResult.Value);
+
 			}
+
 			return tempResult.Value;
 		}
-
-		/// <summary>
-		///		The generic version of the indexer
-		/// </summary>
-		/// <typeparam name="T">The type of the return value</typeparam>
-		/// <param name="name">The name of the <c>tempVariable</c>, which is used to find it</param>
-		/// <returns>The requested variable</returns>
-		public T GetTempVariable<T>(string name)
-			=> tempVariables.GetVariable<T>(name);
-
-		/// <summary>
-		/// 
-		/// </summary>
-		/// <typeparam name="T"></typeparam>
-		/// <param name="name"></param>
-		/// <param name="variable"></param>
-		public void SetTempVariable<T>(string name, T variable)
-			=> tempVariables.SetVariable<T>(name, variable);
 
 		/// <summary>
 		///		The Indexer. This version is a shortcut of <c>GetTempVariable<c/>. 
@@ -141,59 +107,24 @@ namespace UIEngine
 		/// <returns>The requested variable</returns>
 		public object this[string name]
 		{
-			get => tempVariables.GetVariable<object>(name);
-			set => tempVariables.SetVariable<object>(name, value);
+			get => _Variables[name];
+			set => _Variables[name] = value;
 		}
+	}
 
-		/// <summary>
-		///		Show the invocation sequence
-		/// </summary>
-		/// <returns>A list of the names of functions ordered by their invocation</returns>
-		public IEnumerable<string> ShowInvocationOrder()
-		{
-			foreach (KeyValuePair<string, object> function in executionSequence)
-				yield return function.Key;
-		}
+	internal abstract class Expression
+	{
 
-		public class TypedDictionary
-		{
-			private List<object> typedKeyValuePairList = new List<object>();
+	}
 
-			public void Add<T>(string name, T data)
-				=> typedKeyValuePairList.Add(new TypedKeyValuePair<T>(name, data));
+	internal class BinaryExpression<TLeft, TRight, TOut> : Expression
+	{
+		internal TLeft Left { get; set; }
+		internal TRight Right { get; set; }
+	}
 
-			public T GetVariable<T>(string name)
-				=> (
-					(TypedKeyValuePair<T>)typedKeyValuePairList
-						.Where(v => ((TypedKeyValuePair<T>)v).Name == name)
-						.Single()
-				).ObjectData;
-
-			public void SetVariable<T>(string name, T data)
-				=> (
-					(TypedKeyValuePair<T>)typedKeyValuePairList
-						.Where(v => ((TypedKeyValuePair<T>)v).Name == name)
-						.Single()
-				).ObjectData = data;
-
-			public void Concat(TypedDictionary another)
-				=> typedKeyValuePairList.Concat(another.typedKeyValuePairList);
-
-			private int Count => typedKeyValuePairList.Count;
-
-			private class TypedKeyValuePair<T>
-			{
-				public string Name { get; set; }
-				public T ObjectData { get; set; }
-				public Type objectType { get; set; }
-
-				public TypedKeyValuePair(string name, T data)
-				{
-					Name = name;
-					ObjectData = data;
-					objectType = typeof(T);
-				}
-			}
-		}
+	internal class UnaryExpression<TIn, TOut> : Expression
+	{
+		internal TIn In { get; set; }
 	}
 }

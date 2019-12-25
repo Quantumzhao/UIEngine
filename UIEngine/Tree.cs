@@ -8,6 +8,9 @@ using System.Collections.Generic;
 using System.Collections;
 using System.Linq;
 using System.Reflection;
+using CustomFunctionBuilder;
+using System.Linq.Expressions;
+
 namespace UIEngine
 {
 	// For current stage, UI Engine only supports int, double, string, bool, object and collection
@@ -685,9 +688,9 @@ namespace UIEngine
 		public static WhereNode Create(CollectionNode collection) => new WhereNode(collection);
 		private WhereNode(CollectionNode collection) : base(collection) { }
 
-		private static readonly Func<bool, bool, bool> And = (left, right) => left && right;
-		private static readonly Func<bool, bool, bool> Or = (left, right) => left || right;
-		private static readonly Func<bool, bool> Not = value => !value;
+		//private static readonly Func<bool, bool, bool> And = (left, right) => left && right;
+		//private static readonly Func<bool, bool, bool> Or = (left, right) => left || right;
+		//private static readonly Func<bool, bool> Not = value => !value;
 
 		internal override bool IsSatisfySignature => throw new NotImplementedException();
 
@@ -695,7 +698,7 @@ namespace UIEngine
 		 * They are connected by logic operators, e.g. cond1 AND cond2 OR NOT cond3. 
 		 * The initial (template) conditions are syntax trees of object nodes, once the root nodes (i.e. during execution) are assigned,
 		 * the parser will give off their return value and replace themselves in the key value pairs*/
-		private readonly Queue<KeyValuePair<int, object>> _Predicates = new Queue<KeyValuePair<int, object>>();
+		private readonly Queue<object> _Predicates = new Queue<object>();
 		/// <summary>
 		///		Execute the predicate
 		/// </summary>
@@ -712,13 +715,18 @@ namespace UIEngine
 			{
 				foreach (var enumerator in list)
 				{
-					while (Parser.IsReadyToBeParsed(_Predicates.Peek()))
+					while (!(_Predicates.Peek() is bool))
 					{
-						var pair = _Predicates.Dequeue();
-						ObjectNode condition = pair.Value as ObjectNode;
-						condition.SetReferenceTo(enumerator);
-						bool result = (bool)condition.InstantiateSuccession().ObjectData;
-						_Predicates.Enqueue(new KeyValuePair<int, object>(pair.Key, result));
+						if (_Predicates.Peek() is LogicOperators)
+						{
+							continue;
+						}
+						else
+						{
+							ObjectNode condition = _Predicates.Dequeue() as ObjectNode;
+							condition.SetReferenceTo(enumerator);
+							_Predicates.Enqueue((bool)condition.InstantiateSuccession().ObjectData);
+						}
 					}
 					if (Parser.Execute(_Predicates))
 					{
@@ -729,58 +737,72 @@ namespace UIEngine
 			return CollectionNode.Create(ret);
 		}
 
-		public override void AddPredicate(ObjectNode predicate)
-		{
-			_Predicates.Enqueue(new KeyValuePair<int, object>(3, predicate));
-		}
+		public override void AddPredicate(ObjectNode predicate) => _Predicates.Enqueue(predicate);
 
 		public void AddOperator(LogicOperators logicOperator)
 		{
-			switch (logicOperator)
-			{
-				case LogicOperators.Add:
-					_Predicates.Enqueue(new KeyValuePair<int, object>(0, And));
-					break;
-				case LogicOperators.Or:
-					_Predicates.Enqueue(new KeyValuePair<int, object>(1, Or));
-					break;
-				case LogicOperators.Not:
-					_Predicates.Enqueue(new KeyValuePair<int, object>(2, Not));
-					break;
-				default:
-					break;
-			}
+			_Predicates.Enqueue(logicOperator);
 		}
 
 		public enum LogicOperators
 		{
-			Add = 0, 
+			And = 0,
 			Or = 1, 
 			Not = 2
-			// "Condition" has an implicit value of 3
 		}
 
 		private static class Parser
 		{
-			internal static bool Execute(Queue<KeyValuePair<int, object>> conditions)
+			internal static bool Execute(Queue<object> tokens)
 			{
-				int i = 0;
 				var expression = new FunctionBuilder();
-				expression.AddVariable<bool>();
+				FunctionBuilder subTree = new FunctionBuilder();
+
+				while (tokens.Count != 0)
+				{
+					var token = tokens.Dequeue();
+
+					if (token is LogicOperators operand)
+					{
+						switch (operand)
+						{
+							case LogicOperators.And:
+								subTree.AddFunction("0",
+									new Func<bool>(() => (bool)subTree["0"] && (bool)subTree["1"])
+								);
+								subTree.AddVariable("0", null);
+								subTree.AddVariable("1", null);
+								break;
+
+							//case LogicOperators.Or:
+							//	expression.AddFunction($"{i}",
+							//		() => (bool)expression[$"{i - 1}"] || (bool)expression[$"{i + 1}"]
+							//	);
+							//	break;
+
+							//case LogicOperators.Not:
+							//	expression.AddFunction($"{i}",
+							//		() => !(bool)expression[$"{i + 1}"]
+							//	);
+							//	break;
+
+							default:
+								break;
+						}
+					}
+					else
+					{
+						subTree.AddVariable($"{subTree.VariablesCount}", token);
+						if (subTree.VariablesCount == subTree.MaximumVariablesCount)
+						{
+							var tree = new FunctionBuilder();
+							tree.AddFunction("0", subTree);
+							subTree = tree;
+						}
+					}
+				}
 				throw new NotImplementedException();
 
-			}
-
-			internal static bool IsReadyToBeParsed(KeyValuePair<int, object> condition)
-			{
-				if (condition.Key != 3)
-				{
-					return true;
-				}
-				else
-				{
-					return condition.Value is bool;
-				}
 			}
 		}
 	}
