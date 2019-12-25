@@ -160,8 +160,7 @@ namespace UIEngine
 	}
 
 	/* If the target object is retrieved from property, then property info is not null. 
-	 * vice versa
-	 */
+	 * vice versa */
 	internal class DomainModelReferenceInfo
 	{
 		public DomainModelReferenceInfo(PropertyInfo propertyInfo, SourceReferenceType sourceReferenceType)
