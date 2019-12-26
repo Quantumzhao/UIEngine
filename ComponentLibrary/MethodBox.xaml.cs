@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Windows;
 using System.Windows.Controls;
-using CustomFunctionBuilder;
+using UIEngine;
 
 namespace ComponentLibrary
 {
@@ -10,7 +10,7 @@ namespace ComponentLibrary
 	/// </summary>
 	public partial class MethodBox : UserControl, IBox
 	{
-		public static event RemovedHandler Removed;
+		public event RemovedHandler Removed;
 
 		public MethodNode _MethodNode = null;
 		public MethodNode MethodNode
@@ -26,7 +26,9 @@ namespace ComponentLibrary
 			}
 		}
 
-		public IBox Child { get; set; }
+		public IBox VisualChild { get; set; }
+
+		public IBox Host { get; set; }
 
 		public MethodBox()
 		{
@@ -87,7 +89,7 @@ namespace ComponentLibrary
 
 		public void RemoveSelf()
 		{
-			Child?.RemoveSelf();
+			VisualChild?.RemoveSelf();
 			Removed?.Invoke(this);
 		}
 	}

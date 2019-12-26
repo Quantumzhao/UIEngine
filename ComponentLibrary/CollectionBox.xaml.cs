@@ -1,4 +1,5 @@
-﻿using System.Collections;
+﻿using System;
+using System.Collections;
 using System.Windows;
 using System.Windows.Controls;
 using UIEngine;
@@ -17,7 +18,7 @@ namespace ComponentLibrary
 			InitializeComponent();
 		}
 
-		public IBox Child { get; set; }
+		public IBox VisualChild { get; set; }
 
 		private CollectionNode _CollectionNode;
 		public CollectionNode CollectionNode
@@ -31,6 +32,12 @@ namespace ComponentLibrary
 					Initialize();
 				}
 			}
+		}
+
+		public IBox Host
+		{
+			get => this;
+			set => throw new InvalidOperationException();
 		}
 
 		private void Initialize()
@@ -59,7 +66,7 @@ namespace ComponentLibrary
 
 		public void RemoveSelf()
 		{
-			Child?.RemoveSelf();
+			VisualChild?.RemoveSelf();
 			Removed?.Invoke(this);
 		}
 	}

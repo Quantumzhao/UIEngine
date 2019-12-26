@@ -2,11 +2,9 @@
 using System.Windows.Input;
 using System.Windows.Data;
 using System.Windows;
-using CustomFunctionBuilder;
 using System;
+using UIEngine;
 
-/* Drag and drop functionality can be suspended for a little bit until I finish method box
- */
 namespace ComponentLibrary
 {
 	/// <summary>
@@ -28,16 +26,23 @@ namespace ComponentLibrary
 			set => SetValue(ObjectNodeProperty, value);
 		}
 
-		public IBox Child { get; set; }
+		public IBox VisualChild { get; set; }
 
-		public static event NewNodeSelectedHandler NewNodeSelected;
-		public static event RemovedHandler Removed;
+		public static readonly DependencyProperty HostProperty = DependencyProperty.Register("Host", typeof(IBox), typeof(ObjectBox));
+		public IBox Host
+		{
+			get => GetValue(HostProperty) as IBox;
+			set => SetValue(HostProperty, value);
+		}
+
+		public event NewNodeSelectedHandler NewNodeSelected;
+		public event RemovedHandler Removed;
 
 		private static void Initialize(DependencyObject d, DependencyPropertyChangedEventArgs e)
 		{
 			ObjectBox box = d as ObjectBox;
 
-			box.Child?.RemoveSelf();
+			box.VisualChild?.RemoveSelf();
 			box.MainPanel.Children.Clear();
 
 			var type = box.ObjectNode.Type;
@@ -129,7 +134,7 @@ namespace ComponentLibrary
 
 		public void RemoveSelf()
 		{
-			Child?.RemoveSelf();
+			VisualChild?.RemoveSelf();
 			Removed?.Invoke(this);
 		}
 

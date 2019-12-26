@@ -1,7 +1,7 @@
 ﻿using System.Collections.Generic;
 using System.Windows;
 using System.Windows.Controls;
-using CustomFunctionBuilder;
+using UIEngine;
 
 namespace ComponentLibrary
 {
@@ -20,29 +20,21 @@ namespace ComponentLibrary
 		private void UserControl_Loaded(object sender, RoutedEventArgs e)
 		{
 			Start.DataContext = this;
-			Roots = Dashboard.Roots;
-			ObjectBox.NewNodeSelected += (me, newNode) =>
-			{
-				me.Child?.RemoveSelf();
-				me.Child = Utility.CreateBox(newNode);
-				AddNewBox(me.Child);
-			};
-			ObjectBox.Removed += me => RemoveOldBox(me);
-			MethodBox.Removed += me => RemoveOldBox(me);
+			Roots = Dashboard.Roots;			
 		}
 
 		private void Start_SelectionChanged(object sender, SelectionChangedEventArgs e)
 		{
 			MainPanel.Children.Clear();
-			AddNewBox(Utility.CreateBox(e.AddedItems[0] as Node));
+			AddNewBox(Utility.CreateBox(e.AddedItems[0] as Node, this));
 		}
 
-		private void AddNewBox(IBox newBox)
+		internal void AddNewBox(IBox newBox)
 		{
 			MainPanel.Children.Add(newBox as UIElement);
 		}
 
-		private void RemoveOldBox(IBox oldBox)
+		internal void RemoveOldBox(IBox oldBox)
 		{
 			MainPanel.Children.Remove(oldBox as ObjectBox);
 		}
