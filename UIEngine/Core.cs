@@ -60,7 +60,7 @@ namespace UIEngine
 			ObjectNode objectNode = Find(sender);
 			if (objectNode != null)
 			{
-				(objectNode.Properties.FirstOrDefault(n => n.Name == propertyName)).ObjectData = newValue;
+				objectNode.Properties.FirstOrDefault(n => n.Name == propertyName).ObjectData = newValue;
 			}
 		}
 
