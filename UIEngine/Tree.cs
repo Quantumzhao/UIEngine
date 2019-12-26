@@ -8,8 +8,6 @@ using System.Collections.Generic;
 using System.Collections;
 using System.Linq;
 using System.Reflection;
-using CustomFunctionBuilder;
-using System.Linq.Expressions;
 
 namespace UIEngine
 {
@@ -697,7 +695,8 @@ namespace UIEngine
 		/* The set of conditions that the where predicate describes.
 		 * They are connected by logic operators, e.g. cond1 AND cond2 OR NOT cond3. 
 		 * The initial (template) conditions are syntax trees of object nodes, once the root nodes (i.e. during execution) are assigned,
-		 * the parser will give off their return value and replace themselves in the key value pairs*/
+		 * the execution will give off and replace with the return values 
+		 * and then pass the boolean expression to the parser to get the final result */
 		private readonly Queue<object> _Predicates = new Queue<object>();
 		/// <summary>
 		///		Execute the predicate
@@ -723,11 +722,13 @@ namespace UIEngine
 						}
 						else
 						{
+							// executing and replacing a single condition with its return value
 							ObjectNode condition = _Predicates.Dequeue() as ObjectNode;
 							condition.SetReferenceTo(enumerator);
 							_Predicates.Enqueue((bool)condition.InstantiateSuccession().ObjectData);
 						}
 					}
+
 					if (Parser.Execute(_Predicates))
 					{
 						ret.Add(enumerator);
@@ -755,36 +756,28 @@ namespace UIEngine
 		{
 			internal static bool Execute(Queue<object> tokens)
 			{
-				var expression = new FunctionBuilder();
-				FunctionBuilder subTree = new FunctionBuilder();
-
+				Expression tree = new Expression();
 				while (tokens.Count != 0)
 				{
 					var token = tokens.Dequeue();
-
 					if (token is LogicOperators operand)
 					{
 						switch (operand)
 						{
 							case LogicOperators.And:
-								subTree.AddFunction("0",
-									new Func<bool>(() => (bool)subTree["0"] && (bool)subTree["1"])
-								);
-								subTree.AddVariable("0", null);
-								subTree.AddVariable("1", null);
+								tree.Body = new Func<bool, bool, bool>((v1, v2) => v1 && v2);
+								tree.MaxArguments = 2;
 								break;
 
-							//case LogicOperators.Or:
-							//	expression.AddFunction($"{i}",
-							//		() => (bool)expression[$"{i - 1}"] || (bool)expression[$"{i + 1}"]
-							//	);
-							//	break;
+							case LogicOperators.Or:
+								tree.Body = new Func<bool, bool, bool>((v1, v2) => v1 || v2);
+								tree.MaxArguments = 2;
+								break;
 
-							//case LogicOperators.Not:
-							//	expression.AddFunction($"{i}",
-							//		() => !(bool)expression[$"{i + 1}"]
-							//	);
-							//	break;
+							case LogicOperators.Not:
+								tree.Body = new Func<bool, bool>(v => !v);
+								tree.MaxArguments = 1;
+								break;
 
 							default:
 								break;
@@ -792,17 +785,16 @@ namespace UIEngine
 					}
 					else
 					{
-						subTree.AddVariable($"{subTree.VariablesCount}", token);
-						if (subTree.VariablesCount == subTree.MaximumVariablesCount)
+						if (!tree.AddArgument(token.ToVariable()))
 						{
-							var tree = new FunctionBuilder();
-							tree.AddFunction("0", subTree);
-							subTree = tree;
+							var temp = tree;
+							tree = new Expression();
+							tree.AddArgument(temp);
 						}
 					}
 				}
-				throw new NotImplementedException();
 
+				return (bool)tree.Invoke();
 			}
 		}
 	}

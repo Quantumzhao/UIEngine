@@ -157,6 +157,11 @@ namespace UIEngine
 		}
 
 		public static TypeSystem ToValidType(this Type type) => TypeSystem.ToRestrictedType(type);
+
+		internal static Variable ToVariable(this object value)
+		{
+			return new Variable(value);
+		}
 	}
 
 	/* If the target object is retrieved from property, then property info is not null. 
@@ -305,5 +310,43 @@ namespace UIEngine
 			Collection = 16,
 			Object = 32
 		}
+	}
+
+	internal class Expression
+	{
+		private readonly List<Expression> _Arguments = new List<Expression>();
+		internal virtual Delegate Body { get; set; }
+		internal int MaxArguments { get; set; }
+
+		internal bool AddArgument(Expression argument)
+		{
+			if (_Arguments.Count < MaxArguments)
+			{
+				_Arguments.Add(argument);
+				return true;
+			}
+			else
+			{
+				return false;
+			}
+		}
+
+		internal virtual object Invoke()
+		{
+			return Body.DynamicInvoke(_Arguments.Select(a => a.Invoke()).ToArray());
+		}
+	}
+
+	internal class Variable : Expression
+	{
+		internal Variable(object value)
+		{
+			Value = value;
+		}
+
+		internal object Value { get; set; }
+		internal override Delegate Body => throw new InvalidOperationException();
+
+		internal override object Invoke() => Value;
 	}
 }
