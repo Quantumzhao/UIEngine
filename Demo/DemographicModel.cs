@@ -4,11 +4,15 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using UIEngine;
 
 namespace Demo
 {
 	public class DemographicModel
 	{
+		[Visible(nameof(Model))]
+		public static DemographicModel Model { get; } = new DemographicModel();
+
 		private static Random _Random = new Random();
 		public static bool _GetRandom(double prob)
 		{
@@ -73,7 +77,9 @@ namespace Demo
 		}
 
 		private Timer Timer = new Timer(1000);
-		public List<Person> People = new List<Person>();
+
+		[Visible(nameof(People))]
+		public List<Person> People { get; } = new List<Person>();
 
 		public void StartSimulation()
 		{
@@ -82,6 +88,12 @@ namespace Demo
 				People.ForEach(p => p.Grow());
 			};
 			Timer.Start();
+		}
+
+		[Visible(nameof(TimeElapse))]
+		public void TimeElapse()
+		{
+			People.ForEach(p => p.Grow());
 		}
 	}
 
@@ -97,33 +109,137 @@ namespace Demo
 
 		public bool IsWillingToMarry() => DemographicModel._GetRandom(prob_Marry);
 
-		public int Age { get; set; } = 0;
-		public Gender Gender { get; set; }
-		public bool Is_Married { get; set; } = false;
-		public List<Person> Children { get; set; } = new List<Person>();
-		public Person Father { get; set; }
-		public Person Mother { get; set; }
-		public Person Spouse { get; set; }
-		public List<Person> Siblings { get; set; } = new List<Person>();
-		public double Prob_Die { get; private set; } = 0.2;
+		private int _Age = 0;
+		[Visible(nameof(Age))]
+		public int Age
+		{
+			get => _Age;
+			set
+			{
+				_Age = value;
+				Dashboard.NotifyPropertyChanged(this, nameof(Age), value);
+			}
+		}
+
+		private Gender _Gender;
+		[Visible(nameof(Gender))]
+		public Gender Gender
+		{
+			get => _Gender;
+			set
+			{
+				_Gender = value;
+				Dashboard.NotifyPropertyChanged(this, nameof(Gender), value);
+			}
+		}
+
+		private bool _Is_Married = false;
+		[Visible(nameof(Is_Married))]
+		public bool Is_Married
+		{
+			get => _Is_Married;
+			set
+			{
+				_Is_Married = value;
+				Dashboard.NotifyPropertyChanged(this, nameof(Is_Married), value);
+			}
+		}
+
+		[Visible(nameof(Children))]
+		public List<Person> Children { get; } = new List<Person>();
+
+		private Person _Father;
+		[Visible(nameof(Father))]
+		public Person Father
+		{
+			get => _Father;
+			set
+			{
+				_Father = value;
+				Dashboard.NotifyPropertyChanged(this, nameof(Father), value);
+			}
+		}
+
+		private Person _Mother;
+		[Visible(nameof(Mother))]
+		public Person Mother
+		{
+			get => _Mother;
+			set
+			{
+				_Mother = value;
+				Dashboard.NotifyPropertyChanged(this, nameof(Mother), value);
+			}
+		}
+
+		private Person _Spouse;
+		[Visible(nameof(Spouse))]
+		public Person Spouse
+		{
+			get => _Spouse;
+			set
+			{
+				_Spouse = value;
+				Dashboard.NotifyPropertyChanged(this, nameof(Spouse), value);
+			}
+		}
+
+		private List<Person> _Siblings = new List<Person>();
+		[Visible(nameof(Siblings))]
+		public List<Person> Siblings
+		{
+			get => _Siblings;
+			set
+			{
+				_Siblings = value;
+				Dashboard.NotifyPropertyChanged(this, nameof(Siblings), value);
+			}
+		}
+
+		private double _Prob_Die = 0.2;
+		[Visible(nameof(Prob_Die))]
+		public double Prob_Die
+		{
+			get => _Prob_Die;
+			private set
+			{
+				_Prob_Die = value;
+				Dashboard.NotifyPropertyChanged(this, nameof(Prob_Die), value);
+			}
+		}
 
 		private double prob_Marry = 0;
-		public double Prob_Marry 
-		{ 
-			get => prob_Marry; 
+		[Visible(nameof(Prob_Marry))]
+		public double Prob_Marry
+		{
+			get => prob_Marry;
 			private set
 			{
 				if (value >= 0)
 				{
 					prob_Marry = value;
+					Dashboard.NotifyPropertyChanged(this, nameof(Prob_Marry), value);
 				}
 				else
 				{
 					prob_Marry = 0;
+					Dashboard.NotifyPropertyChanged(this, nameof(Prob_Marry), value);
 				}
 			}
 		}
-		public double Prob_Reproduce { get; private set; } = 0;
+
+
+		private double _Prob_Reproduce = 0;
+		[Visible(nameof(Prob_Reproduce))]
+		public double Prob_Reproduce
+		{
+			get => _Prob_Reproduce;
+			private set
+			{
+				_Prob_Reproduce = value;
+				Dashboard.NotifyPropertyChanged(this, nameof(Prob_Reproduce), value);
+			}
+		}
 
 		public static event Action<Person> Died;
 		public static event Action<Person> FindForSpouse;
