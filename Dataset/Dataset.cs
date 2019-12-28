@@ -1,4 +1,4 @@
-﻿#define TEST_COLLECTIONs
+﻿#define TEST_COLLECTION
 
 using Newtonsoft.Json.Linq;
 using System;

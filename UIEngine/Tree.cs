@@ -266,7 +266,7 @@ namespace UIEngine
 			}
 			else
 			{
-				_Properties = ObjectData.GetType().GetVisibleProperties()
+				_Properties = SourceObjectInfo.ObjectDataType.ReflectedType.GetVisibleProperties()
 					.Select(pi => Create(this, pi)).ToList();
 			}
 		}
@@ -286,7 +286,7 @@ namespace UIEngine
 			{
 				return this;
 			}
-			else if (_Properties.Count != 0)
+			else if (_Properties!= null)
 			{
 				foreach (var property in _Properties)
 				{

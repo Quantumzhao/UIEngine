@@ -35,6 +35,7 @@ namespace Demo
 
 		private void Window_Loaded(object sender, RoutedEventArgs e)
 		{
+			DemographicModel.Init();
 			Dashboard.ImportEntryObjects(typeof(DemographicModel));
 		}
 	}

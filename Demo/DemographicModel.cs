@@ -11,13 +11,18 @@ namespace Demo
 	public class DemographicModel
 	{
 		[Visible(nameof(Model))]
-		public static DemographicModel Model { get; } = new DemographicModel();
+		public static DemographicModel Model { get; set; }
 
 		private static Random _Random = new Random();
 		public static bool _GetRandom(double prob)
 		{
 			double rnd = _Random.NextDouble();
 			return rnd < prob;
+		}
+
+		public static void Init()
+		{
+			Model = new DemographicModel();
 		}
 
 		public DemographicModel()
@@ -28,7 +33,10 @@ namespace Demo
 			Person.Died += me =>
 			{
 				People.Remove(me);
-				me.Spouse.Spouse = null;
+				if (me.Spouse != null)
+				{
+					me.Spouse.Spouse = null;
+				}
 				me.Children.ForEach(c => {
 					if (me.Gender == Gender.Male)
 					{
@@ -39,7 +47,7 @@ namespace Demo
 						c.Mother = null;
 					}
 				});
-				me.Siblings.ForEach(s => s.Siblings.Remove(me));
+				me?.Siblings.ForEach(s => s.Siblings.Remove(me));
 			};
 
 			Person.FindForSpouse += me =>
@@ -85,15 +93,18 @@ namespace Demo
 		{
 			Timer.Elapsed += (sender, e) =>
 			{
-				People.ForEach(p => p.Grow());
+				for (int i = 0; i < People.Count; i++)
+				{
+					People[i].Grow();
+				}
 			};
 			Timer.Start();
 		}
 
 		[Visible(nameof(TimeElapse))]
-		public void TimeElapse()
+		public static void TimeElapse()
 		{
-			People.ForEach(p => p.Grow());
+			Model.People.ForEach(p => p.Grow());
 		}
 	}
 
@@ -262,7 +273,8 @@ namespace Demo
 				FindForSpouse?.Invoke(this);
 			}
 
-			if (DemographicModel._GetRandom(Math.Sqrt(Prob_Reproduce * Spouse.Prob_Reproduce)))
+			if (Spouse != null && DemographicModel._GetRandom(
+				Math.Sqrt(Prob_Reproduce * Spouse.Prob_Reproduce)))
 			{
 				Reproduce?.Invoke(this, Spouse);
 			}
