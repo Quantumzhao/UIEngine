@@ -214,6 +214,10 @@ namespace UIEngine
 			{
 				return new TypeSystem(type);
 			}
+			else if (typeof(Enum).IsAssignableFrom(type))
+			{
+				return new TypeSystem(type);
+			}
 			else if (typeof(object).IsAssignableFrom(type))
 			{
 				return new TypeSystem(type);
@@ -256,27 +260,31 @@ namespace UIEngine
 					ReflectedType = typeof(string);
 					break;
 				case Types.Object:
-					ReflectedType = null;
+					ReflectedType = typeof(object);
+					break;
+				case Types.Enum:
+					ReflectedType = typeof(Enum);
 					break;
 			}
 		}
 
-		public static readonly TypeSystem Bool = new TypeSystem(Types.Bool);
+		public static readonly TypeSystem Bool			= new TypeSystem(Types.Bool);
 		/// <summary>
 		///		A shortcut for <c>ICollection</c>. To wrap a <c>System.Type</c>, use <c>ToRestrictedType()</c>
 		/// </summary>
-		public static readonly TypeSystem Collection = new TypeSystem(Types.Collection);
-		public static readonly TypeSystem Double = new TypeSystem(Types.Double);
-		public static readonly TypeSystem Int = new TypeSystem(Types.Int);
-		public static readonly TypeSystem String = new TypeSystem(Types.String);
-		public static readonly TypeSystem Object = new TypeSystem(Types.Object);
+		public static readonly TypeSystem Collection	= new TypeSystem(Types.Collection);
+		public static readonly TypeSystem Double		= new TypeSystem(Types.Double);
+		public static readonly TypeSystem Int			= new TypeSystem(Types.Int);
+		public static readonly TypeSystem String		= new TypeSystem(Types.String);
+		public static readonly TypeSystem Object		= new TypeSystem(Types.Object);
+		public static readonly TypeSystem Enum			= new TypeSystem(Types.Enum);
 
 		internal readonly Type ReflectedType;
 		public readonly Types RestrictedType;
 
 		public bool IsSame(TypeSystem type)
 		{
-			if ((RestrictedType & (Types.Collection | Types.Object)) != 0)
+			if ((RestrictedType & (Types.Collection | Types.Object | Types.Enum)) != 0)
 			{
 				return this.ReflectedType.Equals(type.ReflectedType);
 			}
@@ -288,7 +296,7 @@ namespace UIEngine
 
 		public bool IsDerivedFrom(Type type)
 		{
-			if ((RestrictedType & (Types.Collection | Types.Object)) != 0)
+			if ((RestrictedType & (Types.Collection | Types.Object | Types.Enum)) != 0)
 			{
 				return type.IsAssignableFrom(ReflectedType);
 			}
@@ -300,7 +308,7 @@ namespace UIEngine
 		public bool IsDerivedFrom(TypeSystem type) => IsDerivedFrom(type.ReflectedType);
 		public bool IsAssignableFrom(Type type) => ReflectedType.IsAssignableFrom(type);
 		public bool IsValueType => (RestrictedType & (Types.Int | Types.Double | Types.Bool | Types.String)) != 0;
-
+		public bool IsEnum => IsDerivedFrom(TypeSystem.Enum);
 		public enum Types
 		{
 			Bool = 1,
@@ -308,7 +316,8 @@ namespace UIEngine
 			Int = 4,
 			String = 8,
 			Collection = 16,
-			Object = 32
+			Object = 32,
+			Enum = 64
 		}
 	}
 
