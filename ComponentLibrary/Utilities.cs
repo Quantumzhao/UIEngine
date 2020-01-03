@@ -16,7 +16,11 @@ namespace ComponentLibrary
 			IBox box;
 			if (node is CollectionNode)
 			{
-				box = new CollectionBox() { CollectionNode = node as CollectionNode };
+				box = new CollectionBox()
+				{
+					CollectionNode = node as CollectionNode,
+					ParentContainer = panel
+				};
 			}
 			else if (node is ObjectNode)
 			{
@@ -25,13 +29,7 @@ namespace ComponentLibrary
 				(box as ObjectBox).ObjectNode = node as ObjectNode;
 				if (panel != null)
 				{
-					(box as ObjectBox).NewNodeSelected += (me, newNode) =>
-					{
-						me.Host.VisualChild?.RemoveSelf();
-						me.Host.VisualChild = CreateBox(newNode, panel);
-						panel.AddNewBox(me.Host.VisualChild);
-					};
-					(box as ObjectBox).Removed += me => panel.RemoveOldBox(me);
+					(box as ObjectBox).ParentContainer = panel;
 				}
 			}
 			else
@@ -48,6 +46,7 @@ namespace ComponentLibrary
 
 	public interface IBox
 	{
+		UIPanel ParentContainer { get; set; }
 		IBox Host { get; set; }
 		IBox VisualChild { get; set; }
 		void RemoveSelf();

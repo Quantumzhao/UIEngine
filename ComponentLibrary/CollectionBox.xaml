@@ -9,7 +9,7 @@
 			 Name="Me">
 	<UserControl.Resources>
 		<DataTemplate x:Key="Template">
-			<local:ObjectBox ObjectNode="{Binding Path=[0]}" Host="{Binding ElementName=Me}"></local:ObjectBox>
+			<local:ObjectBox ObjectNode="{Binding Path=[0]}" Host="{Binding ElementName=Me}" ParentContainer="{Binding ElementName=Me, Path=ParentContainer}"></local:ObjectBox>
 		</DataTemplate>
 	</UserControl.Resources>
     <StackPanel Orientation="Vertical">

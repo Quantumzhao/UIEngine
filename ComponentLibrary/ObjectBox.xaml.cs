@@ -19,7 +19,8 @@ namespace ComponentLibrary
 			VerticalAlignment = VerticalAlignment.Top;
 		}
 
-		public static readonly DependencyProperty ObjectNodeProperty = DependencyProperty.Register("ObjectNode", typeof(ObjectNode), typeof(ObjectBox), new PropertyMetadata(Initialize));
+		public static readonly DependencyProperty ObjectNodeProperty
+			= DependencyProperty.Register(nameof(ObjectNode), typeof(ObjectNode), typeof(ObjectBox), new PropertyMetadata(Initialize));
 		public ObjectNode ObjectNode 
 		{ 
 			get => GetValue(ObjectNodeProperty) as ObjectNode;
@@ -28,12 +29,22 @@ namespace ComponentLibrary
 
 		public IBox VisualChild { get; set; }
 
-		public static readonly DependencyProperty HostProperty = DependencyProperty.Register("Host", typeof(IBox), typeof(ObjectBox));
+		public static readonly DependencyProperty HostProperty
+			= DependencyProperty.Register(nameof(Host), typeof(IBox), typeof(ObjectBox));
 		public IBox Host
 		{
 			get => GetValue(HostProperty) as IBox;
 			set => SetValue(HostProperty, value);
 		}
+
+		public static readonly DependencyProperty ParentContainerProperty
+			= DependencyProperty.Register(nameof(ParentContainer), typeof(UIPanel), typeof(ObjectBox), new PropertyMetadata(InitializeHost));
+		public UIPanel ParentContainer
+		{
+			get => GetValue(ParentContainerProperty) as UIPanel;
+			set => SetValue(ParentContainerProperty, value);
+		}
+
 
 		public event NewNodeSelectedHandler NewNodeSelected;
 		public event RemovedHandler Removed;
@@ -54,6 +65,10 @@ namespace ComponentLibrary
 			{
 				box.ToTextBox(type);
 			}
+			else if (type.IsEnum)
+			{
+				box.ToRadioButtons();
+			}
 			else
 			{
 				box.ToDropBox();
@@ -66,6 +81,19 @@ namespace ComponentLibrary
 				label.MouseLeftButtonDown += box.ObjectBox_MouseLeftButtonDown;
 			}
 			box.MainPanel.Children.Add(label);
+		}
+		private static void InitializeHost(DependencyObject d, DependencyPropertyChangedEventArgs e)
+		{
+			ObjectBox box = d as ObjectBox;
+			UIPanel panel = e.NewValue as UIPanel;
+
+			box.NewNodeSelected += (me, newNode) =>
+			{
+				me.Host.VisualChild?.RemoveSelf();
+				me.Host.VisualChild = Utility.CreateBox(newNode, panel);
+				panel.AddNewBox(me.Host.VisualChild);
+			};
+			box.Removed += me => panel.RemoveOldBox(me);
 		}
 
 		private void ChangeObjectData_Int(object sender, RoutedEventArgs e)
@@ -130,6 +158,10 @@ namespace ComponentLibrary
 				};
 			}
 			MainPanel.Children.Add(comboBox);
+		}
+		private void ToRadioButtons()
+		{
+
 		}
 
 		public void RemoveSelf()

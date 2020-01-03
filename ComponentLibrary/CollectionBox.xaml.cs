@@ -40,6 +40,14 @@ namespace ComponentLibrary
 			set => throw new InvalidOperationException();
 		}
 
+		public static readonly DependencyProperty ParentContainerProperty
+			= DependencyProperty.Register(nameof(ParentContainer), typeof(UIPanel), typeof(CollectionBox));
+		public UIPanel ParentContainer
+		{
+			get => GetValue(ParentContainerProperty) as UIPanel;
+			set => SetValue(ParentContainerProperty, value);
+		}
+
 		private void Initialize()
 		{
 			if (!CollectionNode.Is_2D)

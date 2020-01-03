@@ -29,6 +29,7 @@ namespace ComponentLibrary
 		public IBox VisualChild { get; set; }
 
 		public IBox Host { get; set; }
+		public UIPanel ParentContainer { get => throw new NotImplementedException(); set => throw new NotImplementedException(); }
 
 		public MethodBox()
 		{
