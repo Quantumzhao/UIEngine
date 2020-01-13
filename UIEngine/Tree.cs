@@ -315,7 +315,7 @@ namespace UIEngine
 		///		A syntactic sugar for making an object node point to another node
 		/// </summary>
 		/// <param name="objectNode"></param>
-		internal void SetReferenceTo(ObjectNode objectNode)
+		public void SetReferenceTo(ObjectNode objectNode)
 		{
 			ObjectData = objectNode.ObjectData;
 		}
