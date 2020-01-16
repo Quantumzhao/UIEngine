@@ -106,23 +106,26 @@ namespace UIEngine
 		///		Create from class template. Just a typed placeholder. e.g. parameter and in LINQ local variables
 		/// </summary>
 		/// <param name="type"></param>
-		internal static ObjectNode Create(Type type)
+		internal static ObjectNode Create(Type type, DescriptiveInfo description)
 		{
-			var objectNode = new ObjectNode(null, null);
+			var objectNode = new ObjectNode(null, description);
 			objectNode.SourceObjectInfo = new DomainModelReferenceInfo(type, SourceReferenceType.parameter);
 			return objectNode;
 		}
 
 		// The basic ctor
-		protected ObjectNode(ObjectNode parent, Visible attribute)
+		protected ObjectNode(ObjectNode parent, DescriptiveInfo attribute)
 		{
 			Parent = parent;
 			if (attribute != null)
 			{
+				if (attribute is Visible visible)
+				{
+					PreviewExpression = visible.PreviewExpression;
+					Name = visible.Name;
+				}
 				Header = attribute.Header;
-				PreviewExpression = attribute.PreviewExpression;
 				Description = attribute.Description;
-				Name = attribute.Name;
 			}
 		}
 
@@ -341,12 +344,12 @@ namespace UIEngine
 			methodNode.Parent = parent;
 			methodNode._Body = methodInfo;
 			var attr = methodInfo.GetCustomAttribute<Visible>();
-			methodNode.Name = methodNode.Name;
+			methodNode.Name = attr.Name;
 			methodNode.Header = attr.Header;
 			methodNode.Description = attr.Description;
 			methodNode.Signatures = methodInfo.GetParameters()
-				.Select(p => ObjectNode.Create(p.ParameterType)).ToList();
-			methodNode.ReturnNode = ObjectNode.Create(methodInfo.ReturnType);
+				.Select(p => ObjectNode.Create(p.ParameterType, p.GetCustomAttribute<DescriptiveInfo>())).ToList();
+			methodNode.ReturnNode = ObjectNode.Create(methodInfo.ReturnType, attr);
 			if (parent != null)
 			{
 				parent.Succession = methodNode;
@@ -483,7 +486,7 @@ namespace UIEngine
 		{
 			return new CollectionNode(parent, propertyInfo);
 		}
-		internal static new CollectionNode Create(Type type)
+		internal static CollectionNode Create(Type type)
 		{
 			return new CollectionNode(type);
 		}
@@ -654,7 +657,7 @@ namespace UIEngine
 		private ForEachNode(CollectionNode collection) : base(collection) 
 		{
 			// For each only has one predicate
-			_Predicate.Add(ObjectNode.Create(collection.ElementType.ReflectedType));
+			_Predicate.Add(ObjectNode.Create(collection.ElementType.ReflectedType, new Visible(collection.Name)));
 		}
 
 		internal override bool IsSatisfySignature => true;

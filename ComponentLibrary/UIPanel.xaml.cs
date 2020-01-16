@@ -26,7 +26,7 @@ namespace ComponentLibrary
 		private void Start_SelectionChanged(object sender, SelectionChangedEventArgs e)
 		{
 			MainPanel.Children.Clear();
-			AddNewBox(Utility.CreateBox(e.AddedItems[0] as Node, this));
+			AddNewBox(Utilities.CreateBox(e.AddedItems[0] as Node, this));
 		}
 
 		internal void AddNewBox(IBox newBox)

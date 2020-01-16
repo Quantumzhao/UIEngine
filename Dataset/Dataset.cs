@@ -12,30 +12,30 @@ namespace Dataset
 {
 	internal class JsonHelper : IDisposable
 	{
-		string filepath;
-		JObject jObject;
+		readonly string _Filepath;
+		readonly JObject _JObject;
 
 		public JsonHelper(string path)
 		{
-			filepath = path;
-			using (StreamReader reader = new StreamReader(filepath))
+			_Filepath = path;
+			using (StreamReader reader = new StreamReader(_Filepath))
 			{
 				string json = reader.ReadToEnd();
-				jObject = JObject.Parse(json);
+				_JObject = JObject.Parse(json);
 			}
 		}
 
-		public void Dispose() => File.WriteAllText(filepath, jObject.ToString());
+		public void Dispose() => File.WriteAllText(_Filepath, _JObject.ToString());
 
-		public JToken GetProperty(string name) => jObject.Property(name).Value;
+		public JToken GetProperty(string name) => _JObject.Property(name).Value;
 
-		public void SetProperty<T>(string name, JToken value) => jObject.Property(name).Value = value;
+		public void SetProperty<T>(string name, JToken value) => _JObject.Property(name).Value = value;
 
-		public void AddProperty(string name, JToken value) => jObject.Add(name, value);
+		public void AddProperty(string name, JToken value) => _JObject.Add(name, value);
 
-		public IEnumerable<JProperty> ListProperties() => jObject.Properties();
+		public IEnumerable<JProperty> ListProperties() => _JObject.Properties();
 
-		public bool Has(string propertyName) => jObject.Properties().Where(p => p.Name == propertyName).Count() != 0;
+		public bool Has(string propertyName) => _JObject.Properties().Where(p => p.Name == propertyName).Count() != 0;
 	}
 
 	public static class Dataset

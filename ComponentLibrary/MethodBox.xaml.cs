@@ -21,7 +21,7 @@ namespace ComponentLibrary
 				if (_MethodNode != value)
 				{
 					_MethodNode = value;
-					_Initialize();
+					Initialize();
 				}
 			}
 		}
@@ -36,11 +36,11 @@ namespace ComponentLibrary
 			InitializeComponent();
 		}
 
-		private void _Initialize()
+		private void Initialize()
 		{
 			for (int i = 0; i < MethodNode.Signatures.Count; i++)
 			{
-				ParaPanel.Children.Add(Utility.CreateBox(MethodNode.Signatures[i]) as UIElement);
+				ParaPanel.Children.Add(Utilities.CreateBox(MethodNode.Signatures[i]) as UIElement);
 				ParaPanel.Children.Add(new TextBlock() { Text = ", " });
 			}
 			if (ParaPanel.Children.Count > 0)
@@ -81,8 +81,7 @@ namespace ComponentLibrary
 				MainPanel.Children.Remove(control);
 			}
 
-			var objectBox = Utility.CreateBox(MethodNode.Invoke()) as ObjectBox;
-			if (objectBox != null)
+			if (Utilities.CreateBox(MethodNode.Invoke()) is ObjectBox objectBox)
 			{
 				MainPanel.Children.Add(objectBox);
 			}

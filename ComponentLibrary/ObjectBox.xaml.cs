@@ -90,7 +90,7 @@ namespace ComponentLibrary
 			box.NewNodeSelected += (me, newNode) =>
 			{
 				me.Host.VisualChild?.RemoveSelf();
-				me.Host.VisualChild = Utility.CreateBox(newNode, panel);
+				me.Host.VisualChild = Utilities.CreateBox(newNode, panel);
 				panel.AddNewBox(me.Host.VisualChild);
 			};
 			box.Removed += me => panel.RemoveOldBox(me);

@@ -9,7 +9,7 @@ namespace ComponentLibrary
 	public delegate void NewNodeSelectedHandler(ObjectBox sender, Node newSelection);
 	public delegate void RemovedHandler(IBox sender);
 
-	public static class Utility
+	public static class Utilities
 	{
 		internal static IBox CreateBox(Node node, UIPanel panel = null)
 		{

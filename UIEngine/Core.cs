@@ -6,8 +6,8 @@ using System.Reflection;
 
 namespace UIEngine
 {
-	public delegate void NodeOperationsDelegate(Node node);
-	public delegate void WarningMessageDelegate(Node source, string message);
+	public delegate void NodeOperationsHandler(Node node);
+	public delegate void WarningMessageHandler(Node source, string message);
 
 	public static class Dashboard
 	{
@@ -16,7 +16,7 @@ namespace UIEngine
 			=> new HashSet<ObjectNode>(Roots.Where(n => n is ObjectNode).Select(n => n as ObjectNode));
 		public static HashSet<MethodNode> GetRootMethodNodes()
 			=> new HashSet<MethodNode>(Roots.Where(n => n is MethodNode).Select(n => n as MethodNode));
-		public static event WarningMessageDelegate WarningMessageHandler;
+		public static event WarningMessageHandler WarningMessagePublished;
 
 		/// <summary>
 		///		Put all static objects into global objects collection.
@@ -80,56 +80,58 @@ namespace UIEngine
 
 		internal static void OnWarningMessageHappen(Node source, string message)
 		{
-			WarningMessageHandler?.Invoke(source, message);
+			WarningMessagePublished?.Invoke(source, message);
 		}
 	}
 
-	[AttributeUsage(AttributeTargets.Property | AttributeTargets.Method)]
-	public class Visible : Attribute
+	public abstract class DescriptiveInfo : Attribute
 	{
-		/// <summary>
-		///		Initializing the visibility tag. Any member marked with "Visible" can be accessed via front end
-		/// </summary>
-		/// <param name="header">
-		///		Name of the member. It has to be the exact name of the member, i.e.
-		///		<code>
-		///			nameof(member)
-		///		</code>
-		/// </param>
-		/// <param name="description">
-		///		Some description (optional)
-		/// </param>
-		public Visible(string name = "", string header = "", string description = "")
+		public DescriptiveInfo(string name, string header, string description)
 		{
 			Header = header == "" ? name : header;
 			Description = description;
 			Name = name;
 		}
-		public string Name { get; set; }
+
 		public string Header { get; set; }
 		public string Description { get; set; }
+		public string Name { get; set; }
+	}
+
+	[AttributeUsage(AttributeTargets.Property | AttributeTargets.Method)]
+	public class Visible : DescriptiveInfo
+	{
+		/// <summary>
+		///		Initializing the visibility tag. Any member marked with "Visible" can be accessed via front end
+		/// </summary>
+		/// <param name="name">
+		///		Name of this property. If <paramref name="header"/> is left blank, 
+		///		<paramref name="name"/> will be the default string for <paramref name="header"/>
+		/// </param>
+		/// <param name="header">
+		///		Name of the member. It has to be the exact name of the member, i.e. <c>nameof(member)</c>
+		/// </param>
+		/// <param name="description">
+		///		Some descriptions (optional)
+		/// </param>
+		public Visible(string name, string header = "", string description = "")
+			: base(name, header, description) { }
 		public bool IsEnabled { get; set; } = true;
 		public Func<object, string> PreviewExpression { get; set; } = o => o.ToString();
 	}
 
 	[AttributeUsage(AttributeTargets.GenericParameter | AttributeTargets.Parameter)]
-	public class ParamInfo : Attribute
+	public class ParamInfo : DescriptiveInfo
 	{
-		public ParamInfo(string header = "", string description = "")
-		{
-			Header = header;
-			Description = description;
-		}
-
-		public string Header { get; set; }
-		public string Description { get; set; }
+		public ParamInfo(string name, string header = "", string description = "")
+			: base(name, header, description) { }
 	}
 
 	public static class Misc
 	{
 		public static IEnumerable<PropertyInfo> GetVisibleProperties(this Type type, BindingFlags flags)
 		{
-			return type.GetProperties().Where(p =>
+			return type.GetProperties(flags).Where(p =>
 			{
 				var attr = p.GetCustomAttribute<Visible>();
 				return attr != null && attr.IsEnabled;
