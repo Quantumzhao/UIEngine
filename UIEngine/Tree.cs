@@ -266,7 +266,7 @@ namespace UIEngine
 			}
 			else
 			{
-				_Properties = SourceObjectInfo.ObjectDataType.ReflectedType.GetVisibleProperties()
+				_Properties = SourceObjectInfo.ObjectDataType.ReflectedType.GetVisibleProperties(BindingFlags.Public | BindingFlags.Instance)
 					.Select(pi => Create(this, pi)).ToList();
 			}
 		}
@@ -276,7 +276,7 @@ namespace UIEngine
 			{
 				LoadObjectData();
 			}
-			_Methods = SourceObjectInfo.ObjectDataType.ReflectedType.GetVisibleMethods()
+			_Methods = SourceObjectInfo.ObjectDataType.ReflectedType.GetVisibleMethods(BindingFlags.Public | BindingFlags.Instance)
 				.Select(mi => MethodNode.Create(this, mi)).ToList();
 		}
 
