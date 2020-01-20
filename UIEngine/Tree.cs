@@ -8,11 +8,12 @@ using System.Collections.Generic;
 using System.Collections;
 using System.Linq;
 using System.Reflection;
+using System.ComponentModel;
 
 namespace UIEngine
 {
 	// For current stage, UI Engine only supports int, double, string, bool, object and collection
-	public abstract class Node
+	public abstract class Node : INotifyPropertyChanged
 	{
 		/// <summary>
 		///		The unique identifier that is going to be used inside the engine
@@ -28,6 +29,9 @@ namespace UIEngine
 		///		Type of the object inside object node
 		/// </summary>
 		protected string _Preview = "...";
+
+		public event PropertyChangedEventHandler PropertyChanged;
+
 		protected abstract string Preview { get; set; }
 
 		/// <summary>
@@ -46,6 +50,11 @@ namespace UIEngine
 		/// <summary>Transform the succession from a template to an instantiated node</summary>
 		/// <returns>Object node is the tail node of the syntax tree</returns>
 		internal abstract ObjectNode InstantiateSuccession();
+
+		protected void InvokePropertyChanged(object sender, PropertyChangedEventArgs e)
+		{
+			PropertyChanged?.Invoke(sender, e);
+		}
 	}
 
 	/* object nodes should never be created or replaced via external assemblies.
@@ -225,6 +234,11 @@ namespace UIEngine
 					_ObjectData = SourceObjectInfo.PropertyInfo.GetValue(Parent?.ObjectData);
 					//Preview = PreviewExpression?.Invoke(ObjectData);
 				}
+
+				if (_ObjectData is INotifyPropertyChanged objectData)
+				{
+					objectData.PropertyChanged += OnPropertyChanged;
+				}
 			}
 		}
 		protected virtual void SetValueToSourceObject()
@@ -333,6 +347,12 @@ namespace UIEngine
 			// if succession is a method node, just return the method node
 			// if it has no succession, return this
 			return Succession?.InstantiateSuccession() ?? this;
+		}
+
+		private void OnPropertyChanged(object sender, PropertyChangedEventArgs e)
+		{
+			Properties.Single(p => p.Name == e.PropertyName).ObjectData = sender;
+			InvokePropertyChanged(sender, e);
 		}
 	}
 
