@@ -5,6 +5,8 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using UIEngine;
+using System.ComponentModel;
+using System.Collections.ObjectModel;
 
 namespace Demo
 {
@@ -12,6 +14,11 @@ namespace Demo
 	{
 		[Visible(nameof(Model))]
 		public static DemographicModel Model { get; set; }
+
+		private Timer Timer = new Timer(1000);
+
+		[Visible(nameof(People))]
+		public ObservableCollection<Person> People { get; } = new ObservableCollection<Person>();
 
 		private static Random _Random = new Random();
 		public static bool _GetRandom(double prob)
@@ -27,8 +34,10 @@ namespace Demo
 
 		public DemographicModel()
 		{
-			People.Add(new Person(Gender.Male, null, null));
-			People.Add(new Person(Gender.Female, null, null));
+			for (int i = 0; i < 20; i++)
+			{
+				People.Add(new Person(i % 2 == 0 ? Gender.Male : Gender.Female, null, null));
+			}
 
 			Person.Died += me =>
 			{
@@ -54,7 +63,7 @@ namespace Demo
 			{
 				foreach (var person in People)
 				{
-					if (person.IsWillingToMarry())
+					if (person.IsWillingToMarry() && person != me)
 					{
 						me.Is_Married = true;
 						person.Is_Married = true;
@@ -84,31 +93,27 @@ namespace Demo
 			};
 		}
 
-		private Timer Timer = new Timer(1000);
-
-		[Visible(nameof(People))]
-		public List<Person> People { get; } = new List<Person>();
-
 		public void StartSimulation()
 		{
-			Timer.Elapsed += (sender, e) =>
-			{
-				for (int i = 0; i < People.Count; i++)
-				{
-					People[i].Grow();
-				}
-			};
+			Timer.Elapsed += (sender, e) => TimeElapse();
 			Timer.Start();
 		}
 
 		[Visible(nameof(TimeElapse))]
 		public static void TimeElapse()
 		{
-			Model.People.ForEach(p => p.Grow());
+			int tempCount;
+			for (int i = 0; i < Model.People.Count; i++)
+			{
+				tempCount = Model.People.Count;
+				Model.People[i].Grow();
+
+				i -= tempCount - Model.People.Count;
+			}
 		}
 	}
 
-	public class Person
+	public class Person : INotifyPropertyChanged
 	{
 		public Person(Gender gender, Person father, Person mother)
 		{
@@ -116,7 +121,6 @@ namespace Demo
 			Father = father;
 			Mother = mother;
 		}
-
 
 		public bool IsWillingToMarry() => DemographicModel._GetRandom(prob_Marry);
 
@@ -128,7 +132,8 @@ namespace Demo
 			set
 			{
 				_Age = value;
-				Dashboard.NotifyPropertyChanged(this, nameof(Age), value);
+				PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(Age)));
+				//Dashboard.NotifyPropertyChanged(this, nameof(Age), value);
 			}
 		}
 
@@ -140,7 +145,9 @@ namespace Demo
 			set
 			{
 				_Gender = value;
-				Dashboard.NotifyPropertyChanged(this, nameof(Gender), value);
+
+				PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(Gender)));
+				//Dashboard.NotifyPropertyChanged(this, nameof(Gender), value);
 			}
 		}
 
@@ -152,7 +159,9 @@ namespace Demo
 			set
 			{
 				_Is_Married = value;
-				Dashboard.NotifyPropertyChanged(this, nameof(Is_Married), value);
+
+				PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(Is_Married)));
+				//Dashboard.NotifyPropertyChanged(this, nameof(Is_Married), value);
 			}
 		}
 
@@ -167,7 +176,9 @@ namespace Demo
 			set
 			{
 				_Father = value;
-				Dashboard.NotifyPropertyChanged(this, nameof(Father), value);
+
+				PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(Father)));
+				//Dashboard.NotifyPropertyChanged(this, nameof(Father), value);
 			}
 		}
 
@@ -179,7 +190,9 @@ namespace Demo
 			set
 			{
 				_Mother = value;
-				Dashboard.NotifyPropertyChanged(this, nameof(Mother), value);
+
+				PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(Mother)));
+				//Dashboard.NotifyPropertyChanged(this, nameof(Mother), value);
 			}
 		}
 
@@ -191,7 +204,9 @@ namespace Demo
 			set
 			{
 				_Spouse = value;
-				Dashboard.NotifyPropertyChanged(this, nameof(Spouse), value);
+
+				PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(Spouse)));
+				//Dashboard.NotifyPropertyChanged(this, nameof(Spouse), value);
 			}
 		}
 
@@ -203,7 +218,9 @@ namespace Demo
 			set
 			{
 				_Siblings = value;
-				Dashboard.NotifyPropertyChanged(this, nameof(Siblings), value);
+
+				PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(Siblings)));
+				//Dashboard.NotifyPropertyChanged(this, nameof(Siblings), value);
 			}
 		}
 
@@ -215,7 +232,9 @@ namespace Demo
 			private set
 			{
 				_Prob_Die = value;
-				Dashboard.NotifyPropertyChanged(this, nameof(Prob_Die), value);
+
+				PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(Prob_Die)));
+				//Dashboard.NotifyPropertyChanged(this, nameof(Prob_Die), value);
 			}
 		}
 
@@ -234,7 +253,9 @@ namespace Demo
 				else
 				{
 					prob_Marry = 0;
-					Dashboard.NotifyPropertyChanged(this, nameof(Prob_Marry), value);
+
+					PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(Prob_Marry)));
+					//Dashboard.NotifyPropertyChanged(this, nameof(Prob_Marry), value);
 				}
 			}
 		}
@@ -248,13 +269,16 @@ namespace Demo
 			private set
 			{
 				_Prob_Reproduce = value;
-				Dashboard.NotifyPropertyChanged(this, nameof(Prob_Reproduce), value);
+
+				PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(Prob_Reproduce)));
+				//Dashboard.NotifyPropertyChanged(this, nameof(Prob_Reproduce), value);
 			}
 		}
 
 		public static event Action<Person> Died;
 		public static event Action<Person> FindForSpouse;
 		public static event Action<Person, Person> Reproduce;
+		public event PropertyChangedEventHandler PropertyChanged;
 
 		public void Grow()
 		{
@@ -273,10 +297,19 @@ namespace Demo
 				FindForSpouse?.Invoke(this);
 			}
 
-			if (Spouse != null && DemographicModel._GetRandom(
+			if (Spouse != null && 
+				Is_Married &&
+				DemographicModel._GetRandom(
 				Math.Sqrt(Prob_Reproduce * Spouse.Prob_Reproduce)))
 			{
-				Reproduce?.Invoke(this, Spouse);
+				if (Gender == Gender.Male)
+				{
+					Reproduce?.Invoke(this, Spouse);
+				}
+				else
+				{
+					Reproduce?.Invoke(Spouse, this);
+				}
 			}
 		}
 
@@ -346,23 +379,21 @@ namespace Demo
 
 		private void IncrementReproduceProb()
 		{
-			if (!Is_Married || Spouse == null)
+			if (Age < 20)
 			{
-				Prob_Reproduce = 0;
-				return;
-			}
 
-			if (Age == 20)
+			}
+			else if (Age == 20)
 			{
-				Prob_Reproduce = 1d / 10;
+				Prob_Reproduce = 1d / 100;
 			}
 			else if (Age < 35)
 			{
-				Prob_Reproduce += 1d / 100;
+				Prob_Reproduce += 2d / 100;
 			}
 			else if (Age < 45)
 			{
-				Prob_Reproduce += 1d / 200;
+				Prob_Reproduce += 1d / 100;
 			}
 			else if (Age < 50)
 			{
@@ -373,17 +404,9 @@ namespace Demo
 				Prob_Reproduce -= 1d / 10;
 			}
 
-			if (Children.Count <= 2)
+			if (Prob_Reproduce <= 0)
 			{
-				Prob_Reproduce *= 1d / 2;
-			}
-			else if (Children.Count <= 4)
-			{
-				Prob_Reproduce *= 1d / 8;
-			}
-			else
-			{
-				Prob_Reproduce *= 1d / 20;
+				Prob_Reproduce = 0;
 			}
 		}
 	}

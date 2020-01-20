@@ -15,6 +15,7 @@ using System.Windows.Navigation;
 using System.Windows.Shapes;
 using ComponentLibrary;
 using UIEngine;
+using System.Collections.ObjectModel;
 
 namespace Demo
 {
@@ -37,6 +38,14 @@ namespace Demo
 		{
 			DemographicModel.Init();
 			Dashboard.ImportEntryObjects(typeof(DemographicModel));
+			Source = DemographicModel.Model.People;
+			DataGrid.ItemsSource = Source;
+		}
+
+		public ObservableCollection<Person> Source { get; set; }
+		private void Button_Click(object sender, RoutedEventArgs e)
+		{
+			DemographicModel.TimeElapse();
 		}
 	}
 }
