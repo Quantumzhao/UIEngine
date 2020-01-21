@@ -16,18 +16,22 @@ using System.Windows.Shapes;
 using ComponentLibrary;
 using UIEngine;
 using System.Collections.ObjectModel;
+using System.ComponentModel;
 
 namespace Demo
 {
 	/// <summary>
 	/// Interaction logic for MainWindow.xaml
 	/// </summary>
-	public partial class MainWindow : ModernWindow
+	public partial class MainWindow : ModernWindow, INotifyPropertyChanged
 	{
+
 		public MainWindow()
 		{
 			InitializeComponent();
 		}
+
+		public event PropertyChangedEventHandler PropertyChanged;
 
 		private void Add_Click(object sender, RoutedEventArgs e)
 		{
@@ -42,10 +46,19 @@ namespace Demo
 			DataGrid.ItemsSource = Source;
 		}
 
-		public ObservableCollection<Person> Source { get; set; }
+		private ObservableCollection<Person> _Source;
+		public ObservableCollection<Person> Source
+		{
+			get => _Source;
+			set
+			{
+				_Source = value;
+				PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(Source)));
+			}
+		}
 		private void Button_Click(object sender, RoutedEventArgs e)
 		{
-			DemographicModel.TimeElapse();
+			DemographicModel.Model.StartSimulation();
 		}
 	}
 }

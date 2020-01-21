@@ -7,18 +7,23 @@ using System.Threading.Tasks;
 using UIEngine;
 using System.ComponentModel;
 using System.Collections.ObjectModel;
+using System.Windows.Threading;
 
 namespace Demo
 {
 	public class DemographicModel
 	{
+		private const int _MAX_INIT_PEOPLE = 2;
+
 		[Visible(nameof(Model))]
 		public static DemographicModel Model { get; set; }
 
-		private Timer Timer = new Timer(1000);
+		private DispatcherTimer Timer = new DispatcherTimer();
 
 		[Visible(nameof(People))]
 		public ObservableCollection<Person> People { get; } = new ObservableCollection<Person>();
+
+		private readonly HashSet<Person> _Dead = new HashSet<Person>();
 
 		private static Random _Random = new Random();
 		public static bool _GetRandom(double prob)
@@ -30,18 +35,31 @@ namespace Demo
 		public static void Init()
 		{
 			Model = new DemographicModel();
+			Model.Timer.Interval = new TimeSpan(0, 0, 0, 0, 500);
 		}
 
 		public DemographicModel()
 		{
-			for (int i = 0; i < 20; i++)
-			{
-				People.Add(new Person(i % 2 == 0 ? Gender.Male : Gender.Female, null, null));
-			}
+			//for (int i = 0; i < _MAX_INIT_PEOPLE; i++)
+			//{
+			//	People.Add(new Person(i % 2 == 0 ? Gender.Male : Gender.Female, null, null) { Age = 20, Prob_Die = 0.005, Prob_Reproduce = 0.5 });
+			//}
+
+			var m = new Person(Gender.Male, null, null);
+			var f = new Person(Gender.Female, null, null);
+			m.Age = f.Age = 20;
+			m.Prob_Die = f.Prob_Die = 0.005;
+			m.Prob_Reproduce = f.Prob_Reproduce = 0.5;
+			m.Spouse = f;
+			f.Spouse = m;
+			m.Is_Married = f.Is_Married = true;
+			People.Add(m);
+			People.Add(f);
 
 			Person.Died += me =>
 			{
-				People.Remove(me);
+				//People.Remove(me);
+				_Dead.Add(me);
 				if (me.Spouse != null)
 				{
 					me.Spouse.Spouse = null;
@@ -63,7 +81,7 @@ namespace Demo
 			{
 				foreach (var person in People)
 				{
-					if (person.IsWillingToMarry() && person != me)
+					if (person.IsWillingToMarry() && person != me && person.Gender != me.Gender)
 					{
 						me.Is_Married = true;
 						person.Is_Married = true;
@@ -95,7 +113,7 @@ namespace Demo
 
 		public void StartSimulation()
 		{
-			Timer.Elapsed += (sender, e) => TimeElapse();
+			Timer.Tick += (sender, e) => TimeElapse();
 			Timer.Start();
 		}
 
@@ -108,7 +126,12 @@ namespace Demo
 				tempCount = Model.People.Count;
 				Model.People[i].Grow();
 
-				i -= tempCount - Model.People.Count;
+				//i -= tempCount - Model.People.Count;
+			}
+
+			foreach (var person in Model._Dead)
+			{
+				Model.People.Remove(person);
 			}
 		}
 	}
@@ -229,7 +252,7 @@ namespace Demo
 		public double Prob_Die
 		{
 			get => _Prob_Die;
-			private set
+			set
 			{
 				_Prob_Die = value;
 
@@ -266,7 +289,7 @@ namespace Demo
 		public double Prob_Reproduce
 		{
 			get => _Prob_Reproduce;
-			private set
+			set
 			{
 				_Prob_Reproduce = value;
 
@@ -327,7 +350,7 @@ namespace Demo
 			}
 			else if (Age < 20)
 			{
-				Prob_Die = 5d / 10000;
+				Prob_Die = 5d / 1000;
 			}
 			else if (Age < 35)
 			{
@@ -359,17 +382,17 @@ namespace Demo
 			{
 				Prob_Marry = 0;
 			}
-			else if (Age < 35)
+			else if (Age < 25)
 			{
-				Prob_Marry += 4d / 100;
+				Prob_Marry += 10d / 100;
 			}
 			else if (Age < 40)
 			{
-				Prob_Marry += 3d / 100;
+				Prob_Marry += 5d / 100;
 			}
 			else if (Age < 50)
 			{
-				Prob_Marry += 1d / 200;
+				Prob_Marry += 1d / 100;
 			}
 			else
 			{
@@ -385,19 +408,19 @@ namespace Demo
 			}
 			else if (Age == 20)
 			{
-				Prob_Reproduce = 1d / 100;
+				Prob_Reproduce = 50d / 100;
 			}
-			else if (Age < 35)
+			else if (Age < 30)
 			{
-				Prob_Reproduce += 2d / 100;
+				Prob_Reproduce -= 0.5d / 100;
 			}
-			else if (Age < 45)
+			else if (Age < 40)
 			{
-				Prob_Reproduce += 1d / 100;
+				Prob_Reproduce -= 1d / 100;
 			}
 			else if (Age < 50)
 			{
-				Prob_Reproduce -= 1d / 100;
+				Prob_Reproduce -= 2d / 100;
 			}
 			else
 			{
