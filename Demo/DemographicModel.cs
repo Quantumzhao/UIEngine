@@ -13,7 +13,7 @@ namespace Demo
 {
 	public class DemographicModel
 	{
-		private const int _MAX_INIT_PEOPLE = 2;
+		private const int _MAX_INIT_PEOPLE = 4;
 
 		[Visible(nameof(Model))]
 		public static DemographicModel Model { get; set; }
@@ -40,21 +40,21 @@ namespace Demo
 
 		public DemographicModel()
 		{
-			//for (int i = 0; i < _MAX_INIT_PEOPLE; i++)
-			//{
-			//	People.Add(new Person(i % 2 == 0 ? Gender.Male : Gender.Female, null, null) { Age = 20, Prob_Die = 0.005, Prob_Reproduce = 0.5 });
-			//}
+			for (int i = 0; i < _MAX_INIT_PEOPLE; i++)
+			{
+				People.Add(new Person(i % 2 == 0 ? Gender.Male : Gender.Female, null, null) { Age = 20, Prob_Die = 0.005, Prob_Reproduce = 0.5 });
+			}
 
-			var m = new Person(Gender.Male, null, null);
-			var f = new Person(Gender.Female, null, null);
-			m.Age = f.Age = 20;
-			m.Prob_Die = f.Prob_Die = 0.005;
-			m.Prob_Reproduce = f.Prob_Reproduce = 0.5;
-			m.Spouse = f;
-			f.Spouse = m;
-			m.Is_Married = f.Is_Married = true;
-			People.Add(m);
-			People.Add(f);
+			//var m = new Person(Gender.Male, null, null);
+			//var f = new Person(Gender.Female, null, null);
+			//m.Age = f.Age = 20;
+			//m.Prob_Die = f.Prob_Die = 0.005;
+			//m.Prob_Reproduce = f.Prob_Reproduce = 0.5;
+			//m.Spouse = f;
+			//f.Spouse = m;
+			//m.Is_Married = f.Is_Married = true;
+			//People.Add(m);
+			//People.Add(f);
 
 			Person.Died += me =>
 			{
