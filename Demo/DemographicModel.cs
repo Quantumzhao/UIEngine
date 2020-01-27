@@ -13,7 +13,7 @@ namespace Demo
 {
 	public class DemographicModel
 	{
-		private const int _MAX_INIT_PEOPLE = 4;
+		private const int _MAX_INIT_PEOPLE = 3;
 
 		[Visible(nameof(Model))]
 		public static DemographicModel Model { get; set; }
