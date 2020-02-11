@@ -7,6 +7,7 @@ using System.IO;
 using System.Linq;
 using System.Reflection;
 using UIEngine;
+using System.ComponentModel;
 
 namespace Dataset
 {
@@ -90,7 +91,7 @@ namespace Dataset
 #endif
 	}
 
-	public class Person
+	public class Person : INotifyPropertyChanged
 	{
 #if !TEST_COLLECTION
 		[Visible(nameof(Get))]
@@ -106,6 +107,9 @@ namespace Dataset
 		}
 
 		private string _Name;
+
+		public event PropertyChangedEventHandler PropertyChanged;
+
 		[Visible(nameof(Name))]
 		public string Name
 		{
@@ -113,12 +117,17 @@ namespace Dataset
 			set
 			{
 				_Name = value;
-				Dashboard.NotifyPropertyChanged(this, nameof(Name), value);
+				//Dashboard.NotifyPropertyChanged(this, nameof(Name), value);
+				PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(Name)));
 			}
 		}
 
 		[Visible(nameof(Phone))]
-		public string Phone { get; set; }
+		public string Phone 
+		{ 
+			get; 
+			set; 
+		}
 
 		[Visible(nameof(Address))]
 		public Address Address { get; set; }

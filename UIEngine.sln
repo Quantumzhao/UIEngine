@@ -3,7 +3,7 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 16
 VisualStudioVersion = 16.0.29230.47
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FrontEnd", "FrontEnd\FrontEnd.csproj", "{8C30A4CC-29DC-479C-AB08-3C19B7CF53BB}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TestProject", "FrontEnd\TestProject.csproj", "{8C30A4CC-29DC-479C-AB08-3C19B7CF53BB}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Dataset", "Dataset\Dataset.csproj", "{90153826-714F-40E4-A497-D81415307B41}"
 EndProject

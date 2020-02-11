@@ -61,7 +61,7 @@ namespace UIEngine
 	 * object nodes must always maintain a tree data structure.
 	 * thus, if an object node wants to point to another object node(not talking about setting another node as child), 
 	 * it should actually point to the object data wrapped by that node */
-	public class ObjectNode : Node
+	public class ObjectNode : Node, INotifySelfChanged
 	{
 		/// <summary>
 		///		Create from property
@@ -108,6 +108,7 @@ namespace UIEngine
 			}
 			objectNode.Header = objectData.ToString();
 			objectNode._ObjectData = objectData;
+			objectNode.SetBinding(objectData);
 
 			return objectNode;
 		}
@@ -173,8 +174,9 @@ namespace UIEngine
 				return _Methods;
 			}
 		}
+		public event NotifySelfChangedHandler OnSelfChanged;
+
 		#region Object Data
-		public delegate void ObjectdataChangeDelegate(object data);
 		private object _ObjectData = null;
 		public object ObjectData
 		{
@@ -215,7 +217,6 @@ namespace UIEngine
 		///		A reference to object of the object node. Strongly suggest not to modify it. 
 		/// </returns>
 		public T GetObjectData<T>() => (T)ObjectData;
-
 		#endregion
 
 		protected override string Preview
@@ -235,10 +236,7 @@ namespace UIEngine
 					//Preview = PreviewExpression?.Invoke(ObjectData);
 				}
 
-				if (_ObjectData is INotifyPropertyChanged objectData)
-				{
-					objectData.PropertyChanged += OnPropertyChanged;
-				}
+				SetBinding(_ObjectData);
 			}
 		}
 		protected virtual void SetValueToSourceObject()
@@ -353,6 +351,14 @@ namespace UIEngine
 		{
 			Properties.Single(p => p.Name == e.PropertyName).ObjectData = sender;
 			InvokePropertyChanged(sender, e);
+		}
+
+		private void SetBinding(object objectData)
+		{
+			if (objectData is INotifyPropertyChanged notifiable)
+			{
+				notifiable.PropertyChanged += OnPropertyChanged;
+			}
 		}
 	}
 

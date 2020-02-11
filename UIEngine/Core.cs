@@ -8,6 +8,12 @@ namespace UIEngine
 {
 	public delegate void NodeOperationsHandler(Node node);
 	public delegate void WarningMessageHandler(Node source, string message);
+	public delegate void NotifySelfChangedHandler(Node sender, NotifySelfChangedEventArgs e);
+
+	public interface INotifySelfChanged
+	{
+		event NotifySelfChangedHandler OnSelfChanged;
+	}
 
 	public static class Dashboard
 	{
@@ -355,5 +361,10 @@ namespace UIEngine
 		internal override Delegate Body => throw new InvalidOperationException();
 
 		internal override object Invoke() => Value;
+	}
+
+	public class NotifySelfChangedEventArgs : EventArgs
+	{
+		public readonly object newObjectData;
 	}
 }
