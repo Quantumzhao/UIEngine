@@ -2,8 +2,25 @@
 
   <PropertyGroup>
     <TargetFramework>netstandard2.0</TargetFramework>
-    <Version>1.0.1</Version>
+    <Version>0.1.1</Version>
     <PackageRequireLicenseAcceptance>false</PackageRequireLicenseAcceptance>
+    <AssemblyVersion>0.0.1.0</AssemblyVersion>
+    <FileVersion>0.0.1.0</FileVersion>
+    <PackageIcon>icon_1024.png</PackageIcon>
+    <PackageIconUrl />
+    <PackageProjectUrl>https://github.com/Quantumzhao/UIEngine</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/Quantumzhao/UIEngine</RepositoryUrl>
   </PropertyGroup>
+
+  <ItemGroup>
+    <Folder Include="icon\" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="icon\icon_1024.png">
+      <Pack>True</Pack>
+      <PackagePath></PackagePath>
+    </None>
+  </ItemGroup>
 
 </Project>
