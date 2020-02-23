@@ -88,6 +88,8 @@ namespace UIEngine
 		{
 			WarningMessagePublished?.Invoke(source, message);
 		}
+
+		public static string Test() => "New";
 	}
 
 	public abstract class DescriptiveInfo : Attribute

@@ -25,10 +25,21 @@ namespace Demo
 	/// </summary>
 	public partial class MainWindow : ModernWindow, INotifyPropertyChanged
 	{
+		private bool _Test = true;
+		public bool Test
+		{
+			get => _Test;
+			set
+			{
+				_Test = value;
+				PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(Test)));
+			}
+		}
 
 		public MainWindow()
 		{
 			InitializeComponent();
+			//IsTestLayout.DataContext = this;
 		}
 
 		public event PropertyChangedEventHandler PropertyChanged;
@@ -36,6 +47,7 @@ namespace Demo
 		private void Add_Click(object sender, RoutedEventArgs e)
 		{
 			MainPanel.Children.Add(new UIPanel());
+			Test = false;
 		}
 
 		private void Window_Loaded(object sender, RoutedEventArgs e)
