@@ -14,11 +14,12 @@ EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{1AA45197-8FBB-4B47-B4C9-47FD07E9765B}"
 	ProjectSection(SolutionItems) = preProject
 		README.MD = README.MD
+		TODO.MD = TODO.MD
 	EndProjectSection
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ComponentLibrary", "ComponentLibrary\ComponentLibrary.csproj", "{3D29D6D0-AB7D-4C43-BD55-0F665D05D552}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CLITestProject", "CLITestProject\CLITestProject.csproj", "{8CB33A7A-05DE-41CB-B4E7-C252B1702EFF}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CLITestProject", "CLITestProject\CLITestProject.csproj", "{8CB33A7A-05DE-41CB-B4E7-C252B1702EFF}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

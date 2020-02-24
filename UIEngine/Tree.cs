@@ -48,7 +48,7 @@ namespace UIEngine
 		public override string ToString() => Header;
 
 		/// <summary>Transform the succession from a template to an instantiated node</summary>
-		/// <returns>Object node is the tail node of the syntax tree</returns>
+		/// <returns>Object node is the leaf of the syntax tree</returns>
 		internal abstract ObjectNode InstantiateSuccession();
 
 		protected void InvokePropertyChanged(object sender, PropertyChangedEventArgs e)
@@ -339,9 +339,9 @@ namespace UIEngine
 		internal override ObjectNode InstantiateSuccession()
 		{
 			// if succession is an object node, load and return it
-			if (Succession is ObjectNode)
+			if (Succession is ObjectNode objectSuccesstion)
 			{
-				(Succession as ObjectNode).LoadObjectData();
+				objectSuccesstion.LoadObjectData();
 			}
 			// if succession is a method node, just return the method node
 			// if it has no succession, return this

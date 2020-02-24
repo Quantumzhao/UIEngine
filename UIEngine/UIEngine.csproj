@@ -2,7 +2,7 @@
 
   <PropertyGroup>
     <TargetFramework>netstandard2.0</TargetFramework>
-    <Version>0.1.1</Version>
+    <Version>0.1.2</Version>
     <PackageRequireLicenseAcceptance>false</PackageRequireLicenseAcceptance>
     <AssemblyVersion>0.0.1.0</AssemblyVersion>
     <FileVersion>0.0.1.0</FileVersion>
@@ -10,6 +10,7 @@
     <PackageIconUrl />
     <PackageProjectUrl>https://github.com/Quantumzhao/UIEngine</PackageProjectUrl>
     <RepositoryUrl>https://github.com/Quantumzhao/UIEngine</RepositoryUrl>
+    <Authors>Quantum Zhao</Authors>
   </PropertyGroup>
 
   <ItemGroup>
