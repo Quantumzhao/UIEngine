@@ -8,7 +8,7 @@
 // </auto-generated>
 //------------------------------------------------------------------------------
 
-namespace FrontEnd.Properties {
+namespace TestWindow.Properties {
     using System;
     
     
