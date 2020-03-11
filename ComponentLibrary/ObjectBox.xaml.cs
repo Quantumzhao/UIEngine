@@ -4,6 +4,8 @@ using System.Windows.Data;
 using System.Windows;
 using System;
 using UIEngine;
+using System.ComponentModel;
+using System.Globalization;
 
 namespace ComponentLibrary
 {
@@ -124,9 +126,10 @@ namespace ComponentLibrary
 		{
 			var textBox = new TextBox();
 			{
-				textBox.SetBinding(TextBox.TextProperty, new Binding("ObjectData") { Source = ObjectNode });
+				var binding = new Binding("ObjectData") { Source = ObjectNode };
 				if (type.IsSame(TypeSystem.Int))
 				{
+					binding.Converter = new IntToStringConverter();
 					textBox.LostFocus += ChangeObjectData_Int;
 				}
 				else if (type.IsSame(TypeSystem.Double))
@@ -137,6 +140,7 @@ namespace ComponentLibrary
 				{
 					textBox.LostFocus += (ts, te) => ObjectNode.ObjectData = (ts as TextBox).Text;
 				}
+				textBox.SetBinding(TextBox.TextProperty, binding);
 			}
 			MainPanel.Children.Add(textBox);
 		}
@@ -161,7 +165,7 @@ namespace ComponentLibrary
 		}
 		private void ToRadioButtons()
 		{
-
+			throw new NotImplementedException();
 		}
 
 		public void RemoveSelf()
@@ -182,6 +186,19 @@ namespace ComponentLibrary
 			{
 				ObjectNode = e.Data.GetData(typeof(ObjectNode)) as ObjectNode;
 			}
+		}
+	}
+
+	public class IntToStringConverter : IValueConverter
+	{
+		public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
+		{
+			return value?.ToString();
+		}
+
+		public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
+		{
+			return int.Parse(value as string ?? "0");
 		}
 	}
 }
