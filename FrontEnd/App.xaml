@@ -1,7 +1,7 @@
-﻿<Application x:Class="FrontEnd.App"
+﻿<Application x:Class="TestWindow.App"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             xmlns:local="clr-namespace:FrontEnd"
+             xmlns:local="clr-namespace:TestWindow"
              StartupUri="MainWindow.xaml">
     <Application.Resources>
 		<Style TargetType="ComboBox" x:Key="PropertyBox">

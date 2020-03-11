@@ -6,7 +6,7 @@ using UIEngine;
 using ComponentLibrary;
 using System.Linq;
 
-namespace FrontEnd
+namespace TestWindow
 {
 	/// <summary>
 	/// Interaction logic for MainWindow.xaml
@@ -25,8 +25,7 @@ namespace FrontEnd
 
 		private void Window_Loaded(object sender, RoutedEventArgs e)
 		{
-			Dataset.Dataset.Init();
-			Dashboard.ImportEntryObjects(typeof(Dataset.Dataset), typeof(Dataset.Person));
+			Dashboard.ImportEntryObjects(typeof(TestClass));
 		}
 	}
 }
