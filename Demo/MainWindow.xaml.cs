@@ -54,7 +54,7 @@ namespace Demo
 		{
 			DemographicModel.Init();
 			Dashboard.ImportEntryObjects(typeof(DemographicModel));
-			Source = DemographicModel.Model.People;
+			Source = DemographicModel.People;
 			DataGrid.ItemsSource = Source;
 		}
 
@@ -70,7 +70,7 @@ namespace Demo
 		}
 		private void Button_Click(object sender, RoutedEventArgs e)
 		{
-			DemographicModel.Model.StartSimulation();
+			DemographicModel.StartSimulation();
 		}
 	}
 }

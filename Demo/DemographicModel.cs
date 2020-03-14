@@ -15,15 +15,12 @@ namespace Demo
 	{
 		private const int _MAX_INIT_PEOPLE = 3;
 
-		[Visible(nameof(Model))]
-		public static DemographicModel Model { get; set; }
-
-		private DispatcherTimer Timer = new DispatcherTimer();
+		private static DispatcherTimer Timer = new DispatcherTimer() { Interval = new TimeSpan(0, 0, 0, 0, 500) };
 
 		[Visible(nameof(People))]
-		public ObservableCollection<Person> People { get; } = new ObservableCollection<Person>();
+		public static ObservableCollection<Person> People { get; } = new ObservableCollection<Person>();
 
-		private readonly HashSet<Person> _Dead = new HashSet<Person>();
+		private static readonly HashSet<Person> _Dead = new HashSet<Person>();
 
 		private static Random _Random = new Random();
 		public static bool _GetRandom(double prob)
@@ -32,13 +29,13 @@ namespace Demo
 			return rnd < prob;
 		}
 
-		public static void Init()
-		{
-			Model = new DemographicModel();
-			Model.Timer.Interval = new TimeSpan(0, 0, 0, 0, 500);
-		}
+		//public static void Init()
+		//{
+		//	Model = new DemographicModel();
+		//	Model.Timer.Interval = ;
+		//}
 
-		public DemographicModel()
+		public static void Init()
 		{
 			for (int i = 0; i < _MAX_INIT_PEOPLE; i++)
 			{
@@ -111,7 +108,7 @@ namespace Demo
 			};
 		}
 
-		public void StartSimulation()
+		public static void StartSimulation()
 		{
 			Timer.Tick += (sender, e) => TimeElapse();
 			Timer.Start();
@@ -121,17 +118,17 @@ namespace Demo
 		public static void TimeElapse()
 		{
 			int tempCount;
-			for (int i = 0; i < Model.People.Count; i++)
+			for (int i = 0; i < People.Count; i++)
 			{
-				tempCount = Model.People.Count;
-				Model.People[i].Grow();
+				tempCount = People.Count;
+				People[i].Grow();
 
 				//i -= tempCount - Model.People.Count;
 			}
 
-			foreach (var person in Model._Dead)
+			foreach (var person in _Dead)
 			{
-				Model.People.Remove(person);
+				People.Remove(person);
 			}
 		}
 	}
@@ -145,7 +142,7 @@ namespace Demo
 			Mother = mother;
 		}
 
-		public bool IsWillingToMarry() => DemographicModel._GetRandom(prob_Marry);
+		public bool IsWillingToMarry() => DemographicModel._GetRandom(_Prob_Marry);
 
 		private int _Age = 0;
 		[Visible(nameof(Age))]
@@ -261,25 +258,25 @@ namespace Demo
 			}
 		}
 
-		private double prob_Marry = 0;
+		private double _Prob_Marry = 0;
 		[Visible(nameof(Prob_Marry))]
 		public double Prob_Marry
 		{
-			get => prob_Marry;
+			get => _Prob_Marry;
 			private set
 			{
 				if (value >= 0)
 				{
-					prob_Marry = value;
-					Dashboard.NotifyPropertyChanged(this, nameof(Prob_Marry), value);
+					_Prob_Marry = value;
+					//Dashboard.NotifyPropertyChanged(this, nameof(Prob_Marry), value);
 				}
 				else
 				{
-					prob_Marry = 0;
-
-					PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(Prob_Marry)));
+					_Prob_Marry = 0;
 					//Dashboard.NotifyPropertyChanged(this, nameof(Prob_Marry), value);
 				}
+
+				PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(Prob_Marry)));
 			}
 		}
 
@@ -374,7 +371,7 @@ namespace Demo
 		{
 			if (Is_Married)
 			{
-				prob_Marry = 0;
+				_Prob_Marry = 0;
 				return;
 			}
 

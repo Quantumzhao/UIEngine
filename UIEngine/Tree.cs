@@ -9,6 +9,7 @@ using System.Collections;
 using System.Linq;
 using System.Reflection;
 using System.ComponentModel;
+using System.Collections.Specialized;
 
 namespace UIEngine
 {
@@ -174,7 +175,6 @@ namespace UIEngine
 				return _Methods;
 			}
 		}
-		public event NotifySelfChangedHandler OnSelfChanged;
 
 		#region Object Data
 		private object _ObjectData = null;
@@ -245,7 +245,7 @@ namespace UIEngine
 			switch (SourceObjectInfo.SourceReferenceType)
 			{
 				case SourceReferenceType.Property:
-					SourceObjectInfo.PropertyInfo.SetValue(Parent.ObjectData, ObjectData);
+					SourceObjectInfo.PropertyInfo.SetValue(Parent?.ObjectData, ObjectData);
 					break;
 
 				case SourceReferenceType.Indexer:					
@@ -350,10 +350,12 @@ namespace UIEngine
 
 		private void OnPropertyChanged(object sender, PropertyChangedEventArgs e)
 		{
-			var dstProperty = Properties.Single(p => p.Name == e.PropertyName);
-			dstProperty.Refresh();
-			dstProperty.InvokePropertyChanged(dstProperty, new PropertyChangedEventArgs(nameof(ObjectData)));
-			//InvokePropertyChanged(sender, e);
+			var dstProperty = Properties.FirstOrDefault(p => p.Name == e.PropertyName);
+			if (dstProperty != null)
+			{
+				dstProperty.Refresh();
+				dstProperty.InvokePropertyChanged(dstProperty, new PropertyChangedEventArgs(nameof(ObjectData)));
+			}
 		}
 
 		private void SetBinding(object objectData, INotifyPropertyChanged prevObject = null)
@@ -495,15 +497,19 @@ namespace UIEngine
 	///		this node should not be an element of another collection. 
 	///		Only <c>IList</c> is supported at current stage
 	/// </summary>
-	public class CollectionNode : ObjectNode
+	public class CollectionNode : ObjectNode, INotifyCollectionChanged
 	{
 		private const string _INVALID_OPERATION_WARNING = 
 			"Collection node is not supported in a LINQ expression";
+
+		public event NotifyCollectionChangedEventHandler CollectionChanged;
+
 		public bool Is_2D { get; private set; }
 		public bool DisplayPropertiesAsHeadings { get; set; } = false;
 		public List<string> Headings { get; private set; } = new List<string>();
 		public List<List<ObjectNode>> Elements { get; private set; } = new List<List<ObjectNode>>();
 		public TypeSystem ElementType { get; private set; }
+		public int Count => Elements.Count;
 
 		#region LINQ Functionalities
 		public ForEachNode ForEachExpression { get; private set; }
@@ -564,7 +570,16 @@ namespace UIEngine
 		protected override void LoadObjectData()
 		{
 			base.LoadObjectData();
+			SetBinding();
 			LoadFormattedData();
+		}
+
+		private void SetBinding()
+		{
+			if (ObjectData is INotifyCollectionChanged notifiable)
+			{
+				notifiable.CollectionChanged += this.CollectionChanged;
+			}
 		}
 
 		private void LoadFormattedData()
@@ -592,7 +607,7 @@ namespace UIEngine
 				}
 			}
 			// If it's a two dimensional data structure
-			else if (preFormattedData[0] is ICollection)
+			else if (preFormattedData.GetType().GenericTypeArguments[0] is ICollection)
 			{
 				Is_2D = true;
 				foreach (var element in preFormattedData)

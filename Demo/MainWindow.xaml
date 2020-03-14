@@ -14,7 +14,7 @@
 			</StackPanel>
 			<Button x:Name="Add" Content="Add" HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="0,0,10,10.5" Click="Add_Click"></Button>
 
-			<DataGrid Name="DataGrid" Margin="10,10,10,42" AutoGenerateColumns="True" ItemsSource="{Binding Path=Source}" Visibility="Hidden"/>
+			<DataGrid Name="DataGrid" Margin="10,10,10,42" AutoGenerateColumns="True" ItemsSource="{Binding Path=Source}" Visibility="Hidden" diag:PresentationTraceSources.TraceLevel="High"/>
 			<Button Content="Time Elapse" Margin="10,0,0,10" Click="Button_Click" VerticalAlignment="Bottom" HorizontalAlignment="Left"/>
 			<CheckBox Content="Show Test Layout" IsChecked="{Binding Path=Test, diag:PresentationTraceSources.TraceLevel=High}" Name="IsTestLayout" HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="0,0,71,16"/>
 		</Grid>
