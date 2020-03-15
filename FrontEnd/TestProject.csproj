@@ -101,10 +101,6 @@
       <Project>{3d29d6d0-ab7d-4c43-bd55-0f665d05d552}</Project>
       <Name>ComponentLibrary</Name>
     </ProjectReference>
-    <ProjectReference Include="..\Dataset\Dataset.csproj">
-      <Project>{90153826-714f-40e4-a497-d81415307b41}</Project>
-      <Name>Dataset</Name>
-    </ProjectReference>
     <ProjectReference Include="..\UIEngine\UIEngine.csproj">
       <Project>{d55a802c-0976-42e0-a1f7-cae96c1330e9}</Project>
       <Name>UIEngine</Name>
