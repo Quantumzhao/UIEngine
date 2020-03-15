@@ -66,7 +66,7 @@ namespace CLITestProject
 					{
 						if (dstNode is CollectionNode)
 						{
-							Tabulate((dstNode as CollectionNode).Elements);
+							Tabulate((dstNode as CollectionNode).Collection2D);
 						}
 
 						if (!dstNode.IsValueType)

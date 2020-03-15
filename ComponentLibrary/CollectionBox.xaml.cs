@@ -63,7 +63,7 @@ namespace ComponentLibrary
 						MainDataGrid.Columns.Add(column);
 					}
 				}
-				MainDataGrid.ItemsSource = _CollectionNode.Elements;
+				MainDataGrid.ItemsSource = _CollectionNode.Collection2D;
 			}
 			else if (CollectionNode.GetObjectData<object>() is IDictionary)
 			{
