@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using System.Linq;
 using System.Text;
 using UIEngine;
@@ -17,7 +18,6 @@ namespace CLITestProject
 		{
 			DemographicModel.Init();
 			Dashboard.ImportEntryObjects(typeof(DemographicModel));
-			Console.WriteLine(Dashboard.Test());
 			ParseAndExecute("show");
 			while (true)
 			{
@@ -66,7 +66,7 @@ namespace CLITestProject
 					{
 						if (dstNode is CollectionNode)
 						{
-							Tabulate((dstNode as CollectionNode).Collection2D);
+							Tabulate((dstNode as CollectionNode).Collection);
 						}
 
 						if (!dstNode.IsValueType)
@@ -161,15 +161,12 @@ namespace CLITestProject
 			_Counter++;
 		}
 
-		private static void Tabulate(List<List<ObjectNode>> table)
+		private static void Tabulate(ObservableCollection<ObjectNode> table)
 		{
 			for (int i = 0; i < table.Count; i++)
 			{
-				for (int j = 0; j < table[i].Count; j++)
-				{
-					TryAddToCachedNodes(table[i][j]);
-					Console.Write(string.Format("{0,-20}", $"[{_CachedNodes[table[i][j]]}] {table[i][j].Header}"));
-				}
+				TryAddToCachedNodes(table[i]);
+				Console.Write(string.Format("{0,-20}", $"[{_CachedNodes[table[i]]}] {table[i].Header}"));
 				Console.WriteLine();
 			}
 		}
