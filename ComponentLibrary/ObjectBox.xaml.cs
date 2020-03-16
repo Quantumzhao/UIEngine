@@ -22,7 +22,8 @@ namespace ComponentLibrary
 		}
 
 		public static readonly DependencyProperty ObjectNodeProperty
-			= DependencyProperty.Register(nameof(ObjectNode), typeof(ObjectNode), typeof(ObjectBox), new PropertyMetadata(Initialize));
+			= DependencyProperty.Register(nameof(ObjectNode), typeof(ObjectNode), typeof(ObjectBox), 
+				new PropertyMetadata(Initialize));
 		public ObjectNode ObjectNode 
 		{ 
 			get => GetValue(ObjectNodeProperty) as ObjectNode;
@@ -40,7 +41,8 @@ namespace ComponentLibrary
 		}
 
 		public static readonly DependencyProperty ParentContainerProperty
-			= DependencyProperty.Register(nameof(ParentContainer), typeof(UIPanel), typeof(ObjectBox), new PropertyMetadata(InitializeHost));
+			= DependencyProperty.Register(nameof(ParentContainer), typeof(UIPanel), typeof(ObjectBox), 
+				new PropertyMetadata(InitializeHost));
 		public UIPanel ParentContainer
 		{
 			get => GetValue(ParentContainerProperty) as UIPanel;

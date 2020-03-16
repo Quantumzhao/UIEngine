@@ -7,6 +7,8 @@ namespace UIEngine
 {
 	public class MethodNode : Node
 	{
+		private const string _PARAM_EMPTY_ERROR = "Some parameters are empty";
+
 		internal static MethodNode Create(ObjectNode parent, MethodInfo methodInfo)
 		{
 			var methodNode = new MethodNode();
@@ -17,7 +19,8 @@ namespace UIEngine
 			methodNode.Header = attr.Header;
 			methodNode.Description = attr.Description;
 			methodNode.Signatures = methodInfo.GetParameters()
-				.Select(p => ObjectNode.Create(p.ParameterType, p.GetCustomAttribute<DescriptiveInfo>())).ToList();
+				.Select(p => ObjectNode.Create(p.ParameterType, p.GetCustomAttribute<DescriptiveInfo>()))
+				.ToList();
 			methodNode.ReturnNode = ObjectNode.Create(methodInfo.ReturnType, attr);
 			if (parent != null)
 			{
@@ -46,8 +49,8 @@ namespace UIEngine
 			// check if any parameter is empty
 			if (!Signatures.All(n => !n.IsEmpty))
 			{
-				var message = "Some parameters are empty";
-				Dashboard.OnWarningMessageHappen(this, message);
+				var message = _PARAM_EMPTY_ERROR;
+				Dashboard.RaiseWarningMessage(this, message);
 				throw new InvalidOperationException(message);
 			}
 			var objectData = _Body.Invoke(

@@ -84,7 +84,7 @@ namespace UIEngine
 			return null;
 		}
 
-		internal static void OnWarningMessageHappen(Node source, string message)
+		internal static void RaiseWarningMessage(Node source, string message)
 		{
 			WarningMessagePublished?.Invoke(source, message);
 		}
