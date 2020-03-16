@@ -52,18 +52,11 @@ namespace ComponentLibrary
 		{
 			if (!CollectionNode.Is_2D)
 			{
-				if (CollectionNode.Count != 0)
-				{
-					int columns = (CollectionNode[0] as ICollection).Count;
-					for (int i = 1; i <= columns; i++)
-					{
-						var column = new DataGridTemplateColumn();
-						column.Header = i;
-						column.CellTemplate = FindResource("Template") as DataTemplate;
-						MainDataGrid.Columns.Add(column);
-					}
-				}
-				MainDataGrid.ItemsSource = _CollectionNode.Collection2D;
+				var column = new DataGridTemplateColumn();
+				column.Header = "Elements";
+				column.CellTemplate = FindResource("Template") as DataTemplate;
+				MainDataGrid.Columns.Add(column);
+				MainDataGrid.ItemsSource = _CollectionNode;
 			}
 			else if (CollectionNode.GetObjectData<object>() is IDictionary)
 			{

@@ -10,6 +10,7 @@ using System.Linq;
 using System.Reflection;
 using System.ComponentModel;
 using System.Collections.Specialized;
+using System.Collections.ObjectModel;
 
 namespace UIEngine
 {
@@ -68,10 +69,10 @@ namespace UIEngine
 		private const string _INVALID_OPERATION_WARNING = "LINQ nodes do not have succession";
 		internal protected LinqNode(CollectionNode collection)
 		{
-			Collection = collection;
+			SourceCollection = collection;
 		}
 
-		public CollectionNode Collection { get; private set; }
+		public CollectionNode SourceCollection { get; private set; }
 		internal protected ObjectNode Enumerator { get; set; }
 		public CollectionNode ReturnCollectionNode { get; private set; }
 		protected override string Preview { get => throw new NotImplementedException(); 
@@ -80,7 +81,7 @@ namespace UIEngine
 		internal abstract bool IsSatisfySignature { get; }
 		internal override ObjectNode InstantiateSuccession()
 		{
-			Dashboard.OnWarningMessageHappen(this, _INVALID_OPERATION_WARNING);
+			Dashboard.RaiseWarningMessage(this, _INVALID_OPERATION_WARNING);
 			return null;
 		}
 		public abstract void AddPredicate(ObjectNode predicate);
@@ -102,7 +103,7 @@ namespace UIEngine
 
 		internal override CollectionNode Execute()
 		{
-			foreach (var list in Collection.Collection2D)
+			foreach (var list in SourceCollection.Collection2D)
 			{
 				foreach (var enumerator in list)
 				{
@@ -116,7 +117,7 @@ namespace UIEngine
 
 		public override void AddPredicate(ObjectNode predicate)
 		{
-			Dashboard.OnWarningMessageHappen(this, _SINGLE_PREDICATE_WARNING);
+			Dashboard.RaiseWarningMessage(this, _SINGLE_PREDICATE_WARNING);
 			throw new InvalidOperationException(_SINGLE_PREDICATE_WARNING);
 		}
 	} 
@@ -147,35 +148,31 @@ namespace UIEngine
 		{
 			if (!IsSatisfySignature)
 			{
-				Dashboard.OnWarningMessageHappen(this, _INVALID_RETURN_TYPE);
-				return Collection;
+				Dashboard.RaiseWarningMessage(this, _INVALID_RETURN_TYPE);
+				return SourceCollection;
 			}
-			var ret = new List<ObjectNode>();
-			foreach (var list in Collection.Collection2D)
-			{
-				foreach (var enumerator in list)
+			var ret = new ObservableCollection<ObjectNode>();
+			SourceCollection.ForEach(enumerator => {
+				while (!(_Predicates.Peek() is bool))
 				{
-					while (!(_Predicates.Peek() is bool))
+					if (_Predicates.Peek() is LogicOperators)
 					{
-						if (_Predicates.Peek() is LogicOperators)
-						{
-							continue;
-						}
-						else
-						{
-							// executing and replacing a single condition with its return value
-							ObjectNode condition = _Predicates.Dequeue() as ObjectNode;
-							condition.SetReferenceTo(enumerator);
-							_Predicates.Enqueue((bool)condition.InstantiateSuccession().ObjectData);
-						}
+						continue;
 					}
-
-					if (Parser.Execute(_Predicates))
+					else
 					{
-						ret.Add(enumerator);
+						// executing and replacing a single condition with its return value
+						ObjectNode condition = _Predicates.Dequeue() as ObjectNode;
+						condition.SetReferenceTo(enumerator);
+						_Predicates.Enqueue((bool)condition.InstantiateSuccession().ObjectData);
 					}
 				}
-			}
+
+				if (Parser.Execute(_Predicates))
+				{
+					ret.Add(enumerator);
+				}
+			});
 			return CollectionNode.Create(ret);
 		}
 

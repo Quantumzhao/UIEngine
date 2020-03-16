@@ -1,7 +1,10 @@
 ﻿using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using System.Collections.Specialized;
+using System.ComponentModel;
+using System.Linq;
 using System.Reflection;
 
 namespace UIEngine
@@ -11,61 +14,80 @@ namespace UIEngine
 	///		this node should not be an element of another collection. 
 	///		Only <c>IList</c> is supported at current stage
 	/// </summary>
-	public class CollectionNode : ObjectNode, INotifyCollectionChanged
+	public class CollectionNode : ObjectNode, INotifyCollectionChanged, INotifyPropertyChanged, IEnumerable<ObjectNode>
 	{
 		private const string _INVALID_OPERATION_WARNING =
 			"Collection node is not supported in a LINQ expression";
 		private const string _DIMENSION_ERROR =
 			"Applying 1D operations to 2D collections or v.v. ";
+		private const string _NO_SUCH_NODE =
+			"The specified node does not exist";
 
 		public event NotifyCollectionChangedEventHandler CollectionChanged;
 
-		public bool Is_2D => Collection2D == null;
+		public bool Is_2D { get; private set; }
 		public bool DisplayPropertiesAsHeadings { get; set; } = false;
 		public List<string> Headings { get; private set; } = new List<string>();
 
-		private List<List<ObjectNode>> _Collection2D = null;
+		private ObservableCollection<ObservableCollection<ObjectNode>> _Collection2D = null;
 
 		/// <summary>
 		///		Unless you know what you are doing, otherwise don't use this property
 		/// </summary>
-		public List<List<ObjectNode>> Collection2D
+		public ObservableCollection<ObservableCollection<ObjectNode>> Collection2D
 		{
 			get
 			{
-				if (_Collection2D == null)
+				if (!Is_2D)
 				{
 					throw new InvalidOperationException(_DIMENSION_ERROR);
 				}
 				else
 				{
+					if (_Collection2D == null)
+					{
+						this.LoadObjectData();
+					}
 					return _Collection2D;
 				}				
 			}
-			private set => _Collection2D = value;
 		}
 
-		private List<ObjectNode> _Collection = null;
+		private ObservableCollection<ObjectNode> _Collection = null;
 		/// <summary>
 		///		Unless you know what you are doing, otherwise don't use this property
 		/// </summary>
-		public List<ObjectNode> Collection
+		public ObservableCollection<ObjectNode> Collection
 		{
 			get
 			{
-				if (_Collection == null)
+				if (Is_2D)
 				{
 					throw new InvalidOperationException(_DIMENSION_ERROR);
 				}
 				else
 				{
+					if (_Collection == null)
+					{
+						this.LoadObjectData();
+					}
 					return _Collection;
 				}				
 			}
-			private set => _Collection = value;
 		}
 		public TypeSystem ElementType { get; private set; }
-		public int Count => Is_2D ? Collection2D.Count : Collection.Count;
+		/// <summary>
+		///		If the collection is 2D, returns the count for its rows. 
+		///		If it's 1D, returns the count for its elements. 
+		/// </summary>
+		public int Count
+		{
+			get
+			{
+				this.LoadObjectData();
+				return Is_2D ? Collection2D.Count : Collection.Count;
+			}
+		}
 
 		#region LINQ Functionalities
 		public ForEachNode ForEachExpression { get; private set; }
@@ -89,17 +111,17 @@ namespace UIEngine
 			return new CollectionNode(type);
 		}
 		/// <summary>
-		///		For LINQ expression generated collection
+		///		For LINQ expression generated collection. 
+		///		Supports only 1D collection in current phase
 		/// </summary>
 		/// <param name="collection"></param>
 		/// <returns></returns>
-		internal static CollectionNode Create(List<ObjectNode> collection)
+		internal static CollectionNode Create(ObservableCollection<ObjectNode> collection)
 		{
-			var collectionNode = new CollectionNode(typeof(List<ObjectNode>));
+			var collectionNode = new CollectionNode(typeof(ObservableCollection<ObjectNode>));
 			foreach (var element in collection)
 			{
-				var list = new List<ObjectNode> { element };
-				collectionNode.Collection2D.Add(list);
+				collectionNode.Collection.Add(element);
 			}
 			return collectionNode;
 		}
@@ -125,13 +147,15 @@ namespace UIEngine
 			// If it is a 1D collection
 			if (SourceObjectInfo.ObjectDataType.IsDerivedFrom(typeof(IList)))
 			{
-				_Collection = new List<ObjectNode>();
+				Is_2D = false;
+				//_Collection = new ObservableCollection<ObjectNode>();
 			}
 			// if it is a 2D collection, or things other than list ...
 			// will be changed in the future
 			else
 			{
-				_Collection2D = new List<List<ObjectNode>>();
+				Is_2D = true;
+				//_Collection2D = new ObservableCollection<ObservableCollection<ObjectNode>>();
 			}
 		}
 
@@ -146,7 +170,30 @@ namespace UIEngine
 		{
 			if (ObjectData is INotifyCollectionChanged notifiable)
 			{
-				notifiable.CollectionChanged += this.CollectionChanged;
+				notifiable.CollectionChanged += OnCollectionChanged;
+			}
+
+			void OnCollectionChanged(object sender, NotifyCollectionChangedEventArgs e)
+			{
+				switch (e.Action)
+				{
+					case NotifyCollectionChangedAction.Add:
+						var objectNode = ObjectNode.Create(this, e.NewItems[0], 
+							new Visible(Header, Description));
+						Add(objectNode);
+						break;
+
+					case NotifyCollectionChangedAction.Remove:
+						Remove(e.OldItems[0]);
+						break;
+
+					case NotifyCollectionChangedAction.Replace:
+					case NotifyCollectionChangedAction.Reset:
+					case NotifyCollectionChangedAction.Move:
+						throw new NotImplementedException();
+					default:
+						break;
+				}
 			}
 		}
 
@@ -154,7 +201,7 @@ namespace UIEngine
 		{
 			var preFormattedData = (ObjectData as ICollection).ToObjectList();
 			var formattedData = new List<object>();
-			var list = new List<ObjectNode>();
+			var list = new ObservableCollection<ObjectNode>();
 			// If it is a dictionary
 			if (SourceObjectInfo.ObjectDataType.IsDerivedFrom(typeof(IDictionary)))
 			{
@@ -169,7 +216,7 @@ namespace UIEngine
 				enumerator.MoveNext();
 				foreach (var value in (ObjectData as IDictionary).Values)
 				{
-					enumerator.Current.Add(Create(this, value, new Visible(Header, Description)));
+					enumerator.Current.Add(ObjectNode.Create(this, value, new Visible(Header, Description)));
 					enumerator.MoveNext();
 				}
 			}
@@ -180,12 +227,13 @@ namespace UIEngine
 				{
 					formattedData.Add((element as ICollection).ToObjectList());
 				}
+				_Collection2D = new ObservableCollection<ObservableCollection<ObjectNode>>();
 				foreach (var row in formattedData)
 				{
-					var elementRow = new List<ObjectNode>();
+					var elementRow = new ObservableCollection<ObjectNode>();
 					foreach (var column in row as ICollection)
 					{
-						elementRow.Add(Create(this, column, new Visible(Header, Description)));
+						elementRow.Add(ObjectNode.Create(this, column, new Visible(Header, Description)));
 					}
 					Collection2D.Add(elementRow);
 				}
@@ -193,11 +241,10 @@ namespace UIEngine
 			// If it's a one dimensional list (or set, stack ...)
 			else
 			{
+				_Collection = new ObservableCollection<ObjectNode>();
 				foreach (var objectData in ObjectData as ICollection)
 				{
-					var row = new List<ObjectNode>();
-					row.Add(ObjectNode.Create(this, objectData, new Visible(Header, Description)));
-					Collection2D.Add(row);
+					Collection.Add(ObjectNode.Create(this, objectData, new Visible(Header, Description)));
 				}
 			}
 		}
@@ -206,6 +253,27 @@ namespace UIEngine
 		internal void SetValueToSourceCollectionElement(object oldValue, object newValue)
 		{
 			throw new NotImplementedException();
+		}
+
+		internal void ForEach(Action<ObjectNode> operation)
+		{
+			if (Is_2D)
+			{
+				foreach (var row in Collection2D)
+				{
+					foreach (var item in row)
+					{
+						operation(item);
+					}
+				}
+			}
+			else
+			{
+				foreach (var item in Collection)
+				{
+					operation(item);
+				}
+			}
 		}
 
 		public ObjectNode this[int row, int column]
@@ -220,22 +288,85 @@ namespace UIEngine
 				return Succession as ObjectNode;
 			}
 		}
-		public List<ObjectNode> this[int row]
+		public ObjectNode this[int index]
 		{
 			get
 			{
-				if (Collection2D.Count == 0)
+				if (Collection.Count == 0)
 				{
 					LoadObjectData();
 				}
-				return Collection2D[row];
+				Succession = Collection[index];
+				return Succession as ObjectNode;
 			}
 		}
 
 		internal override ObjectNode InstantiateSuccession()
 		{
-			Dashboard.OnWarningMessageHappen(this, _INVALID_OPERATION_WARNING);
+			Dashboard.RaiseWarningMessage(this, _INVALID_OPERATION_WARNING);
 			return null;
 		}
+
+		public void Add(ObjectNode objectNode)
+		{
+			if (Is_2D)
+			{
+				throw new NotImplementedException();
+			}
+			else
+			{
+				Collection.Add(objectNode);
+				CollectionChanged?.Invoke(this, new NotifyCollectionChangedEventArgs(
+					NotifyCollectionChangedAction.Add, objectNode));
+			}
+		}
+
+		public void Remove(ObjectNode objectNode)
+		{
+			if (Is_2D)
+			{
+				throw new NotImplementedException();
+			}
+			else
+			{
+				Collection.Remove(objectNode);
+				CollectionChanged?.Invoke(this, new NotifyCollectionChangedEventArgs(
+					NotifyCollectionChangedAction.Remove, objectNode));
+			}
+		}
+		private void Remove(object NodeWithObjectData)
+		{
+			if (Is_2D)
+			{
+				throw new NotImplementedException();
+			}
+			else
+			{
+				try
+				{
+					var objNode = Collection.Single(node => node.ObjectData == NodeWithObjectData);
+					CollectionChanged?.Invoke(this, new NotifyCollectionChangedEventArgs(
+						NotifyCollectionChangedAction.Remove, objNode));
+				}
+				catch (InvalidOperationException)
+				{
+					Dashboard.RaiseWarningMessage(this, _NO_SUCH_NODE);
+				}
+			}
+		}
+
+		public IEnumerator<ObjectNode> GetEnumerator()
+		{
+			if (Is_2D)
+			{
+				throw new NotImplementedException();
+			}
+			else
+			{
+				return Collection.GetEnumerator();
+			}
+		}
+
+		IEnumerator IEnumerable.GetEnumerator() => this.GetEnumerator();
 	}
 }
