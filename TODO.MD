@@ -22,9 +22,9 @@ Completed and developing features.
 - [x] template instantiation
   
 - [ ] ==preview==
-    
+  
 - [ ] ==unsafe accessing==
-    
+  
     > Continue display descendant template object nodes without the object is not loaded
 
 ## Method Node
@@ -35,14 +35,20 @@ Completed and developing features.
     - [ ] complete list of candidate arguments
     - [ ] correct list of candidate arguments
 - [x] Modify parameters
+    - [ ] Object node assignment (drag and drop)
 - [ ] Do verification (type inference) when modifying parameters
 - [x] ~~Return value~~
 - [x] Type inference on return value
 
+## Collection Node
+
+- [ ] ==2-dimensional collection (i.e. table) support==
+- [ ] ==Dictionary support==
+- [x] Two way collection binding
+- [ ] ==Collection node assignment==
+
 ## LINQ Node
 
-- [ ] 2-dimensional collection (i.e. table) support
-- [ ] Dictionary support
 - [ ] ==Where==
     - [ ] ==composite expression==
 - [ ] Sort
