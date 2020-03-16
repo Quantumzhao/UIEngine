@@ -8,9 +8,9 @@ using System.Reflection;
 namespace UIEngine
 {
 	/* object nodes should never be created or replaced via external assemblies.
- * object nodes must always maintain a tree data structure.
- * thus, if an object node wants to point to another object node(not talking about setting another node as child), 
- * it should actually point to the object data wrapped by that node */
+	 * object nodes must always maintain a tree data structure.
+	 * thus, if an object node wants to point to another object node(not talking about setting another node as child), 
+	 * it should actually point to the object data wrapped by that node */
 	public class ObjectNode : Node, INotifyPropertyChanged
 	{
 		/// <summary>
@@ -98,7 +98,7 @@ namespace UIEngine
 		internal bool IsEmpty => _ObjectData == null;
 		internal DomainModelReferenceInfo SourceObjectInfo { get; set; }
 		public bool CanWrite { get; internal set; } = true;
-		public bool IsLeaf => Properties.Count == 0;
+		public bool IsLeaf => Properties?.Count == 0;
 		private List<ObjectNode> _Properties = null;
 		public List<ObjectNode> Properties
 		{
