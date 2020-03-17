@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using System.Linq;
 using System.Reflection;
 
@@ -218,34 +219,27 @@ namespace UIEngine
 			}
 			else if (typeof(ICollection).IsAssignableFrom(type))
 			{
-				return new TypeSystem(type);
+				return new TypeSystem(type, Types.Collection);
 			}
 			else if (typeof(Enum).IsAssignableFrom(type))
 			{
-				return new TypeSystem(type);
+				return new EnumType(type);
 			}
 			else if (typeof(object).IsAssignableFrom(type))
 			{
-				return new TypeSystem(type);
+				return new TypeSystem(type, Types.Object);
 			}
 			else
 			{
 				throw new ArgumentException("Not a valid type");
 			}
 		}
-		private TypeSystem(Type type)
+		protected TypeSystem(Type type, Types restrictedType)
 		{
 			ReflectedType = type;
-			if (type.IsAssignableFrom(typeof(ICollection)))
-			{
-				RestrictedType = Types.Collection;
-			}
-			else
-			{
-				RestrictedType = Types.Object;
-			}
+			RestrictedType = restrictedType;
 		}
-		private TypeSystem(Types restrictedType)
+		protected TypeSystem(Types restrictedType)
 		{
 			RestrictedType = restrictedType;
 			switch (restrictedType)
@@ -283,7 +277,7 @@ namespace UIEngine
 		public static readonly TypeSystem Int			= new TypeSystem(Types.Int);
 		public static readonly TypeSystem String		= new TypeSystem(Types.String);
 		public static readonly TypeSystem Object		= new TypeSystem(Types.Object);
-		public static readonly TypeSystem Enum			= new TypeSystem(Types.Enum);
+		public static readonly EnumType   Enum			= new EnumType  (typeof(Enum));
 
 		internal readonly Type ReflectedType;
 		public readonly Types RestrictedType;
@@ -313,6 +307,9 @@ namespace UIEngine
 		}
 		public bool IsDerivedFrom(TypeSystem type) => IsDerivedFrom(type.ReflectedType);
 		public bool IsAssignableFrom(Type type) => ReflectedType.IsAssignableFrom(type);
+		/// <summary>
+		///		Enum is not considered a value type by this context
+		/// </summary>
 		public bool IsValueType => (RestrictedType & (Types.Int | Types.Double | Types.Bool | Types.String)) != 0;
 		public bool IsEnum => IsDerivedFrom(TypeSystem.Enum);
 		public enum Types
@@ -324,6 +321,18 @@ namespace UIEngine
 			Collection = 16,
 			Object = 32,
 			Enum = 64
+		}
+
+		public class EnumType : TypeSystem
+		{
+			internal EnumType(Type type) : base(type, Types.Enum)
+			{
+				IsMultiSelect = type.GetCustomAttribute<FlagsAttribute>() != null;
+				Candidates = new ReadOnlyCollection<string>(System.Enum.GetNames(type));
+			}
+
+			public readonly ReadOnlyCollection<string> Candidates;
+			public readonly bool IsMultiSelect;
 		}
 	}
 
