@@ -9,11 +9,27 @@ namespace UIEngine
 {
 	public delegate void NodeOperationsHandler(Node node);
 	public delegate void WarningMessageHandler(Node source, string message);
+	[Obsolete]
 	public delegate void NotifySelfChangedHandler(Node sender, NotifySelfChangedEventArgs e);
 
+	[Obsolete]
 	public interface INotifySelfChanged
 	{
 		event NotifySelfChangedHandler OnSelfChanged;
+	}
+
+	public interface IMetaDataInfo
+	{
+		/// <summary>
+		///		The unique identifier. 
+		///		It does not necessarily have to be the same as member name
+		/// </summary>
+		string Name { get; }
+		string Description { get; }
+		/// <summary>
+		///		The actual name that will be seen by the users
+		/// </summary>
+		string Header { get; set; }
 	}
 
 	public static class Dashboard
