@@ -28,10 +28,9 @@ namespace UIEngine
 			else
 			{
 				var objectNode = new ObjectNode(parent, propertyInfo.GetCustomAttribute<VisibleAttribute>());
-				objectNode.SourceObjectInfo = new DomainModelReferenceInfo(propertyInfo, SourceReferenceType.Property);
+				objectNode.SourceObjectInfo = new PropertyDomainModelRefInfo(propertyInfo);
 				//var setter = propertyInfo.SetMethod;
 				//CanWrite = setter.IsPublic && (setter.GetCustomAttribute<Visible>()?.IsEnabled ?? true);
-				objectNode.Name = propertyInfo.Name;
 
 				return objectNode;
 			}
@@ -48,16 +47,16 @@ namespace UIEngine
 			var objectNode = new ObjectNode(parent, attribute);
 			if (parent is CollectionNode)
 			{
-				objectNode.SourceObjectInfo = new DomainModelReferenceInfo(objectData.GetType(),
+				objectNode.SourceObjectInfo = new OtherDomainModelRefInfo(objectData.GetType(),
 					SourceReferenceType.Indexer);
 			}
 			else
 			{
-				objectNode.SourceObjectInfo = new DomainModelReferenceInfo(objectData.GetType(),
+				objectNode.SourceObjectInfo = new OtherDomainModelRefInfo(objectData.GetType(),
 					SourceReferenceType.ReturnValue);
 			}
 			objectNode._ObjectData = objectData;
-			objectNode.TryReadFromIVisible(objectData);
+			objectNode.TryGetDescriptiveInfo(objectData);
 			objectNode.SetBinding(objectData);
 
 			return objectNode;
@@ -66,10 +65,10 @@ namespace UIEngine
 		///		Create from class template. Just a typed placeholder. e.g. parameter and in LINQ local variables
 		/// </summary>
 		/// <param name="type"></param>
-		internal static ObjectNode Create(Type type, DescriptiveInfoAttribute description)
+		internal static ObjectNode Create(Type type, DescriptiveInfoAttribute descriptiveInfo)
 		{
-			var objectNode = new ObjectNode(null, description);
-			objectNode.SourceObjectInfo = new DomainModelReferenceInfo(type, SourceReferenceType.parameter);
+			var objectNode = new ObjectNode(null, descriptiveInfo);
+			objectNode.SourceObjectInfo = new OtherDomainModelRefInfo(type, SourceReferenceType.parameter);
 			return objectNode;
 		}
 
@@ -82,8 +81,8 @@ namespace UIEngine
 				if (attribute is VisibleAttribute visible)
 				{
 					PreviewExpression = visible.PreviewExpression;
-					Name = visible.Name;
 				}
+				Name = attribute.Name;
 				Header = attribute.Header;
 				Description = attribute.Description;
 			}
@@ -96,7 +95,7 @@ namespace UIEngine
 		public TypeSystem Type => SourceObjectInfo.ObjectDataType;
 		public bool IsValueType => SourceObjectInfo.ObjectDataType.IsValueType;
 		internal bool IsEmpty => _ObjectData == null;
-		internal DomainModelReferenceInfo SourceObjectInfo { get; set; }
+		internal DomainModelRefInfo SourceObjectInfo { get; set; }
 		public bool CanWrite { get; internal set; } = true;
 		public bool IsLeaf => Properties?.Count == 0;
 		private List<ObjectNode> _Properties = null;
@@ -177,16 +176,16 @@ namespace UIEngine
 
 		protected virtual void LoadObjectData()
 		{
-			if (SourceObjectInfo.SourceReferenceType == SourceReferenceType.Property)
+			if (SourceObjectInfo is PropertyDomainModelRefInfo propertyDomainModelRefInfo)
 			{
 				// if property info is null, then it's an abstract object, don't load object data
-				if (SourceObjectInfo.PropertyInfo != null)
+				if (propertyDomainModelRefInfo.PropertyInfo != null)
 				{
-					_ObjectData = SourceObjectInfo.PropertyInfo.GetValue(Parent?.ObjectData);
+					_ObjectData = propertyDomainModelRefInfo.PropertyInfo.GetValue(Parent?.ObjectData);
 					//Preview = PreviewExpression?.Invoke(ObjectData);
 				}
 
-				TryReadFromIVisible(_ObjectData);
+				TryGetDescriptiveInfo(_ObjectData);
 				SetBinding(_ObjectData);
 			}
 		}
@@ -195,7 +194,7 @@ namespace UIEngine
 			switch (SourceObjectInfo.SourceReferenceType)
 			{
 				case SourceReferenceType.Property:
-					SourceObjectInfo.PropertyInfo.SetValue(Parent?.ObjectData, ObjectData);
+					((PropertyDomainModelRefInfo)SourceObjectInfo).PropertyInfo.SetValue(Parent?.ObjectData, ObjectData);
 					break;
 
 				case SourceReferenceType.Indexer:
@@ -223,22 +222,16 @@ namespace UIEngine
 
 		private void LoadProperties()
 		{
-			if (ObjectData is IEnumerable<object>)
+			if (_ObjectData == null)
 			{
-				_Properties = (ObjectData as IEnumerable<object>)
-					.Select(o => Create(
-						this, o, SourceObjectInfo.PropertyInfo.GetCustomAttribute<VisibleAttribute>()
-					)).ToList();
+				LoadObjectData();
 			}
-			else
-			{
-				_Properties = SourceObjectInfo.ObjectDataType.ReflectedType.GetVisibleProperties(BindingFlags.Public | BindingFlags.Instance)
-					.Select(pi => Create(this, pi)).ToList();
-			}
+			_Properties = SourceObjectInfo.ObjectDataType.ReflectedType.GetVisibleProperties(BindingFlags.Public | BindingFlags.Instance)
+				.Select(pi => Create(this, pi)).ToList();
 		}
 		private void LoadMethods()
 		{
-			if (ObjectData == null)
+			if (_ObjectData == null)
 			{
 				LoadObjectData();
 			}
@@ -323,7 +316,7 @@ namespace UIEngine
 			}
 		}
 
-		private void TryReadFromIVisible(object data)
+		private void TryGetDescriptiveInfo(object data)
 		{
 			if (data is IVisible visible)
 			{

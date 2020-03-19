@@ -22,11 +22,11 @@ namespace UIEngine
 	public interface IVisible
 	{
 		/// <summary>
-		///		The unique identifier. 
-		///		It does not necessarily have to be the same as member name
+		///		The unique name that is used to locate and find a node. 
+		///		It is optional, but the node cannot be found if it is left blank
 		/// </summary>
 		string Name { get; }
-		string Description { get; }
+		string Description { get; set; }
 		/// <summary>
 		///		The actual name that will be seen by the users
 		/// </summary>
@@ -56,7 +56,8 @@ namespace UIEngine
 			foreach (var type in classes)
 			{
 				// Load all static properties
-				foreach (var property in type.GetVisibleProperties(BindingFlags.Public | BindingFlags.Static))
+				foreach (var property in 
+					type.GetVisibleProperties(BindingFlags.Public | BindingFlags.Static))
 				{
 					ObjectNode node = ObjectNode.Create(null, property);
 					Roots.Add(node);
@@ -126,21 +127,35 @@ namespace UIEngine
 	{
 		public DescriptiveInfoAttribute(string name, string header, string description)
 		{
-			Header = header == "" ? name : header;
-			Description = description;
 			Name = name;
+			Header = header;
+			Description = description;
 		}
 
+		/// <summary>
+		///		The unique name that is used to locate and find a node. 
+		///		It is optional, but the node cannot be found if it is left blank
+		/// </summary>
+		public string Name { get; }
 		public string Header { get; set; }
 		public string Description { get; set; }
-		public string Name { get; set; }
 	}
 
+	/* There are 3 ways in providing descriptive information, which are:
+	 * 1. Conditional weak table, i.e. appended pseudo-attribute
+	 *    This is best for objects dynamically added into a collection
+	 * 2. IVisible interface
+	 *    This is the best way of storing/accessing this information, 
+	 *    but is limited to user defined types
+	 * 3. Visible Attribute
+	 *    This is an alternative way for properties with non user defined types
+	 * They are with priority order: 1 > 2 > 3 */
 	[AttributeUsage(AttributeTargets.Property | AttributeTargets.Method)]
 	public class VisibleAttribute : DescriptiveInfoAttribute
 	{
 		/// <summary>
-		///		Initializing the visibility tag. Any member marked with "Visible" can be accessed via front end
+		///		Initializing the visibility tag. 
+		///		Any member marked with "Visible" can be accessed via front end
 		/// </summary>
 		/// <param name="name">
 		///		Name of this property. If <paramref name="header"/> is left blank, 
@@ -152,7 +167,7 @@ namespace UIEngine
 		/// <param name="description">
 		///		Some descriptions (optional)
 		/// </param>
-		public VisibleAttribute(string name, string header = "", string description = "")
+		public VisibleAttribute(string header, string description = "", string name = "")
 			: base(name, header, description) { }
 		public bool IsEnabled { get; set; } = true;
 		public Func<object, string> PreviewExpression { get; set; } = o => o.ToString();
@@ -161,7 +176,7 @@ namespace UIEngine
 	[AttributeUsage(AttributeTargets.GenericParameter | AttributeTargets.Parameter)]
 	public class ParamInfo : DescriptiveInfoAttribute
 	{
-		public ParamInfo(string name, string header = "", string description = "")
+		public ParamInfo(string header, string description = "", string name = "")
 			: base(name, header, description) { }
 	}
 
@@ -203,24 +218,33 @@ namespace UIEngine
 		}
 	}
 
-	/* If the target object is retrieved from property, then property info is not null. 
-	 * vice versa */
-	internal class DomainModelReferenceInfo
+	public abstract class DomainModelRefInfo 
 	{
-		public DomainModelReferenceInfo(PropertyInfo propertyInfo, SourceReferenceType sourceReferenceType)
-			: this(propertyInfo.PropertyType, sourceReferenceType)
-		{
-			PropertyInfo = propertyInfo;
-		}
-		public DomainModelReferenceInfo(Type type, SourceReferenceType sourceReferenceType)
+		internal DomainModelRefInfo(Type type, SourceReferenceType sourceReferenceType)
 		{
 			SourceReferenceType = sourceReferenceType;
 			ObjectDataType = type.ToValidType();
 		}
 
+		internal readonly SourceReferenceType SourceReferenceType;
+		internal readonly TypeSystem ObjectDataType;
+	}
+	public class OtherDomainModelRefInfo : DomainModelRefInfo
+	{
+		internal OtherDomainModelRefInfo(Type type, SourceReferenceType sourceReferenceType) 
+			: base(type, sourceReferenceType) { }
+	}
+	public class PropertyDomainModelRefInfo : DomainModelRefInfo
+	{
+		public readonly string PropertyName;
 		public readonly PropertyInfo PropertyInfo;
-		public readonly SourceReferenceType SourceReferenceType;
-		public readonly TypeSystem ObjectDataType;
+
+		public PropertyDomainModelRefInfo(PropertyInfo info) 
+			: base(info.PropertyType, SourceReferenceType.Property)
+		{
+			PropertyInfo = info;
+			PropertyName = PropertyInfo.Name;
+		}
 	}
 	internal enum SourceReferenceType
 	{
@@ -436,5 +460,7 @@ namespace UIEngine
 
 		public static implicit operator T(W<T> wrappedStruct) => wrappedStruct.Value;
 		public static implicit operator W<T>(T value) => new W<T>(value);
+
+		public override string ToString() => Value.ToString();
 	}
 }
