@@ -37,7 +37,13 @@ namespace CLITestProject
 		{
 			for (int i = 0; i < _MAX_INIT_PEOPLE; i++)
 			{
-				People.Add(new Person(i % 2 == 0 ? Gender.Male : Gender.Female, null, null) { Age = 20, Prob_Die = 0.005, Prob_Reproduce = 0.5 });
+				var person = new Person(i % 2 == 0 ? Gender.Male : Gender.Female, null, null) 
+				{ 
+					Age = 20, 
+					Prob_Die = 0.005, 
+					Prob_Reproduce = 0.5 
+				};
+				People.Add(person.AppendVisibleAttribute(new VisibleAttribute("person")));
 			}
 
 			//var m = new Person(Gender.Male, null, null);
@@ -98,7 +104,7 @@ namespace CLITestProject
 				{
 					child = new Person(Gender.Female, husband, wife);
 				}
-				husband.Children.Add(child.AppendVisibleAttribute(new VisibleAttribute("", "child")));
+				husband.Children.Add(child.AppendVisibleAttribute(new VisibleAttribute("person", "")));
 				wife.Children.Add(child);
 				child.Siblings = husband.Children.Where(c => !c.Equals(child)).ToList();
 				child.Siblings.ForEach(s => s.Siblings.Add(child));
