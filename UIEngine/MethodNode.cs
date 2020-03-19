@@ -14,12 +14,12 @@ namespace UIEngine
 			var methodNode = new MethodNode();
 			methodNode.Parent = parent;
 			methodNode._Body = methodInfo;
-			var attr = methodInfo.GetCustomAttribute<Visible>();
+			var attr = methodInfo.GetCustomAttribute<VisibleAttribute>();
 			methodNode.Name = attr.Name;
 			methodNode.Header = attr.Header;
 			methodNode.Description = attr.Description;
 			methodNode.Signatures = methodInfo.GetParameters()
-				.Select(p => ObjectNode.Create(p.ParameterType, p.GetCustomAttribute<DescriptiveInfo>()))
+				.Select(p => ObjectNode.Create(p.ParameterType, p.GetCustomAttribute<DescriptiveInfoAttribute>()))
 				.ToList();
 			methodNode.ReturnNode = ObjectNode.Create(methodInfo.ReturnType, attr);
 			if (parent != null)

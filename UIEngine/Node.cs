@@ -18,7 +18,7 @@ namespace UIEngine
 	public abstract class Node : INotifyPropertyChanged
 	{
 		/// <summary>
-		///		The unique identifier that is going to be used inside the engine
+		///		The name of the property if the object node is created out of a property. 
 		/// </summary>
 		public string Name { get; set; } = string.Empty;
 		/// <summary>
@@ -96,7 +96,7 @@ namespace UIEngine
 		private ForEachNode(CollectionNode collection) : base(collection) 
 		{
 			// For each only has one predicate
-			_Predicate.Add(ObjectNode.Create(collection.ElementType.ReflectedType, new Visible(collection.Name)));
+			_Predicate.Add(ObjectNode.Create(collection.ElementType.ReflectedType, new VisibleAttribute(collection.Name)));
 		}
 
 		internal override bool IsSatisfySignature => true;

@@ -126,7 +126,7 @@ namespace UIEngine
 			return collectionNode;
 		}
 		private CollectionNode(ObjectNode parent, PropertyInfo propertyInfo)
-			: base(parent, propertyInfo.GetCustomAttribute<Visible>())
+			: base(parent, propertyInfo.GetCustomAttribute<VisibleAttribute>())
 		{
 			SourceObjectInfo = new DomainModelReferenceInfo(propertyInfo, SourceReferenceType.Property);
 			Initialize();
@@ -179,7 +179,7 @@ namespace UIEngine
 				{
 					case NotifyCollectionChangedAction.Add:
 						var objectNode = ObjectNode.Create(this, e.NewItems[0], 
-							new Visible(Header, Description));
+							new VisibleAttribute(Header, Description));
 						Add(objectNode);
 						break;
 
@@ -209,14 +209,14 @@ namespace UIEngine
 				Headings.Add("Value");
 				foreach (var key in (ObjectData as IDictionary).Keys)
 				{
-					list.Add(Create(this, key, new Visible(Header, Description)));
+					list.Add(Create(this, key, new VisibleAttribute(Header, Description)));
 					Collection2D.Add(list);
 				}
 				var enumerator = Collection2D.GetEnumerator();
 				enumerator.MoveNext();
 				foreach (var value in (ObjectData as IDictionary).Values)
 				{
-					enumerator.Current.Add(ObjectNode.Create(this, value, new Visible(Header, Description)));
+					enumerator.Current.Add(ObjectNode.Create(this, value, new VisibleAttribute(Header, Description)));
 					enumerator.MoveNext();
 				}
 			}
@@ -233,7 +233,7 @@ namespace UIEngine
 					var elementRow = new ObservableCollection<ObjectNode>();
 					foreach (var column in row as ICollection)
 					{
-						elementRow.Add(ObjectNode.Create(this, column, new Visible(Header, Description)));
+						elementRow.Add(ObjectNode.Create(this, column, new VisibleAttribute(Header, Description)));
 					}
 					Collection2D.Add(elementRow);
 				}
@@ -244,7 +244,7 @@ namespace UIEngine
 				_Collection = new ObservableCollection<ObjectNode>();
 				foreach (var objectData in ObjectData as ICollection)
 				{
-					Collection.Add(ObjectNode.Create(this, objectData, new Visible(Header, Description)));
+					Collection.Add(ObjectNode.Create(this, objectData, new VisibleAttribute(Header, Description)));
 				}
 			}
 		}

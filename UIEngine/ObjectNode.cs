@@ -27,7 +27,7 @@ namespace UIEngine
 			}
 			else
 			{
-				var objectNode = new ObjectNode(parent, propertyInfo.GetCustomAttribute<Visible>());
+				var objectNode = new ObjectNode(parent, propertyInfo.GetCustomAttribute<VisibleAttribute>());
 				objectNode.SourceObjectInfo = new DomainModelReferenceInfo(propertyInfo, SourceReferenceType.Property);
 				//var setter = propertyInfo.SetMethod;
 				//CanWrite = setter.IsPublic && (setter.GetCustomAttribute<Visible>()?.IsEnabled ?? true);
@@ -43,7 +43,7 @@ namespace UIEngine
 		/// <param name="objectData"></param>
 		/// <param name="attribute"></param>
 		/// <returns></returns>
-		internal static ObjectNode Create(ObjectNode parent, object objectData, Visible attribute)
+		internal static ObjectNode Create(ObjectNode parent, object objectData, VisibleAttribute attribute)
 		{
 			var objectNode = new ObjectNode(parent, attribute);
 			if (parent is CollectionNode)
@@ -56,8 +56,8 @@ namespace UIEngine
 				objectNode.SourceObjectInfo = new DomainModelReferenceInfo(objectData.GetType(),
 					SourceReferenceType.ReturnValue);
 			}
-			objectNode.Header = objectData.ToString();
 			objectNode._ObjectData = objectData;
+			objectNode.TryReadFromIVisible(objectData);
 			objectNode.SetBinding(objectData);
 
 			return objectNode;
@@ -66,7 +66,7 @@ namespace UIEngine
 		///		Create from class template. Just a typed placeholder. e.g. parameter and in LINQ local variables
 		/// </summary>
 		/// <param name="type"></param>
-		internal static ObjectNode Create(Type type, DescriptiveInfo description)
+		internal static ObjectNode Create(Type type, DescriptiveInfoAttribute description)
 		{
 			var objectNode = new ObjectNode(null, description);
 			objectNode.SourceObjectInfo = new DomainModelReferenceInfo(type, SourceReferenceType.parameter);
@@ -74,12 +74,12 @@ namespace UIEngine
 		}
 
 		// The basic ctor
-		protected ObjectNode(ObjectNode parent, DescriptiveInfo attribute)
+		protected ObjectNode(ObjectNode parent, DescriptiveInfoAttribute attribute)
 		{
 			Parent = parent;
 			if (attribute != null)
 			{
-				if (attribute is Visible visible)
+				if (attribute is VisibleAttribute visible)
 				{
 					PreviewExpression = visible.PreviewExpression;
 					Name = visible.Name;
@@ -155,7 +155,7 @@ namespace UIEngine
 
 		/// <summary>
 		///		Retrieves object value of the object node. 
-		///		Returns null if cannot cast object to the given type
+		///		Returns default value if cannot cast object to the given type
 		///		<para>
 		///			Only use it if necessary. 
 		///		</para>
@@ -186,6 +186,7 @@ namespace UIEngine
 					//Preview = PreviewExpression?.Invoke(ObjectData);
 				}
 
+				TryReadFromIVisible(_ObjectData);
 				SetBinding(_ObjectData);
 			}
 		}
@@ -226,7 +227,7 @@ namespace UIEngine
 			{
 				_Properties = (ObjectData as IEnumerable<object>)
 					.Select(o => Create(
-						this, o, SourceObjectInfo.PropertyInfo.GetCustomAttribute<Visible>()
+						this, o, SourceObjectInfo.PropertyInfo.GetCustomAttribute<VisibleAttribute>()
 					)).ToList();
 			}
 			else
@@ -319,6 +320,26 @@ namespace UIEngine
 				{
 					notifiable.PropertyChanged += OnPropertyChanged;
 				}
+			}
+		}
+
+		private void TryReadFromIVisible(object data)
+		{
+			if (data is IVisible visible)
+			{
+				this.Header = visible.Header;
+				this.Name = visible.Name;
+				this.Description = visible.Description;
+			}
+			else if (Misc.ObjectTable.TryGetValue(data, out VisibleAttribute visibleAttribute))
+			{
+				this.Header = visibleAttribute.Header;
+				this.Name = visibleAttribute.Name;
+				this.Description = visibleAttribute.Description;
+			}
+			else
+			{
+				this.Header = data.ToString();
 			}
 		}
 	}
