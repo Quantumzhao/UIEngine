@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
 using System.Reflection;
+using System.Runtime.CompilerServices;
 
 namespace UIEngine
 {
@@ -18,7 +19,7 @@ namespace UIEngine
 		event NotifySelfChangedHandler OnSelfChanged;
 	}
 
-	public interface IMetaDataInfo
+	public interface IVisible
 	{
 		/// <summary>
 		///		The unique identifier. 
@@ -106,12 +107,24 @@ namespace UIEngine
 			WarningMessagePublished?.Invoke(source, message);
 		}
 
-		public static string Test() => "New";
+		/// <summary>
+		///		Appends descriptive info to the designated object
+		/// </summary>
+		/// <typeparam name="T">Accepts only reference types. </typeparam>
+		/// <param name="target"> the target object </param>
+		/// <param name="visibleAttribute"> descriptive info in the form of <c>Visible</c> attribute </param>
+		/// <example><code>object.AppendVisibleAttribute(new Visible(""))</code></example>
+		public static T AppendVisibleAttribute<T>(this T target, VisibleAttribute visibleAttribute)
+			where T : class
+		{
+			Misc.ObjectTable.Add(target, visibleAttribute);
+			return target;
+		}
 	}
 
-	public abstract class DescriptiveInfo : Attribute
+	public abstract class DescriptiveInfoAttribute : Attribute
 	{
-		public DescriptiveInfo(string name, string header, string description)
+		public DescriptiveInfoAttribute(string name, string header, string description)
 		{
 			Header = header == "" ? name : header;
 			Description = description;
@@ -124,7 +137,7 @@ namespace UIEngine
 	}
 
 	[AttributeUsage(AttributeTargets.Property | AttributeTargets.Method)]
-	public class Visible : DescriptiveInfo
+	public class VisibleAttribute : DescriptiveInfoAttribute
 	{
 		/// <summary>
 		///		Initializing the visibility tag. Any member marked with "Visible" can be accessed via front end
@@ -139,14 +152,14 @@ namespace UIEngine
 		/// <param name="description">
 		///		Some descriptions (optional)
 		/// </param>
-		public Visible(string name, string header = "", string description = "")
+		public VisibleAttribute(string name, string header = "", string description = "")
 			: base(name, header, description) { }
 		public bool IsEnabled { get; set; } = true;
 		public Func<object, string> PreviewExpression { get; set; } = o => o.ToString();
 	}
 
 	[AttributeUsage(AttributeTargets.GenericParameter | AttributeTargets.Parameter)]
-	public class ParamInfo : DescriptiveInfo
+	public class ParamInfo : DescriptiveInfoAttribute
 	{
 		public ParamInfo(string name, string header = "", string description = "")
 			: base(name, header, description) { }
@@ -154,11 +167,14 @@ namespace UIEngine
 
 	public static class Misc
 	{
+		public static readonly ConditionalWeakTable<object, VisibleAttribute> ObjectTable 
+			= new ConditionalWeakTable<object, VisibleAttribute>();
+
 		public static IEnumerable<PropertyInfo> GetVisibleProperties(this Type type, BindingFlags flags)
 		{
 			return type.GetProperties(flags).Where(p =>
 			{
-				var attr = p.GetCustomAttribute<Visible>();
+				var attr = p.GetCustomAttribute<VisibleAttribute>();
 				return attr != null && attr.IsEnabled;
 			});
 		}
@@ -167,7 +183,7 @@ namespace UIEngine
 		{
 			return type.GetMethods(flags).Where(m =>
 			{
-				var attr = m.GetCustomAttribute<Visible>();
+				var attr = m.GetCustomAttribute<VisibleAttribute>();
 				return attr != null && attr.IsEnabled;
 			});
 		}
@@ -213,6 +229,7 @@ namespace UIEngine
 		ReturnValue,
 		parameter
 	}
+
 	public class TypeSystem
 	{
 		public static TypeSystem ToRestrictedType(Type type)
@@ -344,7 +361,14 @@ namespace UIEngine
 			internal EnumType(Type type) : base(type, Types.Enum)
 			{
 				IsMultiSelect = type.GetCustomAttribute<FlagsAttribute>() != null;
-				Candidates = new ReadOnlyCollection<string>(System.Enum.GetNames(type));
+				if (!type.Equals(typeof(System.Enum)))
+				{
+					Candidates = new ReadOnlyCollection<string>(System.Enum.GetNames(type));
+				}
+				else
+				{
+					Candidates = new ReadOnlyCollection<string>(new List<string>());
+				}
 			}
 
 			public readonly ReadOnlyCollection<string> Candidates;
@@ -390,8 +414,27 @@ namespace UIEngine
 		internal override object Invoke() => Value;
 	}
 
+	[Obsolete]
 	public class NotifySelfChangedEventArgs : EventArgs
 	{
 		public readonly object newObjectData;
+	}
+
+	/// <summary>
+	///		The purpose of this class is to wrap up a struct into a reference type 
+	///		for <c>AppendVisibleAttribute</c>
+	///		<para> please take extra caution when handling it, since it it immutable, and any assignment will remove its visible attribute. </para>
+	/// </summary>
+	/// <typeparam name="T">
+	///		T must be a struct. There's nno need to wrap up a reference type into a reference type
+	///	</typeparam>
+	public class W<T> where T : struct
+	{
+		public readonly T Value;
+
+		public W(T value) => Value = value;
+
+		public static implicit operator T(W<T> wrappedStruct) => wrappedStruct.Value;
+		public static implicit operator W<T>(T value) => new W<T>(value);
 	}
 }
