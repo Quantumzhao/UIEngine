@@ -128,12 +128,12 @@ namespace UIEngine
 		private CollectionNode(ObjectNode parent, PropertyInfo propertyInfo)
 			: base(parent, propertyInfo.GetCustomAttribute<VisibleAttribute>())
 		{
-			SourceObjectInfo = new DomainModelReferenceInfo(propertyInfo, SourceReferenceType.Property);
+			SourceObjectInfo = new PropertyDomainModelRefInfo(propertyInfo);
 			Initialize();
 		}
 		private CollectionNode(Type type) : base(null, null)
 		{
-			SourceObjectInfo = new DomainModelReferenceInfo(type, SourceReferenceType.parameter);
+			SourceObjectInfo = new OtherDomainModelRefInfo(type, SourceReferenceType.parameter);
 			Initialize();
 		}
 		private void Initialize()
