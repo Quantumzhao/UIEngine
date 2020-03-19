@@ -17,7 +17,7 @@ namespace Demo
 
 		private static DispatcherTimer Timer = new DispatcherTimer() { Interval = new TimeSpan(0, 0, 0, 0, 500) };
 
-		[Visible(nameof(People))]
+		[VisibleAttribute(nameof(People))]
 		public static ObservableCollection<Person> People { get; } = new ObservableCollection<Person>();
 
 		private static readonly HashSet<Person> _Dead = new HashSet<Person>();
@@ -114,7 +114,7 @@ namespace Demo
 			Timer.Start();
 		}
 
-		[Visible(nameof(TimeElapse))]
+		[VisibleAttribute(nameof(TimeElapse))]
 		public static void TimeElapse()
 		{
 			int tempCount;
@@ -145,7 +145,7 @@ namespace Demo
 		public bool IsWillingToMarry() => DemographicModel._GetRandom(_Prob_Marry);
 
 		private int _Age = 0;
-		[Visible(nameof(Age))]
+		[VisibleAttribute(nameof(Age))]
 		public int Age
 		{
 			get => _Age;
@@ -158,7 +158,7 @@ namespace Demo
 		}
 
 		private Gender _Gender;
-		[Visible(nameof(Gender))]
+		[VisibleAttribute(nameof(Gender))]
 		public Gender Gender
 		{
 			get => _Gender;
@@ -172,7 +172,7 @@ namespace Demo
 		}
 
 		private bool _Is_Married = false;
-		[Visible(nameof(Is_Married))]
+		[VisibleAttribute(nameof(Is_Married))]
 		public bool Is_Married
 		{
 			get => _Is_Married;
@@ -185,11 +185,11 @@ namespace Demo
 			}
 		}
 
-		[Visible(nameof(Children))]
+		[VisibleAttribute(nameof(Children))]
 		public List<Person> Children { get; } = new List<Person>();
 
 		private Person _Father;
-		[Visible(nameof(Father))]
+		[VisibleAttribute(nameof(Father))]
 		public Person Father
 		{
 			get => _Father;
@@ -203,7 +203,7 @@ namespace Demo
 		}
 
 		private Person _Mother;
-		[Visible(nameof(Mother))]
+		[VisibleAttribute(nameof(Mother))]
 		public Person Mother
 		{
 			get => _Mother;
@@ -217,7 +217,7 @@ namespace Demo
 		}
 
 		private Person _Spouse;
-		[Visible(nameof(Spouse))]
+		[VisibleAttribute(nameof(Spouse))]
 		public Person Spouse
 		{
 			get => _Spouse;
@@ -231,7 +231,7 @@ namespace Demo
 		}
 
 		private List<Person> _Siblings = new List<Person>();
-		[Visible(nameof(Siblings))]
+		[VisibleAttribute(nameof(Siblings))]
 		public List<Person> Siblings
 		{
 			get => _Siblings;
@@ -245,7 +245,7 @@ namespace Demo
 		}
 
 		private double _Prob_Die = 0.2;
-		[Visible(nameof(Prob_Die))]
+		[VisibleAttribute(nameof(Prob_Die))]
 		public double Prob_Die
 		{
 			get => _Prob_Die;
@@ -259,7 +259,7 @@ namespace Demo
 		}
 
 		private double _Prob_Marry = 0;
-		[Visible(nameof(Prob_Marry))]
+		[VisibleAttribute(nameof(Prob_Marry))]
 		public double Prob_Marry
 		{
 			get => _Prob_Marry;
@@ -282,7 +282,7 @@ namespace Demo
 
 
 		private double _Prob_Reproduce = 0;
-		[Visible(nameof(Prob_Reproduce))]
+		[VisibleAttribute(nameof(Prob_Reproduce))]
 		public double Prob_Reproduce
 		{
 			get => _Prob_Reproduce;

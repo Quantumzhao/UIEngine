@@ -98,7 +98,7 @@ namespace CLITestProject
 				{
 					child = new Person(Gender.Female, husband, wife);
 				}
-				husband.Children.Add(child);
+				husband.Children.Add(child.AppendVisibleAttribute(new VisibleAttribute("", "child")));
 				wife.Children.Add(child);
 				child.Siblings = husband.Children.Where(c => !c.Equals(child)).ToList();
 				child.Siblings.ForEach(s => s.Siblings.Add(child));
@@ -209,7 +209,7 @@ namespace CLITestProject
 		}
 
 		private Person _Spouse;
-		[Visible(nameof(Spouse))]
+		[VisibleAttribute(nameof(Spouse))]
 		public Person Spouse
 		{
 			get => _Spouse;
@@ -223,7 +223,7 @@ namespace CLITestProject
 		}
 
 		private List<Person> _Siblings = new List<Person>();
-		[Visible(nameof(Siblings))]
+		[VisibleAttribute(nameof(Siblings))]
 		public List<Person> Siblings
 		{
 			get => _Siblings;
@@ -237,7 +237,7 @@ namespace CLITestProject
 		}
 
 		private double _Prob_Die = 0.2;
-		[Visible(nameof(Prob_Die))]
+		[VisibleAttribute(nameof(Prob_Die))]
 		public double Prob_Die
 		{
 			get => _Prob_Die;
