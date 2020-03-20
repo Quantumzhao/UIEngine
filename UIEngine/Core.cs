@@ -26,11 +26,11 @@ namespace UIEngine
 		///		It is optional, but the node cannot be found if it is left blank
 		/// </summary>
 		string Name { get; }
-		string Description { get; set; }
+		string Description { get; }
 		/// <summary>
 		///		The actual name that will be seen by the users
 		/// </summary>
-		string Header { get; set; }
+		string Header { get; }
 	}
 
 	public static class Dashboard
@@ -85,7 +85,8 @@ namespace UIEngine
 			ObjectNode objectNode = Find(sender);
 			if (objectNode != null)
 			{
-				objectNode.Properties.FirstOrDefault(n => n.Name == propertyName).ObjectData = newValue;
+				objectNode.Properties.FirstOrDefault(n => ((PropertyDomainModelRefInfo)n.SourceObjectInfo)
+					.PropertyName == propertyName).ObjectData = newValue;
 			}
 		}
 

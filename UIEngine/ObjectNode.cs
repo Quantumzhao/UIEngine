@@ -291,16 +291,6 @@ namespace UIEngine
 			return Succession?.InstantiateSuccession() ?? this;
 		}
 
-		private void OnPropertyChanged(object sender, PropertyChangedEventArgs e)
-		{
-			var dstProperty = Properties.FirstOrDefault(p => p.Name == e.PropertyName);
-			if (dstProperty != null)
-			{
-				dstProperty.Refresh();
-				dstProperty.InvokePropertyChanged(dstProperty, new PropertyChangedEventArgs(nameof(ObjectData)));
-			}
-		}
-
 		private void SetBinding(object objectData, INotifyPropertyChanged prevObject = null)
 		{
 			if (prevObject != objectData)
@@ -312,6 +302,18 @@ namespace UIEngine
 				if (objectData is INotifyPropertyChanged notifiable)
 				{
 					notifiable.PropertyChanged += OnPropertyChanged;
+				}
+			}
+
+			void OnPropertyChanged(object sender, PropertyChangedEventArgs e)
+			{
+				var dstProperty = Properties.FirstOrDefault(p => 
+					((PropertyDomainModelRefInfo)p.SourceObjectInfo).PropertyName == e.PropertyName);
+				if (dstProperty != null)
+				{
+					dstProperty.Refresh();
+					dstProperty.InvokePropertyChanged(dstProperty, 
+						new PropertyChangedEventArgs(nameof(ObjectData)));
 				}
 			}
 		}
