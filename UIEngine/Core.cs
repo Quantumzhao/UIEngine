@@ -72,6 +72,9 @@ namespace UIEngine
 			}
 		}
 
+		/// <summary>
+		///		Not yet implemented
+		/// </summary>
 		public static void RefreshAll()
 		{
 			foreach (var node in GetRootObjectNodes())
@@ -80,6 +83,9 @@ namespace UIEngine
 			}
 		}
 
+		/// <summary>
+		///		Not yet implemented
+		/// </summary>
 		public static void NotifyPropertyChanged(object sender, string propertyName, object newValue)
 		{
 			ObjectNode objectNode = Find(sender);
@@ -90,6 +96,9 @@ namespace UIEngine
 			}
 		}
 
+		/// <summary>
+		///		Not yet implemented
+		/// </summary>
 		public static ObjectNode Find(object objectData)
 		{
 			foreach (var objectNode in GetRootObjectNodes())
@@ -186,7 +195,7 @@ namespace UIEngine
 		public static readonly ConditionalWeakTable<object, VisibleAttribute> ObjectTable 
 			= new ConditionalWeakTable<object, VisibleAttribute>();
 
-		public static IEnumerable<PropertyInfo> GetVisibleProperties(this Type type, BindingFlags flags)
+		internal static IEnumerable<PropertyInfo> GetVisibleProperties(this Type type, BindingFlags flags)
 		{
 			return type.GetProperties(flags).Where(p =>
 			{
@@ -195,7 +204,7 @@ namespace UIEngine
 			});
 		}
 
-		public static IEnumerable<MethodInfo> GetVisibleMethods(this Type type, BindingFlags flags)
+		internal static IEnumerable<MethodInfo> GetVisibleMethods(this Type type, BindingFlags flags)
 		{
 			return type.GetMethods(flags).Where(m =>
 			{
@@ -204,7 +213,7 @@ namespace UIEngine
 			});
 		}
 
-		public static List<object> ToObjectList(this ICollection collection)
+		internal static List<object> ToObjectList(this ICollection collection)
 		{
 			var array = new object[collection.Count];
 			collection.CopyTo(array, 0);
