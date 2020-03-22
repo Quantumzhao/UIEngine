@@ -11,6 +11,7 @@
     <PackageProjectUrl>https://github.com/Quantumzhao/UIEngine</PackageProjectUrl>
     <RepositoryUrl>https://github.com/Quantumzhao/UIEngine</RepositoryUrl>
     <Authors>Quantum Zhao</Authors>
+    <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
   </PropertyGroup>
 
   <ItemGroup>
