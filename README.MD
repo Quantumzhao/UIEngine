@@ -60,3 +60,4 @@ Finalization and Optimization
 - [X] Components for Collections (`IColection`)
 - [X] Components for Methods/Functions
 - [ ] Components for LINQ
+- [ ] Garbage Collection
