@@ -2,6 +2,8 @@
 
 <img src="/UIEngine/icon/icon_2048_MKII.png" alt="Icon" style="zoom: 25%;" />
 
+> This icon was designed using *MagicaVoxel*
+
 For detailed information, please see project wiki page. 
 
 ---
