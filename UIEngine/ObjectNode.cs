@@ -13,6 +13,7 @@ namespace UIEngine
 	 * it should actually point to the object data wrapped by that node */
 	public class ObjectNode : Node, INotifyPropertyChanged
 	{
+		private const string _ILLEGAL_CTRL_STATE = "This control doesn't accept input, therefore it is always disabled. ";
 		/// <summary>
 		///		Create from property
 		/// </summary>
@@ -30,7 +31,8 @@ namespace UIEngine
 				var objectNode = new ObjectNode(parent, propertyInfo.GetCustomAttribute<VisibleAttribute>());
 				objectNode.SourceObjectInfo = new PropertyDomainModelRefInfo(propertyInfo);
 				var setter = propertyInfo.SetMethod;
-				objectNode.IsReadOnly = !(setter.IsPublic && (setter.GetCustomAttribute<VisibleAttribute>()?.IsEnabled ?? true));
+				objectNode.DoesAcceptInput = setter.IsPublic && (setter.GetCustomAttribute<VisibleAttribute>()?.IsFeatureEnabled ?? true);
+				objectNode._IsEnabled = objectNode.DoesAcceptInput;
 
 				return objectNode;
 			}
@@ -78,14 +80,7 @@ namespace UIEngine
 			Parent = parent;
 			if (attribute != null)
 			{
-				if (attribute is VisibleAttribute visible)
-				{
-					this.AppendVisibleAttribute(visible);
-					PreviewExpression = visible.PreviewExpression;
-				}
-				Name = attribute.Name;
-				Header = attribute.Header;
-				Description = attribute.Description;
+				TryGetDescriptiveInfo(attribute);
 			}
 		}
 
@@ -97,8 +92,31 @@ namespace UIEngine
 		public bool IsValueType => SourceObjectInfo.ObjectDataType.IsValueType;
 		internal bool IsEmpty => _ObjectData == null;
 		internal DomainModelRefInfo SourceObjectInfo { get; set; }
-		public bool IsReadOnly { get; internal set; } = false;
+		public bool DoesAcceptInput { get; private set; }
 		public bool IsLeaf => Properties?.Count == 0;
+
+		private bool _IsEnabled;
+		/// <summary>
+		///		By default, it is the same value as <see cref="DoesAcceptInput"/>. 
+		///		When it is set to true, the object node can be read and written. 
+		///		When false, the object node is still accessible but becomes read only, 
+		///		similar to conventional user controls
+		/// </summary>
+		public bool IsEnabled 
+		{ 
+			get => _IsEnabled;
+			set
+			{
+				if (DoesAcceptInput)
+				{
+					_IsEnabled = value;
+				}
+				else
+				{
+					Dashboard.RaiseWarningMessage(this, _ILLEGAL_CTRL_STATE);
+				}
+			}
+		}
 		private List<ObjectNode> _Properties = null;
 		public List<ObjectNode> Properties
 		{
@@ -127,6 +145,7 @@ namespace UIEngine
 
 		#region Object Data
 		private object _ObjectData = null;
+
 		public object ObjectData
 		{
 			get
@@ -144,11 +163,19 @@ namespace UIEngine
 			}
 			set
 			{
-				if (IsReadOnly && value != _ObjectData)
+				if (IsEnabled)
 				{
-					_ObjectData = value;
-					SetValueToSourceObject();
-					InvokePropertyChanged(this, new PropertyChangedEventArgs(nameof(ObjectData)));
+					if (value != _ObjectData)
+					{
+						_ObjectData = value;
+						SetValueToSourceObject();
+						InvokePropertyChanged(this, new PropertyChangedEventArgs(nameof(ObjectData)));
+
+					}
+				}
+				else
+				{
+					throw new InvalidOperationException();
 				}
 			}
 		}
@@ -308,17 +335,30 @@ namespace UIEngine
 
 			void OnPropertyChanged(object sender, PropertyChangedEventArgs e)
 			{
-				var dstProperty = Properties.FirstOrDefault(p => 
+				var dstProperty = Properties.FirstOrDefault(p =>
 					((PropertyDomainModelRefInfo)p.SourceObjectInfo).PropertyName == e.PropertyName);
 				if (dstProperty != null)
 				{
 					dstProperty.Refresh();
-					dstProperty.InvokePropertyChanged(dstProperty, 
+					dstProperty.InvokePropertyChanged(dstProperty,
 						new PropertyChangedEventArgs(nameof(ObjectData)));
 				}
 			}
 		}
 
+		private void TryGetDescriptiveInfo(DescriptiveInfoAttribute attribute)
+		{
+			// Make sure the priority is: Interface > ConditionalWeakTable > Attribute
+			this.AppendVisibleAttribute(attribute);
+			Name = attribute.Name;
+			Header = attribute.Header;
+			Description = attribute.Description;
+			if (attribute is VisibleAttribute visible)
+			{
+				PreviewExpression = visible.PreviewExpression;
+				IsEnabled = visible.IsControlEnabled;
+			}
+		}
 		private void TryGetDescriptiveInfo(object data)
 		{
 			if (!string.IsNullOrEmpty(this.Header))
@@ -336,6 +376,7 @@ namespace UIEngine
 				this.Header = descriptiveInfoAttribute.Header;
 				this.Name = descriptiveInfoAttribute.Name;
 				this.Description = descriptiveInfoAttribute.Description;
+				this.IsEnabled = (descriptiveInfoAttribute as VisibleAttribute).IsControlEnabled;
 			}
 			else
 			{

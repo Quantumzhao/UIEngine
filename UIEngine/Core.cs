@@ -179,10 +179,15 @@ namespace UIEngine
 		/// </param>
 		public VisibleAttribute(string header, string description = "", string name = "")
 			: base(name, header, description) { }
+
 		/// <summary>
 		///		Indicates whether this feature is enabled
 		/// </summary>
-		public bool IsEnabled { get; set; } = true;
+		public bool IsFeatureEnabled { get; set; } = true;
+		/// <summary>
+		///		Indicates whether the control generated from the object node that is marked by this is enabled initially
+		/// </summary>
+		public bool IsControlEnabled { get; set; } = true;
 		public Func<object, string> PreviewExpression { get; set; } = o => o.ToString();
 	}
 
@@ -203,7 +208,7 @@ namespace UIEngine
 			return type.GetProperties(flags).Where(p =>
 			{
 				var attr = p.GetCustomAttribute<VisibleAttribute>();
-				return attr != null && attr.IsEnabled;
+				return attr != null && attr.IsFeatureEnabled;
 			});
 		}
 
@@ -212,7 +217,7 @@ namespace UIEngine
 			return type.GetMethods(flags).Where(m =>
 			{
 				var attr = m.GetCustomAttribute<VisibleAttribute>();
-				return attr != null && attr.IsEnabled;
+				return attr != null && attr.IsFeatureEnabled;
 			});
 		}
 
