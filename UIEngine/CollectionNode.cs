@@ -27,6 +27,7 @@ namespace UIEngine
 
 		public bool Is_2D { get; private set; }
 		public bool DisplayPropertiesAsHeadings { get; set; } = false;
+		// This is for dictionary and 2D collections
 		public List<string> Headings { get; private set; } = new List<string>();
 
 		private ObservableCollection<ObservableCollection<ObjectNode>> _Collection2D = null;

@@ -29,8 +29,8 @@ namespace UIEngine
 			{
 				var objectNode = new ObjectNode(parent, propertyInfo.GetCustomAttribute<VisibleAttribute>());
 				objectNode.SourceObjectInfo = new PropertyDomainModelRefInfo(propertyInfo);
-				//var setter = propertyInfo.SetMethod;
-				//CanWrite = setter.IsPublic && (setter.GetCustomAttribute<Visible>()?.IsEnabled ?? true);
+				var setter = propertyInfo.SetMethod;
+				objectNode.IsReadOnly = !(setter.IsPublic && (setter.GetCustomAttribute<VisibleAttribute>()?.IsEnabled ?? true));
 
 				return objectNode;
 			}
@@ -80,6 +80,7 @@ namespace UIEngine
 			{
 				if (attribute is VisibleAttribute visible)
 				{
+					this.AppendVisibleAttribute(visible);
 					PreviewExpression = visible.PreviewExpression;
 				}
 				Name = attribute.Name;
@@ -96,7 +97,7 @@ namespace UIEngine
 		public bool IsValueType => SourceObjectInfo.ObjectDataType.IsValueType;
 		internal bool IsEmpty => _ObjectData == null;
 		internal DomainModelRefInfo SourceObjectInfo { get; set; }
-		public bool CanWrite { get; internal set; } = true;
+		public bool IsReadOnly { get; internal set; } = false;
 		public bool IsLeaf => Properties?.Count == 0;
 		private List<ObjectNode> _Properties = null;
 		public List<ObjectNode> Properties
@@ -143,7 +144,7 @@ namespace UIEngine
 			}
 			set
 			{
-				if (CanWrite && value != _ObjectData)
+				if (IsReadOnly && value != _ObjectData)
 				{
 					_ObjectData = value;
 					SetValueToSourceObject();
@@ -320,17 +321,21 @@ namespace UIEngine
 
 		private void TryGetDescriptiveInfo(object data)
 		{
-			if (data is IVisible visible)
+			if (!string.IsNullOrEmpty(this.Header))
+			{
+				return;
+			}
+			else if (data is IVisible visible)
 			{
 				this.Header = visible.Header;
 				this.Name = visible.Name;
 				this.Description = visible.Description;
 			}
-			else if (Misc.ObjectTable.TryGetValue(data, out VisibleAttribute visibleAttribute))
+			else if (Misc.ObjectTable.TryGetValue(data, out DescriptiveInfoAttribute descriptiveInfoAttribute))
 			{
-				this.Header = visibleAttribute.Header;
-				this.Name = visibleAttribute.Name;
-				this.Description = visibleAttribute.Description;
+				this.Header = descriptiveInfoAttribute.Header;
+				this.Name = descriptiveInfoAttribute.Name;
+				this.Description = descriptiveInfoAttribute.Description;
 			}
 			else
 			{

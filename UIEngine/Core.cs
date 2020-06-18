@@ -123,12 +123,12 @@ namespace UIEngine
 		/// </summary>
 		/// <typeparam name="T">Accepts only reference types. </typeparam>
 		/// <param name="target"> the target object </param>
-		/// <param name="visibleAttribute"> descriptive info in the form of <c>Visible</c> attribute </param>
+		/// <param name="descriptiveInfoAttribute"> descriptive info in the form of <c>Visible</c> attribute </param>
 		/// <example><code>object.AppendVisibleAttribute(new Visible(""))</code></example>
-		public static T AppendVisibleAttribute<T>(this T target, VisibleAttribute visibleAttribute)
+		public static T AppendVisibleAttribute<T>(this T target, DescriptiveInfoAttribute descriptiveInfoAttribute)
 			where T : class
 		{
-			Misc.ObjectTable.Add(target, visibleAttribute);
+			Misc.ObjectTable.Add(target, descriptiveInfoAttribute);
 			return target;
 		}
 	}
@@ -179,6 +179,9 @@ namespace UIEngine
 		/// </param>
 		public VisibleAttribute(string header, string description = "", string name = "")
 			: base(name, header, description) { }
+		/// <summary>
+		///		Indicates whether this feature is enabled
+		/// </summary>
 		public bool IsEnabled { get; set; } = true;
 		public Func<object, string> PreviewExpression { get; set; } = o => o.ToString();
 	}
@@ -192,8 +195,8 @@ namespace UIEngine
 
 	public static class Misc
 	{
-		public static readonly ConditionalWeakTable<object, VisibleAttribute> ObjectTable 
-			= new ConditionalWeakTable<object, VisibleAttribute>();
+		public static readonly ConditionalWeakTable<object, DescriptiveInfoAttribute> ObjectTable 
+			= new ConditionalWeakTable<object, DescriptiveInfoAttribute>();
 
 		internal static IEnumerable<PropertyInfo> GetVisibleProperties(this Type type, BindingFlags flags)
 		{
