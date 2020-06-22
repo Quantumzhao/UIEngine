@@ -19,6 +19,15 @@ namespace UIEngine
 		event NotifySelfChangedHandler OnSelfChanged;
 	}
 
+	/// <summary>
+	///		This is an alternative for <see cref="VisibleAttribute"/>. 
+	///		It is lightweight, and can be used to mark up objects 
+	///		that don't work well with attributes, such as objects in a collection. 
+	///		<para>
+	///			For complete functionalities, 
+	///			use <see cref="Dashboard.AppendVisibleAttribute{T}(T, DescriptiveInfoAttribute)"/> instead
+	///		</para>
+	/// </summary>
 	public interface IVisible
 	{
 		/// <summary>
@@ -345,7 +354,7 @@ namespace UIEngine
 
 		public static readonly TypeSystem Bool			= new TypeSystem(Types.Bool);
 		/// <summary>
-		///		A shortcut for <c>ICollection</c>. To wrap a <c>System.Type</c>, use <c>ToRestrictedType()</c>
+		///		A shortcut for <see cref="ICollection"/>. To wrap a <see cref="Type"/>, use <see cref="ToRestrictedType(Type)"/>
 		/// </summary>
 		public static readonly TypeSystem Collection	= new TypeSystem(Types.Collection);
 		public static readonly TypeSystem Double		= new TypeSystem(Types.Double);

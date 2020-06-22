@@ -132,7 +132,7 @@ namespace UIEngine
 			SourceObjectInfo = new PropertyDomainModelRefInfo(propertyInfo);
 			Initialize();
 		}
-		private CollectionNode(Type type) : base(null, null)
+		private CollectionNode(Type type) : base(null)
 		{
 			SourceObjectInfo = new OtherDomainModelRefInfo(type, SourceReferenceType.parameter);
 			Initialize();
@@ -179,8 +179,7 @@ namespace UIEngine
 				switch (e.Action)
 				{
 					case NotifyCollectionChangedAction.Add:
-						var objectNode = ObjectNode.Create(this, e.NewItems[0], 
-							new VisibleAttribute(Header, Description));
+						var objectNode = ObjectNode.Create(this, e.NewItems[0]);
 						Add(objectNode);
 						break;
 
@@ -210,14 +209,14 @@ namespace UIEngine
 				Headings.Add("Value");
 				foreach (var key in (ObjectData as IDictionary).Keys)
 				{
-					list.Add(Create(this, key, new VisibleAttribute(Header, Description)));
+					list.Add(Create(this, key));
 					Collection2D.Add(list);
 				}
 				var enumerator = Collection2D.GetEnumerator();
 				enumerator.MoveNext();
 				foreach (var value in (ObjectData as IDictionary).Values)
 				{
-					enumerator.Current.Add(ObjectNode.Create(this, value, new VisibleAttribute(Header, Description)));
+					enumerator.Current.Add(ObjectNode.Create(this, value));
 					enumerator.MoveNext();
 				}
 			}
@@ -234,7 +233,7 @@ namespace UIEngine
 					var elementRow = new ObservableCollection<ObjectNode>();
 					foreach (var column in row as ICollection)
 					{
-						elementRow.Add(ObjectNode.Create(this, column, new VisibleAttribute(Header, Description)));
+						elementRow.Add(ObjectNode.Create(this, column));
 					}
 					Collection2D.Add(elementRow);
 				}
@@ -245,7 +244,7 @@ namespace UIEngine
 				_Collection = new ObservableCollection<ObjectNode>();
 				foreach (var objectData in ObjectData as ICollection)
 				{
-					Collection.Add(ObjectNode.Create(this, objectData, new VisibleAttribute(Header, Description)));
+					Collection.Add(ObjectNode.Create(this, objectData));
 				}
 			}
 		}

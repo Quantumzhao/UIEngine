@@ -44,9 +44,9 @@ namespace UIEngine
 		/// <param name="objectData"></param>
 		/// <param name="attribute"></param>
 		/// <returns></returns>
-		internal static ObjectNode Create(ObjectNode parent, object objectData, VisibleAttribute attribute)
+		internal static ObjectNode Create(ObjectNode parent, object objectData)
 		{
-			var objectNode = new ObjectNode(parent, attribute);
+			var objectNode = new ObjectNode(parent);
 			if (parent is CollectionNode)
 			{
 				objectNode.SourceObjectInfo = new OtherDomainModelRefInfo(objectData.GetType(),
@@ -58,7 +58,7 @@ namespace UIEngine
 					SourceReferenceType.ReturnValue);
 			}
 			objectNode._ObjectData = objectData;
-			objectNode.TryGetDescriptiveInfo(objectData);
+			objectNode.TryGetDescriptiveInfo();
 			objectNode.SetBinding(objectData);
 
 			return objectNode;
@@ -75,7 +75,7 @@ namespace UIEngine
 		}
 
 		// The basic ctor
-		protected ObjectNode(ObjectNode parent, DescriptiveInfoAttribute attribute)
+		protected ObjectNode(ObjectNode parent, DescriptiveInfoAttribute attribute = null)
 		{
 			Parent = parent;
 			if (attribute != null)
@@ -84,9 +84,11 @@ namespace UIEngine
 			}
 		}
 
-		/* the next node in the syntax tree
-		 * The succession should be an empty (but not null) node when first assigned. 
-		 * It should be instantiated by InstantiateSuccession method */
+		/// <summary>
+		///		the next node in the syntax tree. 
+		///		The succession should be an empty (but not null) node when first assigned. 
+		///		It should be instantiated by <see cref="InstantiateSuccession"/> method. 
+		/// </summary>
 		internal Node Succession { get; set; }
 		public TypeSystem Type => SourceObjectInfo.ObjectDataType;
 		public bool IsValueType => SourceObjectInfo.ObjectDataType.IsValueType;
@@ -213,7 +215,7 @@ namespace UIEngine
 					//Preview = PreviewExpression?.Invoke(ObjectData);
 				}
 
-				TryGetDescriptiveInfo(_ObjectData);
+				TryGetDescriptiveInfo();
 				SetBinding(_ObjectData);
 			}
 		}
@@ -348,8 +350,6 @@ namespace UIEngine
 
 		private void TryGetDescriptiveInfo(DescriptiveInfoAttribute attribute)
 		{
-			// Make sure the priority is: Interface > ConditionalWeakTable > Attribute
-			this.AppendVisibleAttribute(attribute);
 			Name = attribute.Name;
 			Header = attribute.Header;
 			Description = attribute.Description;
@@ -359,19 +359,19 @@ namespace UIEngine
 				IsEnabled = visible.IsControlEnabled;
 			}
 		}
-		private void TryGetDescriptiveInfo(object data)
+		private void TryGetDescriptiveInfo()
 		{
-			if (!string.IsNullOrEmpty(this.Header))
+			if (_ObjectData == null)
 			{
 				return;
 			}
-			else if (data is IVisible visible)
+			else if (_ObjectData is IVisible visible)
 			{
 				this.Header = visible.Header;
 				this.Name = visible.Name;
 				this.Description = visible.Description;
 			}
-			else if (Misc.ObjectTable.TryGetValue(data, out DescriptiveInfoAttribute descriptiveInfoAttribute))
+			else if (Misc.ObjectTable.TryGetValue(_ObjectData, out DescriptiveInfoAttribute descriptiveInfoAttribute))
 			{
 				this.Header = descriptiveInfoAttribute.Header;
 				this.Name = descriptiveInfoAttribute.Name;
@@ -380,7 +380,7 @@ namespace UIEngine
 			}
 			else
 			{
-				this.Header = data.ToString();
+				this.Header = _ObjectData.ToString();
 			}
 		}
 	}

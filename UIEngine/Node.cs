@@ -38,12 +38,6 @@ namespace UIEngine
 		/// </summary>
 		public Func<object, string> PreviewExpression { get; set; } = o => o.ToString();
 
-		/// <summary>
-		///		The currently selected node. 
-		///		It can be (instance) method node or object node
-		/// 	This property is for LINQ node
-		/// </summary>
-
 		public override string ToString() => Header;
 
 		/// <summary>Transform the succession from a template to an instantiated node</summary>
