@@ -18,18 +18,19 @@ namespace CLITestProject
 		{
 			DemographicModel.Init();
 			Dashboard.ImportEntryObjects(typeof(DemographicModel));
-			ParseAndExecute("show");
-			while (true)
+			
+			var flag = ParseAndExecute("show");
+			while (flag)
 			{
-				ParseAndExecute(Console.ReadLine());
+				flag = ParseAndExecute(Console.ReadLine());
 			}
 		}
 
 		/* NAME							: name of current objectnode
 		 * SHOW							: show members of current OBJECTNODE. If current is null, then show root members
+		 * SHOW [NO]					: show members of ID [NO]
 		 * SHOW #[No]					: show members of ID [No]
 		 *								  If current is a methodnode, then show its signature
-		 * ACSS #[No]					: change current node to the one of ID [No]
 		 * ASGN #[No]					: assign the value of ID [No] to current objectnode
 		 * ASGN #[No1] #[No2]			: assign the value of ID [No2] to [No1]
 		 * ASGN #[No] {lit}				: assign a literal to ID [No]
@@ -37,11 +38,12 @@ namespace CLITestProject
 		 * PARA #[No1] #[No2] #[No3]	: assign the value of [No3] to parameter [No2] of the method node of ID [No1]
 		 * PARA #[No1] #[No2] {lit}		: assign a literal to parameter [No2] of the method node of ID [No1]
 		 * EXEC #[No1]					: execute the method of [No1], and assign the result a new ID
+		 * EXIT							: Exit
 		 * e.g. 
 		 * ASGN #1 #2			ASGN #1				ASGN 0.0
 		 * ASGN #1 "Hello"		ASGN #1 2			ASGN #1 false
 		 * PARA #1 #2 #3		PARA #1 #2 3		EXEC #1 */
-		private static void ParseAndExecute(string input)
+		private static bool ParseAndExecute(string input)
 		{
 			Queue<string> tokens = new Queue<string>(input.Split());
 			var opcode = tokens.Dequeue().ToUpper();
@@ -59,7 +61,11 @@ namespace CLITestProject
 					if (tokens.TryDequeue(out string token))
 					{
 						// modify that node instead of current objectnode
-						dstNode = GetByID(ParseToID(token)) as ObjectNode;
+						if (!int.TryParse(token, out int id))
+						{
+							id = ParseToID(token);
+						}
+						dstNode = GetByID(id) as ObjectNode;
 					}
 
 					if (dstNode != null)
@@ -100,10 +106,10 @@ namespace CLITestProject
 					Console.WriteLine(")\n");
 				}
 			}
-			else if (opcode == "ACSS")
-			{
-				_CurrentNode = GetByID(ParseToID(tokens.Dequeue()));
-			}
+			//else if (opcode == "ACSS")
+			//{
+			//	_CurrentNode = GetByID(ParseToID(tokens.Dequeue()));
+			//}
 			else if (opcode == "ASGN" && _CurrentNode is ObjectNode currentNode)
 			{
 				ObjectNode firstNode = currentNode;
@@ -147,7 +153,12 @@ namespace CLITestProject
 			{
 
 			}
+			else if (opcode == "EXIT")
+			{
+				return false;
+			}
 			else throw new NotImplementedException();
+			return true;
 		}
 
 		private static void TryAddToCachedNodes(Node node)

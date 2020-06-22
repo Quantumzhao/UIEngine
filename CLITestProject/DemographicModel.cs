@@ -131,7 +131,7 @@ namespace CLITestProject
 		}
 	}
 
-	public class Person : INotifyPropertyChanged
+	public class Person : INotifyPropertyChanged, IVisible
 	{
 		public Person(Gender gender, Person father, Person mother)
 		{
@@ -229,7 +229,7 @@ namespace CLITestProject
 		}
 
 		private List<Person> _Siblings = new List<Person>();
-		[VisibleAttribute(nameof(Siblings))]
+		[Visible(nameof(Siblings))]
 		public List<Person> Siblings
 		{
 			get => _Siblings;
@@ -243,7 +243,7 @@ namespace CLITestProject
 		}
 
 		private double _Prob_Die = 0.2;
-		[VisibleAttribute(nameof(Prob_Die))]
+		[Visible(nameof(Prob_Die))]
 		public double Prob_Die
 		{
 			get => _Prob_Die;
@@ -292,6 +292,12 @@ namespace CLITestProject
 				//Dashboard.NotifyPropertyChanged(this, nameof(Prob_Reproduce), value);
 			}
 		}
+
+		public string Name => "";
+
+		public string Description => "";
+
+		public string Header => "Someone";
 
 		public static event Action<Person> Died;
 		public static event Action<Person> FindForSpouse;
