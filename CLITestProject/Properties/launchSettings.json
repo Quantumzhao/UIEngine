@@ -1,0 +1,10 @@
+{
+  "profiles": {
+    "CLITestProject": {
+      "commandName": "Project"
+    },
+    "Docker": {
+      "commandName": "Docker"
+    }
+  }
+}
