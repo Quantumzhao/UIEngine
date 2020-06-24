@@ -1,8 +1,7 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <TargetFramework>netstandard2.0</TargetFramework>
-    <Version>0.2.2</Version>
     <PackageRequireLicenseAcceptance>false</PackageRequireLicenseAcceptance>
     <AssemblyVersion>0.0.1.0</AssemblyVersion>
     <FileVersion>0.0.1.0</FileVersion>
@@ -12,6 +11,11 @@
     <RepositoryUrl>https://github.com/Quantumzhao/UIEngine</RepositoryUrl>
     <Authors>Quantum Zhao</Authors>
     <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
+    <OutputType>Library</OutputType>
+    <PackageId>UIEngine</PackageId>
+    <Version>0.2.3</Version>
+    <Company>Quantum</Company>
+    <PackageDescription>UIEngine</PackageDescription>
   </PropertyGroup>
 
   <ItemGroup>
