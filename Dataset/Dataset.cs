@@ -1,6 +1,5 @@
 ﻿#define TEST_COLLECTION
 
-using Newtonsoft.Json.Linq;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -11,34 +10,6 @@ using System.ComponentModel;
 
 namespace Dataset
 {
-	internal class JsonHelper : IDisposable
-	{
-		readonly string _Filepath;
-		readonly JObject _JObject;
-
-		public JsonHelper(string path)
-		{
-			_Filepath = path;
-			using (StreamReader reader = new StreamReader(_Filepath))
-			{
-				string json = reader.ReadToEnd();
-				_JObject = JObject.Parse(json);
-			}
-		}
-
-		public void Dispose() => File.WriteAllText(_Filepath, _JObject.ToString());
-
-		public JToken GetProperty(string name) => _JObject.Property(name).Value;
-
-		public void SetProperty<T>(string name, JToken value) => _JObject.Property(name).Value = value;
-
-		public void AddProperty(string name, JToken value) => _JObject.Add(name, value);
-
-		public IEnumerable<JProperty> ListProperties() => _JObject.Properties();
-
-		public bool Has(string propertyName) => _JObject.Properties().Where(p => p.Name == propertyName).Count() != 0;
-	}
-
 	public static class Dataset
 	{
 #if !TEST_COLLECTION

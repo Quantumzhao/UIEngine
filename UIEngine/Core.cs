@@ -10,14 +10,12 @@ namespace UIEngine
 {
 	public delegate void NodeOperationsHandler(Node node);
 	public delegate void WarningMessageHandler(Node source, string message);
-	[Obsolete]
-	public delegate void NotifySelfChangedHandler(Node sender, NotifySelfChangedEventArgs e);
+	//public delegate void NotifySelfChangedHandler(Node sender, NotifySelfChangedEventArgs e);
 
-	[Obsolete]
-	public interface INotifySelfChanged
-	{
-		event NotifySelfChangedHandler OnSelfChanged;
-	}
+	//public interface INotifySelfChanged
+	//{
+	//	event NotifySelfChangedHandler OnSelfChanged;
+	//}
 
 	/// <summary>
 	///		This is an alternative for <see cref="VisibleAttribute"/>. 
@@ -465,11 +463,10 @@ namespace UIEngine
 		internal override object Invoke() => Value;
 	}
 
-	[Obsolete]
-	public class NotifySelfChangedEventArgs : EventArgs
-	{
-		public readonly object newObjectData;
-	}
+	//public class NotifySelfChangedEventArgs : EventArgs
+	//{
+	//	public readonly object newObjectData;
+	//}
 
 	/// <summary>
 	///		The purpose of this class is to wrap up a struct into a reference type 
