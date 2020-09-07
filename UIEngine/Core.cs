@@ -42,12 +42,22 @@ namespace UIEngine
 
 	public static class Dashboard
 	{
-		public static HashSet<Node> Roots { get; } = new HashSet<Node>();
-		public static HashSet<ObjectNode> GetRootObjectNodes()
-			=> new HashSet<ObjectNode>(Roots.Where(n => n is ObjectNode).Select(n => n as ObjectNode));
-		public static HashSet<MethodNode> GetRootMethodNodes()
-			=> new HashSet<MethodNode>(Roots.Where(n => n is MethodNode).Select(n => n as MethodNode));
 		public static event WarningMessageHandler WarningMessagePublished;
+
+		internal static HashSet<Node> Roots { get; } = new HashSet<Node>();
+		public static IEnumerable<T> GetRootNodes<T>() where T : Node 
+			=> Roots.Where(n => n is T).Select(n => n as T);
+
+		/// <summary>
+		///		Get a root node by its name
+		/// </summary>
+		/// <typeparam name="T"><see cref="ObjectNode"/>, <see cref="CollectionNode"/> or <see cref="MethodNode"/></typeparam>
+		/// <param name="name"></param>
+		/// <returns>Null if not found</returns>
+		public static T GetRootNode<T>(string name) where T : Node
+		{
+			return Roots.SingleOrDefault(n => n.Name == name) as T;
+		}
 
 		/// <summary>
 		///		Put all static objects into global objects collection.
@@ -79,46 +89,46 @@ namespace UIEngine
 			}
 		}
 
-		/// <summary>
-		///		Not yet implemented
-		/// </summary>
-		public static void RefreshAll()
-		{
-			foreach (var node in GetRootObjectNodes())
-			{
-				node.Refresh();
-			}
-		}
+		///// <summary>
+		/////		Not yet implemented
+		///// </summary>
+		//public static void RefreshAll()
+		//{
+		//	foreach (var node in GetRootObjectNodes())
+		//	{
+		//		node.Refresh();
+		//	}
+		//}
 
-		/// <summary>
-		///		Not yet implemented
-		/// </summary>
-		public static void NotifyPropertyChanged(object sender, string propertyName, object newValue)
-		{
-			ObjectNode objectNode = Find(sender);
-			if (objectNode != null)
-			{
-				objectNode.Properties.FirstOrDefault(n => ((PropertyDomainModelRefInfo)n.SourceObjectInfo)
-					.PropertyName == propertyName).ObjectData = newValue;
-			}
-		}
+		///// <summary>
+		/////		Not yet implemented
+		///// </summary>
+		//public static void NotifyPropertyChanged(object sender, string propertyName, object newValue)
+		//{
+		//	ObjectNode objectNode = Find(sender);
+		//	if (objectNode != null)
+		//	{
+		//		objectNode.Properties.FirstOrDefault(n => ((PropertyDomainModelRefInfo)n.SourceObjectInfo)
+		//			.PropertyName == propertyName).ObjectData = newValue;
+		//	}
+		//}
 
-		/// <summary>
-		///		Not yet implemented
-		/// </summary>
-		public static ObjectNode Find(object objectData)
-		{
-			foreach (var objectNode in GetRootObjectNodes())
-			{
-				var ret = objectNode.FindDecendant(objectData);
-				if (ret != null)
-				{
-					return ret;
-				}
-			}
+		///// <summary>
+		/////		Not yet implemented
+		///// </summary>
+		//public static ObjectNode Find(object objectData)
+		//{
+		//	foreach (var objectNode in GetRootObjectNodes())
+		//	{
+		//		var ret = objectNode.FindDecendant(objectData);
+		//		if (ret != null)
+		//		{
+		//			return ret;
+		//		}
+		//	}
 
-			return null;
-		}
+		//	return null;
+		//}
 
 		internal static void RaiseWarningMessage(Node source, string message)
 		{

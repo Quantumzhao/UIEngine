@@ -106,7 +106,7 @@ namespace UIEngine
 		public Dictionary<Node, bool> GetCandidates(int index)
 		{
 			var candidates = new Dictionary<Node, bool>();
-			foreach (var node in Dashboard.Roots)
+			foreach (var node in Dashboard.GetRootNodes<Node>())
 			{
 				candidates.Add(node, CanAssignArgument(node, index));
 			}

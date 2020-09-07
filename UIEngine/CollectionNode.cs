@@ -14,7 +14,7 @@ namespace UIEngine
 	///		this node should not be an element of another collection. 
 	///		Only <c>IList</c> is supported at current stage
 	/// </summary>
-	public class CollectionNode : ObjectNode, INotifyCollectionChanged, INotifyPropertyChanged, IEnumerable<ObjectNode>
+	public class CollectionNode : ObjectNode, INotifyCollectionChanged, INotifyPropertyChanged, IEnumerable<ObjectNode>, IEnumerable
 	{
 		private const string _INVALID_OPERATION_WARNING =
 			"Collection node is not supported in a LINQ expression";

@@ -9,11 +9,12 @@ namespace UIEngine
 {
 	/* object nodes should never be created or replaced via external assemblies.
 	 * object nodes must always maintain a tree data structure.
-	 * thus, if an object node wants to point to another object node(not talking about setting another node as child), 
+	 * thus, if an object node wants to point to another object node(not referring setting another node as child), 
 	 * it should actually point to the object data wrapped by that node */
 	public class ObjectNode : Node, INotifyPropertyChanged
 	{
 		private const string _ILLEGAL_CTRL_STATE = "This control doesn't accept input, therefore it is always disabled. ";
+
 		/// <summary>
 		///		Create from property
 		/// </summary>
@@ -22,7 +23,7 @@ namespace UIEngine
 		/// <returns></returns>
 		internal static ObjectNode Create(ObjectNode parent, PropertyInfo propertyInfo)
 		{
-			if (typeof(ICollection).IsAssignableFrom(propertyInfo.PropertyType))
+			if (typeof(IEnumerable).IsAssignableFrom(propertyInfo.PropertyType))
 			{
 				return CollectionNode.Create(parent, propertyInfo);
 			}
@@ -31,7 +32,7 @@ namespace UIEngine
 				var objectNode = new ObjectNode(parent, propertyInfo.GetCustomAttribute<VisibleAttribute>());
 				objectNode.SourceObjectInfo = new PropertyDomainModelRefInfo(propertyInfo);
 				var setter = propertyInfo.SetMethod;
-				objectNode.DoesAcceptInput = setter.IsPublic && (setter.GetCustomAttribute<VisibleAttribute>()?.IsFeatureEnabled ?? true);
+				objectNode.DoesAcceptInput = setter != null && setter.IsPublic && (setter.GetCustomAttribute<VisibleAttribute>()?.IsFeatureEnabled ?? true);
 				objectNode._IsEnabled = objectNode.DoesAcceptInput;
 
 				return objectNode;
