@@ -23,7 +23,7 @@ namespace UIEngine
 		/// <returns></returns>
 		internal static ObjectNode Create(ObjectNode parent, PropertyInfo propertyInfo)
 		{
-			if (typeof(IEnumerable).IsAssignableFrom(propertyInfo.PropertyType))
+			if (typeof(IEnumerable).IsAssignableFrom(propertyInfo.PropertyType) && !CollectionNode.NotEnumerables.Contains(propertyInfo.PropertyType))
 			{
 				return CollectionNode.Create(parent, propertyInfo);
 			}
@@ -204,6 +204,21 @@ namespace UIEngine
 			get => _Preview;
 			set => _Preview = value;
 		}
+
+		/// <summary>
+		///		Use this to state if <see cref="ObjectData"/> is type of <see cref="T"/> to avoid loading it. 
+		/// </summary>
+		/// <typeparam name="T">The comparing type</typeparam>
+		/// <returns>true if the <see cref="ObjectData"/> is type of <see cref="T"/></returns>
+		public bool IsTypeOf<T>() => Type.ReflectedType == typeof(T);
+
+		/// <summary>
+		///		Finds the property with the specified name. 
+		/// </summary>
+		/// <remarks>Properties with no names attached cannot be found with this function</remarks>
+		/// <param name="name">property name</param>
+		/// <returns>null if not found</returns>
+		public ObjectNode this[string name] => Properties.SingleOrDefault(p => p.Name == name);
 
 		protected virtual void LoadObjectData()
 		{

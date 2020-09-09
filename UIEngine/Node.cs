@@ -94,13 +94,13 @@ namespace UIEngine
 
 		internal override CollectionNode Execute()
 		{
-			foreach (var list in SourceCollection.Collection2D)
+			foreach (var list in SourceCollection.Collection/*2D*/)
 			{
-				foreach (var enumerator in list)
-				{
-					_Predicate[0].SetReferenceTo(enumerator);
+				//foreach (var enumerator in list)
+				//{
+					_Predicate[0].SetReferenceTo(list/*enumerator*/);
 					_Predicate[0].InstantiateSuccession();
-				}
+				//}
 			}
 
 			return null;

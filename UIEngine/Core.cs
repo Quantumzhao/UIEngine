@@ -238,12 +238,12 @@ namespace UIEngine
 			});
 		}
 
-		internal static List<object> ToObjectList(this ICollection collection)
-		{
-			var array = new object[collection.Count];
-			collection.CopyTo(array, 0);
-			return array.ToList();
-		}
+		//internal static List<object> ToObjectList(this IEnumerable enumerable)
+		//{
+		//	var array = new object[enumerable.Count];
+		//	enumerable.CopyTo(array, 0);
+		//	return array.ToList();
+		//}
 
 		public static TypeSystem ToValidType(this Type type) => TypeSystem.ToRestrictedType(type);
 
