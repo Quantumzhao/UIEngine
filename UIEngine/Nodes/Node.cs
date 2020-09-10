@@ -8,7 +8,7 @@ using System.Collections.Generic;
 using System.ComponentModel;
 using System.Collections.ObjectModel;
 
-namespace UIEngine
+namespace UIEngine.Nodes
 {
 	// For current stage, UI Engine only supports int, double, string, bool, object and collection
 	public abstract class Node : INotifyPropertyChanged

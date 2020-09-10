@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 
-namespace UIEngine
+namespace UIEngine.Nodes
 {
 	public class MethodNode : Node
 	{
@@ -49,9 +49,8 @@ namespace UIEngine
 			// check if any parameter is empty
 			if (!Signatures.All(n => !n.IsEmpty))
 			{
-				var message = _PARAM_EMPTY_ERROR;
-				Dashboard.RaiseWarningMessage(this, message);
-				throw new InvalidOperationException(message);
+				Dashboard.RaiseWarningMessage(this, _PARAM_EMPTY_ERROR);
+				throw new InvalidOperationException(_PARAM_EMPTY_ERROR);
 			}
 			var objectData = _Body.Invoke(
 				Parent?.ObjectData,
@@ -75,7 +74,7 @@ namespace UIEngine
 		}
 		public bool CanAssignArgument(object argument, ObjectNode parameter)
 		{
-			return parameter.SourceObjectInfo.ObjectDataType.IsAssignableFrom(argument.GetType());
+			return parameter.IsAssignableFrom(argument.GetType());
 		}
 
 		public bool SetParameter(object argument, ObjectNode parameter)
@@ -115,7 +114,7 @@ namespace UIEngine
 
 		internal override ObjectNode InstantiateSuccession()
 		{
-			if (ReturnNode.Type.ReflectedType.Equals(typeof(void)))
+			if (ReturnNode.SourceObjectInfo.ReflectedType.Equals(typeof(void)))
 			{
 				return ReturnNode;
 			}

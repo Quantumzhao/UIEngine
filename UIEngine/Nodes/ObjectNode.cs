@@ -4,8 +4,9 @@ using System.Collections.Generic;
 using System.ComponentModel;
 using System.Linq;
 using System.Reflection;
+using UIEngine;
 
-namespace UIEngine
+namespace UIEngine.Nodes
 {
 	/* object nodes should never be created or replaced via external assemblies.
 	 * object nodes must always maintain a tree data structure.
@@ -39,11 +40,10 @@ namespace UIEngine
 			}
 		}
 		/// <summary>
-		///		Create from anonymous object. i.e. elements in a collection or return value
+		///		Create from anonymous object. i.e. elements in a collection
 		/// </summary>
 		/// <param name="parent"></param>
 		/// <param name="objectData"></param>
-		/// <param name="attribute"></param>
 		/// <returns></returns>
 		internal static ObjectNode Create(ObjectNode parent, object objectData)
 		{
@@ -51,9 +51,10 @@ namespace UIEngine
 			if (parent is CollectionNode)
 			{
 				objectNode.SourceObjectInfo = new OtherDomainModelRefInfo(objectData.GetType(),
-					SourceReferenceType.Indexer);
+					SourceReferenceType.Enumerator);
 			}
 			else
+			// parent is null, in the case of return value
 			{
 				objectNode.SourceObjectInfo = new OtherDomainModelRefInfo(objectData.GetType(),
 					SourceReferenceType.ReturnValue);
@@ -86,13 +87,11 @@ namespace UIEngine
 		}
 
 		/// <summary>
-		///		the next node in the syntax tree. 
+		///		the next node in the tree. 
 		///		The succession should be an empty (but not null) node when first assigned. 
-		///		It should be instantiated by <see cref="InstantiateSuccession"/> method. 
 		/// </summary>
 		internal Node Succession { get; set; }
-		public TypeSystem Type => SourceObjectInfo.ObjectDataType;
-		public bool IsValueType => SourceObjectInfo.ObjectDataType.IsValueType;
+		//public TypeSystem Type => SourceObjectInfo.ObjectDataType;
 		internal bool IsEmpty => _ObjectData == null;
 		internal DomainModelRefInfo SourceObjectInfo { get; set; }
 		public bool DoesAcceptInput { get; private set; }
@@ -148,7 +147,6 @@ namespace UIEngine
 
 		#region Object Data
 		private object _ObjectData = null;
-
 		public object ObjectData
 		{
 			get
@@ -210,8 +208,15 @@ namespace UIEngine
 		/// </summary>
 		/// <typeparam name="T">The comparing type</typeparam>
 		/// <returns>true if the <see cref="ObjectData"/> is type of <see cref="T"/></returns>
-		public bool IsTypeOf<T>() => Type.ReflectedType == typeof(T);
-
+		public bool IsTypeOf<T>() => SourceObjectInfo.ReflectedType == typeof(T);
+		/// <summary>
+		///		Use this to state if <see cref="ObjectData"/> is derived from <see cref="T"/> to avoid loading it. 
+		/// </summary>
+		/// <typeparam name="T">The comparing type</typeparam>
+		/// <returns>true if the <see cref="ObjectData"/> is derived from <see cref="T"/></returns>
+		public bool IsDerivedFrom<T>() => typeof(T).IsAssignableFrom(SourceObjectInfo.ReflectedType);
+		public bool IsAssignableFrom<T>() => IsAssignableFrom(typeof(T));
+		internal bool IsAssignableFrom(Type type) => SourceObjectInfo.ReflectedType.IsAssignableFrom(type);
 		/// <summary>
 		///		Finds the property with the specified name. 
 		/// </summary>
@@ -219,6 +224,27 @@ namespace UIEngine
 		/// <param name="name">property name</param>
 		/// <returns>null if not found</returns>
 		public ObjectNode this[string name] => Properties.SingleOrDefault(p => p.Name == name);
+
+		/// <summary>
+		///		A primitive type means, int, float, byte
+		///		and their derivatives, bool and string, char, decimal 
+		/// </summary>
+		/// <returns>true if it is a primitive type </returns>
+		public bool IsPrimitiveType() =>
+			IsTypeOf<int>() ||
+			IsTypeOf<ushort>() ||
+			IsTypeOf<uint>() ||
+			IsTypeOf<ulong>() ||
+			IsTypeOf<short>() ||
+			IsTypeOf<long>() ||
+			IsTypeOf<float>() ||
+			IsTypeOf<double>() ||
+			IsTypeOf<string>() ||
+			IsTypeOf<bool>() ||
+			IsTypeOf<sbyte>() ||
+			IsTypeOf<char>() ||
+			IsTypeOf<decimal>() ||
+			IsTypeOf<byte>();
 
 		protected virtual void LoadObjectData()
 		{
@@ -243,15 +269,15 @@ namespace UIEngine
 					((PropertyDomainModelRefInfo)SourceObjectInfo).PropertyInfo.SetValue(Parent?.ObjectData, ObjectData);
 					break;
 
-				case SourceReferenceType.Indexer:
+				case SourceReferenceType.Enumerator:
 					if (Parent.ObjectData is IList)
 					{
 						var collection = Parent.ObjectData as IList;
 						collection[collection.IndexOf(ObjectData)] = ObjectData;
 					}
-					else
+					else if (Parent.ObjectData is IEnumerable<object>)
 					{
-						throw new NotImplementedException();
+						
 					}
 					break;
 
@@ -272,7 +298,7 @@ namespace UIEngine
 			{
 				LoadObjectData();
 			}
-			_Properties = SourceObjectInfo.ObjectDataType.ReflectedType.GetVisibleProperties(BindingFlags.Public | BindingFlags.Instance)
+			_Properties = SourceObjectInfo.ReflectedType.GetVisibleProperties(BindingFlags.Public | BindingFlags.Instance)
 				.Select(pi => Create(this, pi)).ToList();
 		}
 		private void LoadMethods()
@@ -281,10 +307,11 @@ namespace UIEngine
 			{
 				LoadObjectData();
 			}
-			_Methods = SourceObjectInfo.ObjectDataType.ReflectedType.GetVisibleMethods(BindingFlags.Public | BindingFlags.Instance)
+			_Methods = SourceObjectInfo.ReflectedType.GetVisibleMethods(BindingFlags.Public | BindingFlags.Instance)
 				.Select(mi => MethodNode.Create(this, mi)).ToList();
 		}
 
+		[Obsolete]
 		internal ObjectNode FindDecendant(object objectData)
 		{
 			if (objectData.Equals(_ObjectData))
@@ -337,6 +364,7 @@ namespace UIEngine
 			return Succession?.InstantiateSuccession() ?? this;
 		}
 
+		// magic, I don't want to touch it any more
 		private void SetBinding(object objectData, INotifyPropertyChanged prevObject = null)
 		{
 			if (prevObject != objectData)
@@ -364,6 +392,7 @@ namespace UIEngine
 			}
 		}
 
+		// This method is for accessing info via compile-time attributes
 		private void TryGetDescriptiveInfo(DescriptiveInfoAttribute attribute)
 		{
 			Name = attribute.Name;
@@ -375,6 +404,7 @@ namespace UIEngine
 				IsEnabled = visible.IsControlEnabled;
 			}
 		}
+		// This is for accessing run-time info (i.e. interfaces and object table)
 		private void TryGetDescriptiveInfo()
 		{
 			if (_ObjectData == null)
@@ -394,7 +424,7 @@ namespace UIEngine
 				this.Description = descriptiveInfoAttribute.Description;
 				this.IsEnabled = (descriptiveInfoAttribute as VisibleAttribute).IsControlEnabled;
 			}
-			else
+			else if (string.IsNullOrEmpty(Header))
 			{
 				this.Header = _ObjectData.ToString();
 			}
