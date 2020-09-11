@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using System.Text;
 
-namespace UIEngine
+namespace UIEngine.Core
 {
 	public abstract class DescriptiveInfoAttribute : Attribute
 	{

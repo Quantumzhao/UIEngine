@@ -7,9 +7,8 @@ using System.Reflection;
 using System.Runtime.CompilerServices;
 using UIEngine.Nodes;
 
-namespace UIEngine
+namespace UIEngine.Core
 {
-	//public delegate void NodeOperationsHandler(Node node);
 	public delegate void WarningMessageHandler(Node source, string message);
 	//public delegate void NotifySelfChangedHandler(Node sender, NotifySelfChangedEventArgs e);
 
@@ -39,7 +38,7 @@ namespace UIEngine
 
 	public static class Misc
 	{
-		public static readonly ConditionalWeakTable<object, DescriptiveInfoAttribute> ObjectTable 
+		internal static readonly ConditionalWeakTable<object, DescriptiveInfoAttribute> ObjectTable 
 			= new ConditionalWeakTable<object, DescriptiveInfoAttribute>();
 
 		internal static IEnumerable<PropertyInfo> GetVisibleProperties(this Type type, BindingFlags flags)
@@ -66,41 +65,11 @@ namespace UIEngine
 		}
 	}
 
-	public abstract class DomainModelRefInfo 
-	{
-		internal DomainModelRefInfo(Type type, SourceReferenceType sourceReferenceType)
-		{
-			SourceReferenceType = sourceReferenceType;
-			ReflectedType = type;
-		}
 
-		internal readonly SourceReferenceType SourceReferenceType;
-		//internal readonly TypeSystem ObjectDataType;
-		internal readonly Type ReflectedType;
-	}
-	public class OtherDomainModelRefInfo : DomainModelRefInfo
+	public enum SelectionMode
 	{
-		internal OtherDomainModelRefInfo(Type type, SourceReferenceType sourceReferenceType) 
-			: base(type, sourceReferenceType) { }
-	}
-	public class PropertyDomainModelRefInfo : DomainModelRefInfo
-	{
-		public readonly string PropertyName;
-		public readonly PropertyInfo PropertyInfo;
-
-		public PropertyDomainModelRefInfo(PropertyInfo info) 
-			: base(info.PropertyType, SourceReferenceType.Property)
-		{
-			PropertyInfo = info;
-			PropertyName = PropertyInfo.Name;
-		}
-	}
-	internal enum SourceReferenceType
-	{
-		Property,
-		Enumerator,
-		ReturnValue,
-		parameter
+		SingleSelect, 
+		MultiSelect
 	}
 
 	internal class Expression
@@ -143,11 +112,11 @@ namespace UIEngine
 
 	/// <summary>
 	///		The purpose of this class is to wrap up a struct into a reference type 
-	///		for <c>AppendVisibleAttribute</c>
-	///		<para> please take extra caution when handling it, since it it immutable, and any assignment will remove its visible attribute. </para>
+	///		for <see cref="Dashboard.AppendVisibleAttribute{T}(T, DescriptiveInfoAttribute)"/>
+	///		<para> please take extra caution when handling it, since it is immutable, and any assignment will remove its visible attribute. </para>
 	/// </summary>
 	/// <typeparam name="T">
-	///		T must be a struct. There's nno need to wrap up a reference type into a reference type
+	///		T must be a struct. There's no need to wrap up a reference type into a reference type
 	///	</typeparam>
 	public class W<T> where T : struct
 	{
