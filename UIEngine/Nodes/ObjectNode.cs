@@ -5,6 +5,7 @@ using System.ComponentModel;
 using System.Linq;
 using System.Reflection;
 using UIEngine;
+using UIEngine.Core;
 
 namespace UIEngine.Nodes
 {
@@ -14,7 +15,8 @@ namespace UIEngine.Nodes
 	 * it should actually point to the object data wrapped by that node */
 	public class ObjectNode : Node, INotifyPropertyChanged
 	{
-		private const string _ILLEGAL_CTRL_STATE = "This control doesn't accept input, therefore it is always disabled. ";
+		private const string _ILLEGAL_CTRL_STATE = "This node doesn't accept input, therefore it is always disabled. ";
+		private const string _ENUM_ASSERTION_FAILURE = "This node is not an Enum type";
 
 		/// <summary>
 		///		Create from property
@@ -53,6 +55,7 @@ namespace UIEngine.Nodes
 				objectNode.SourceObjectInfo = new OtherDomainModelRefInfo(objectData.GetType(),
 					SourceReferenceType.Enumerator);
 			}
+			// questionable, consider revision
 			else
 			// parent is null, in the case of return value
 			{
@@ -225,26 +228,87 @@ namespace UIEngine.Nodes
 		/// <returns>null if not found</returns>
 		public ObjectNode this[string name] => Properties.SingleOrDefault(p => p.Name == name);
 
+		public string TypeName => SourceObjectInfo.ReflectedType.ToString();
+
+		#region Type related utilities
 		/// <summary>
 		///		A primitive type means, int, float, byte
 		///		and their derivatives, bool and string, char, decimal 
 		/// </summary>
 		/// <returns>true if it is a primitive type </returns>
 		public bool IsPrimitiveType() =>
+			IsContinuousNumeric() ||
+			IsBoolean() ||
+			IsText();
+
+		/// <summary>
+		///		States if it is int, byte and their derivatives
+		/// </summary>
+		public bool IsDiscreteNumeric() =>
 			IsTypeOf<int>() ||
 			IsTypeOf<ushort>() ||
 			IsTypeOf<uint>() ||
 			IsTypeOf<ulong>() ||
 			IsTypeOf<short>() ||
 			IsTypeOf<long>() ||
+			IsTypeOf<sbyte>() ||
+			IsTypeOf<byte>();
+
+		/// <summary>
+		///		States if it is float and its derivatives
+		/// </summary>
+		/// <remarks>discrete numerics are considered as a super set of </remarks>
+		public bool IsContinuousNumeric() =>
+			IsDiscreteNumeric() ||
 			IsTypeOf<float>() ||
 			IsTypeOf<double>() ||
+			IsTypeOf<decimal>();
+
+		/// <summary>
+		///		States if it is bool
+		/// </summary>
+		public bool IsBoolean() =>
+			IsTypeOf<bool>();
+
+		/// <summary>
+		///		States if it is string or char
+		/// </summary>
+		public bool IsText() =>
 			IsTypeOf<string>() ||
-			IsTypeOf<bool>() ||
-			IsTypeOf<sbyte>() ||
-			IsTypeOf<char>() ||
-			IsTypeOf<decimal>() ||
-			IsTypeOf<byte>();
+			IsTypeOf<char>();
+
+		/// <summary>
+		///		States if the node is of <see cref="Enum"/> type. 
+		///		Can also state if the <see cref="Enum"/> is marked with <see cref="FlagsAttribute"/>
+		/// </summary>
+		/// <param name="mode"></param>
+		/// <returns>
+		///		true if it is an <see cref="Enum"/>, or it is an <see cref="Enum"/> 
+		///		with <see cref="FlagsAttribute"/>, if specified
+		///	</returns>
+		///	<remarks>
+		///		Throws <see cref="ArgumentException"/> if it is not an <see cref="Enum"/> 
+		///		but specifies the selection mode
+		///	</remarks>
+		/// <exception cref="ArgumentException"/>
+		public bool IsEnum(SelectionMode? mode = null)
+		{
+			var isEnum = IsTypeOf<Enum>();
+			if (mode == null)
+			{
+				return isEnum;
+			}
+			else if (!isEnum)
+			{
+				throw new ArgumentException(_ENUM_ASSERTION_FAILURE);
+			}
+			else
+			{
+				var isMS = SourceObjectInfo.ReflectedType.GetCustomAttribute(typeof(FlagsAttribute)) == null;
+				return mode == SelectionMode.MultiSelect && isMS;
+			}
+		}
+		#endregion
 
 		protected virtual void LoadObjectData()
 		{

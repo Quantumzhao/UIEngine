@@ -6,6 +6,7 @@ using System.Collections.Specialized;
 using System.ComponentModel;
 using System.Linq;
 using System.Reflection;
+using UIEngine.Core;
 
 namespace UIEngine.Nodes
 {
