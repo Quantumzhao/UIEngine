@@ -1,8 +1,11 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.Linq;
 using System.Reflection;
+using System.Runtime.CompilerServices;
 using System.Text;
+using UIEngine.Core;
 using UIEngine.Nodes;
 
 namespace UIEngine
@@ -114,6 +117,34 @@ namespace UIEngine
 		{
 			Misc.ObjectTable.Add(target, descriptiveInfoAttribute);
 			return target;
+		}
+
+		public static void SetAndRaiseIfPropertyChanged<T, V>(this T src, ref V propertyField, V value, 
+			[CallerMemberName] string propertyName = null) where T : INotifyPropertyChanged
+		{
+			throw new NotImplementedException();
+		}
+
+		/// <summary>
+		///		Maps selected (recursive) properties into a new object. For example: 
+		///		<code>{"name":"string","member":{"id":0}} => {"name":"string","id":0}</code>
+		/// </summary>
+		/// <remarks>Does not support methods</remarks>
+		/// <example><code>{"name":"string","member":{"id":0}} => {"name":"string","id":0}</code></example>
+		/// <typeparam name="T">Type of the class that is about to be converted</typeparam>
+		/// <param name="src">An onject of the class</param>
+		/// <param name="mappings">paths to properties</param>
+		/// <returns>a new object</returns>
+		internal static FlattenedClass<T> ToFlattenedClass<T>(this T src, IEnumerable<Func<T, object>> mappings)
+		{
+			var ret = new FlattenedClass<T>();
+
+			foreach (var mapping in mappings)
+			{
+				ret.Properties.Add(new PseudoProperty<T>(mapping, src));
+			}
+
+			return ret;
 		}
 	}
 }

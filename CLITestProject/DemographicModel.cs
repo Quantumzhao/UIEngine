@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using UIEngine;
 using System.ComponentModel;
 using System.Collections.ObjectModel;
+using UIEngine.Core;
 
 namespace CLITestProject
 {
@@ -266,15 +267,15 @@ namespace CLITestProject
 				if (value >= 0)
 				{
 					prob_Marry = value;
-					Dashboard.NotifyPropertyChanged(this, nameof(Prob_Marry), value);
+					//Dashboard.NotifyPropertyChanged(this, nameof(Prob_Marry), value);
 				}
 				else
 				{
 					prob_Marry = 0;
 
-					PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(Prob_Marry)));
 					//Dashboard.NotifyPropertyChanged(this, nameof(Prob_Marry), value);
 				}
+				PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(Prob_Marry)));
 			}
 		}
 
