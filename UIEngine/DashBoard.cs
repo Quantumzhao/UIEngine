@@ -119,10 +119,18 @@ namespace UIEngine
 			return target;
 		}
 
-		public static void SetAndRaiseIfPropertyChanged<T, V>(this T src, ref V propertyField, V value, 
+		/// <summary>
+		///		Use it inside property setters
+		/// </summary>
+		/// <param name="src">owner of the property</param>
+		/// <param name="propertyField">the field that is wrapped by getter and setter</param>
+		/// <param name="value">the pass-in value</param>
+		public static void SetAndRaiseIfPropertyChanged<T, V>(this T src, ref V propertyField, V value,
 			[CallerMemberName] string propertyName = null) where T : INotifyPropertyChanged
 		{
-			throw new NotImplementedException();
+			propertyField = value;
+			typeof(T).GetEvent("PropertyChanged").GetRaiseMethod()
+				.Invoke(src, new object[] { src, new PropertyChangedEventArgs(propertyName) });
 		}
 
 		/// <summary>

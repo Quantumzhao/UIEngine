@@ -4,7 +4,7 @@ using System.Text;
 
 namespace UIEngine.Nodes
 {
-	public abstract class ExtensionNode : Node
+	public abstract class ExtensionFunctionNode : Node
 	{
 		public ObjectNode ReturnNode { get; set; }
 		public abstract ObjectNode Invoke();

@@ -237,7 +237,7 @@ namespace UIEngine.Nodes
 		/// </summary>
 		/// <returns>true if it is a primitive type </returns>
 		public bool IsPrimitiveType() =>
-			IsContinuousNumeric() ||
+			IsNumeric() ||
 			IsBoolean() ||
 			IsText();
 
@@ -255,12 +255,11 @@ namespace UIEngine.Nodes
 			IsTypeOf<byte>();
 
 		/// <summary>
-		///		States if it is float and its derivatives
+		///		States if it is a number
 		/// </summary>
-		/// <remarks>discrete numerics are considered as a super set of </remarks>
-		public bool IsContinuousNumeric() =>
-			IsDiscreteNumeric() ||
-			IsTypeOf<float>() ||
+		public bool IsNumeric() =>
+			IsDiscreteNumeric()||
+			IsTypeOf<float>()  ||
 			IsTypeOf<double>() ||
 			IsTypeOf<decimal>();
 
@@ -339,9 +338,9 @@ namespace UIEngine.Nodes
 						var collection = Parent.ObjectData as IList;
 						collection[collection.IndexOf(ObjectData)] = ObjectData;
 					}
-					else if (Parent.ObjectData is IEnumerable<object>)
+					else if (Parent.ObjectData is IEnumerable<object> enumerable)
 					{
-						
+						throw new InvalidOperationException("readonly");
 					}
 					break;
 

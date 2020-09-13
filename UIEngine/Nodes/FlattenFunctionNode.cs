@@ -4,7 +4,7 @@ using System.Text;
 
 namespace UIEngine.Nodes
 {
-	public class FlattenNode : ExtensionNode
+	public class FlattenFunctionNode : ExtensionFunctionNode
 	{
 		protected override string Preview { get; set; }
 		/// <summary>
