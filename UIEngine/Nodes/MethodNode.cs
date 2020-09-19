@@ -22,7 +22,7 @@ namespace UIEngine.Nodes
 			methodNode.Signatures = methodInfo.GetParameters()
 				.Select(p => ObjectNode.Create(p.ParameterType, p.GetCustomAttribute<DescriptiveInfoAttribute>()))
 				.ToList();
-			methodNode.ReturnNode = ObjectNode.Create(methodInfo.ReturnType, attr);
+			methodNode.Succession = ObjectNode.Create(methodInfo.ReturnType, attr);
 			if (parent != null)
 			{
 				parent.Succession = methodNode;
@@ -31,7 +31,7 @@ namespace UIEngine.Nodes
 			return methodNode;
 		}
 
-		public ObjectNode ReturnNode { get; private set; }
+		public ObjectNode ReturnNode => Succession as ObjectNode;
 		public List<ObjectNode> Signatures { get; set; }
 		private MethodInfo _Body;
 

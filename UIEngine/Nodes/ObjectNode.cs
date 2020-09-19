@@ -89,12 +89,6 @@ namespace UIEngine.Nodes
 			}
 		}
 
-		/// <summary>
-		///		the next node in the tree. 
-		///		The succession should be an empty (but not null) node when first assigned. 
-		/// </summary>
-		internal Node Succession { get; set; }
-		//public TypeSystem Type => SourceObjectInfo.ObjectDataType;
 		internal bool IsEmpty => _ObjectData == null;
 		internal DomainModelRefInfo SourceObjectInfo { get; set; }
 		public bool DoesAcceptInput { get; private set; }
@@ -422,6 +416,9 @@ namespace UIEngine.Nodes
 			{
 				objectSuccesstion.LoadObjectData();
 			}
+
+			/* Great, now I have no idea what it means */
+
 			// if succession is a method node, just return the method node
 			// if it has no succession, return this
 			return Succession?.InstantiateSuccession() ?? this;

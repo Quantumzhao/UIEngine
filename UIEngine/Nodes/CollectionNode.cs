@@ -53,11 +53,11 @@ namespace UIEngine.Nodes
 			}
 		}
 
-		#region LINQ Functionalities
+		#region High Order Functions
 		public ForEachNode ForEachExpression { get; private set; }
 		public SelectNode SelectExpression { get; private set; }
 		public SortNode SortExpression { get; private set; }
-		public WhereNode WhereExpression { get; set; }
+		public FilterFunctionNode FilterExpression { get; set; }
 		#endregion
 
 		/// <summary>

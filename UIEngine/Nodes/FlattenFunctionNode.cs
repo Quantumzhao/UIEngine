@@ -6,6 +6,7 @@ namespace UIEngine.Nodes
 {
 	public class FlattenFunctionNode : ExtensionFunctionNode
 	{
+		public FlattenFunctionNode(CollectionNode collectionNode) : base(collectionNode) { }
 		protected override string Preview { get; set; }
 		/// <summary>
 		///		Node templates that WILL be instantiated in the resultant FlattenedClass object. 
@@ -24,6 +25,11 @@ namespace UIEngine.Nodes
 		}
 
 		internal override ObjectNode InstantiateSuccession()
+		{
+			throw new NotImplementedException();
+		}
+
+		internal override bool DoesSatisfySignature()
 		{
 			throw new NotImplementedException();
 		}
