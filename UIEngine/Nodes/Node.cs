@@ -41,8 +41,13 @@ namespace UIEngine.Nodes
 
 		public override string ToString() => Header;
 
-		/// <summary>Transform the succession from a template to an instantiated node</summary>
-		/// <returns>Object node is the leaf of the syntax tree</returns>
+		/// <summary>
+		///		the next node in the tree. 
+		///		The succession should be an empty (but not null) node when first assigned. 
+		/// </summary>
+		internal Node Succession { get; set; }
+
+		/// <summary>Transforms the succession from a template to an instantiated node</summary>
 		internal abstract ObjectNode InstantiateSuccession();
 
 		protected void InvokePropertyChanged(object sender, PropertyChangedEventArgs e)
@@ -112,120 +117,120 @@ namespace UIEngine.Nodes
 		}
 	} 
 
-	public class WhereNode : LinqNode
-	{
-		private const string _INVALID_RETURN_TYPE = "Current expression does not qualify return type requirement";
-		public static WhereNode Create(CollectionNode collection) => new WhereNode(collection);
-		private WhereNode(CollectionNode collection) : base(collection) { }
+	//public class WhereNode : LinqNode
+	//{
+	//	private const string _INVALID_RETURN_TYPE = "Current expression does not qualify return type requirement";
+	//	public static WhereNode Create(CollectionNode collection) => new WhereNode(collection);
+	//	private WhereNode(CollectionNode collection) : base(collection) { }
 
-		//private static readonly Func<bool, bool, bool> And = (left, right) => left && right;
-		//private static readonly Func<bool, bool, bool> Or = (left, right) => left || right;
-		//private static readonly Func<bool, bool> Not = value => !value;
+	//	//private static readonly Func<bool, bool, bool> And = (left, right) => left && right;
+	//	//private static readonly Func<bool, bool, bool> Or = (left, right) => left || right;
+	//	//private static readonly Func<bool, bool> Not = value => !value;
 
-		internal override bool IsSatisfySignature => throw new NotImplementedException();
+	//	internal override bool IsSatisfySignature => throw new NotImplementedException();
 
-		/* The set of conditions that the where predicate describes.
-		 * They are connected by logic operators, e.g. cond1 AND cond2 OR NOT cond3. 
-		 * The initial (template) conditions are syntax trees of object nodes, once the root nodes (i.e. during execution) are assigned,
-		 * the execution will give off and replace with the return values 
-		 * and then pass the boolean expression to the parser to get the final result */
-		private readonly Queue<object> _Predicates = new Queue<object>();
-		/// <summary>
-		///		Execute the predicate
-		/// </summary>
-		/// <returns>If the expression is invalid, it will give off a warning and just return the collection itself</returns>
-		internal override CollectionNode Execute()
-		{
-			if (!IsSatisfySignature)
-			{
-				Dashboard.RaiseWarningMessage(this, _INVALID_RETURN_TYPE);
-				return SourceCollection;
-			}
-			var ret = new ObservableCollection<ObjectNode>();
-			SourceCollection.ForEach(enumerator => {
-				while (!(_Predicates.Peek() is bool))
-				{
-					if (_Predicates.Peek() is LogicOperators)
-					{
-						continue;
-					}
-					else
-					{
-						// executing and replacing a single condition with its return value
-						ObjectNode condition = _Predicates.Dequeue() as ObjectNode;
-						condition.SetReferenceTo(enumerator);
-						_Predicates.Enqueue((bool)condition.InstantiateSuccession().ObjectData);
-					}
-				}
+	//	/* The set of conditions that the where predicate describes.
+	//	 * They are connected by logic operators, e.g. cond1 AND cond2 OR NOT cond3. 
+	//	 * The initial (template) conditions are syntax trees of object nodes, once the root nodes (i.e. during execution) are assigned,
+	//	 * the execution will give off and replace with the return values 
+	//	 * and then pass the boolean expression to the parser to get the final result */
+	//	private readonly Queue<object> _Predicates = new Queue<object>();
+	//	/// <summary>
+	//	///		Execute the predicate
+	//	/// </summary>
+	//	/// <returns>If the expression is invalid, it will give off a warning and just return the collection itself</returns>
+	//	internal override CollectionNode Execute()
+	//	{
+	//		if (!IsSatisfySignature)
+	//		{
+	//			Dashboard.RaiseWarningMessage(this, _INVALID_RETURN_TYPE);
+	//			return SourceCollection;
+	//		}
+	//		var ret = new ObservableCollection<ObjectNode>();
+	//		SourceCollection.ForEach(enumerator => {
+	//			while (!(_Predicates.Peek() is bool))
+	//			{
+	//				if (_Predicates.Peek() is LogicOperators)
+	//				{
+	//					continue;
+	//				}
+	//				else
+	//				{
+	//					// executing and replacing a single condition with its return value
+	//					ObjectNode condition = _Predicates.Dequeue() as ObjectNode;
+	//					condition.SetReferenceTo(enumerator);
+	//					_Predicates.Enqueue((bool)condition.InstantiateSuccession().ObjectData);
+	//				}
+	//			}
 
-				if (Parser.Execute(_Predicates))
-				{
-					ret.Add(enumerator);
-				}
-			});
-			return CollectionNode.Create(ret);
-		}
+	//			if (Parser.Execute(_Predicates))
+	//			{
+	//				ret.Add(enumerator);
+	//			}
+	//		});
+	//		return CollectionNode.Create(ret);
+	//	}
 
-		public override void AddPredicate(ObjectNode predicate) => _Predicates.Enqueue(predicate);
+	//	public override void AddPredicate(ObjectNode predicate) => _Predicates.Enqueue(predicate);
 
-		public void AddOperator(LogicOperators logicOperator)
-		{
-			_Predicates.Enqueue(logicOperator);
-		}
+	//	public void AddOperator(LogicOperators logicOperator)
+	//	{
+	//		_Predicates.Enqueue(logicOperator);
+	//	}
 
-		public enum LogicOperators
-		{
-			And = 0,
-			Or = 1, 
-			Not = 2
-		}
+	//	public enum LogicOperators
+	//	{
+	//		And = 0,
+	//		Or = 1, 
+	//		Not = 2
+	//	}
 
-		private static class Parser
-		{
-			internal static bool Execute(Queue<object> tokens)
-			{
-				Expression tree = new Expression();
-				while (tokens.Count != 0)
-				{
-					var token = tokens.Dequeue();
-					if (token is LogicOperators operand)
-					{
-						switch (operand)
-						{
-							case LogicOperators.And:
-								tree.Body = new Func<bool, bool, bool>((v1, v2) => v1 && v2);
-								tree.MaxArguments = 2;
-								break;
+	//	private static class Parser
+	//	{
+	//		internal static bool Execute(Queue<object> tokens)
+	//		{
+	//			Expression tree = new Expression();
+	//			while (tokens.Count != 0)
+	//			{
+	//				var token = tokens.Dequeue();
+	//				if (token is LogicOperators operand)
+	//				{
+	//					switch (operand)
+	//					{
+	//						case LogicOperators.And:
+	//							tree.Body = new Func<bool, bool, bool>((v1, v2) => v1 && v2);
+	//							tree.MaxArguments = 2;
+	//							break;
 
-							case LogicOperators.Or:
-								tree.Body = new Func<bool, bool, bool>((v1, v2) => v1 || v2);
-								tree.MaxArguments = 2;
-								break;
+	//						case LogicOperators.Or:
+	//							tree.Body = new Func<bool, bool, bool>((v1, v2) => v1 || v2);
+	//							tree.MaxArguments = 2;
+	//							break;
 
-							case LogicOperators.Not:
-								tree.Body = new Func<bool, bool>(v => !v);
-								tree.MaxArguments = 1;
-								break;
+	//						case LogicOperators.Not:
+	//							tree.Body = new Func<bool, bool>(v => !v);
+	//							tree.MaxArguments = 1;
+	//							break;
 
-							default:
-								break;
-						}
-					}
-					else
-					{
-						if (!tree.AddArgument(token.ToVariable()))
-						{
-							var temp = tree;
-							tree = new Expression();
-							tree.AddArgument(temp);
-						}
-					}
-				}
+	//						default:
+	//							break;
+	//					}
+	//				}
+	//				else
+	//				{
+	//					if (!tree.AddArgument(token.ToVariable()))
+	//					{
+	//						var temp = tree;
+	//						tree = new Expression();
+	//						tree.AddArgument(temp);
+	//					}
+	//				}
+	//			}
 
-				return (bool)tree.Invoke();
-			}
-		}
-	}
+	//			return (bool)tree.Invoke();
+	//		}
+	//	}
+	//}
 
 	public class SelectNode : LinqNode
 	{
