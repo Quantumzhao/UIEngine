@@ -59,10 +59,10 @@ namespace UIEngine.Core
 			});
 		}
 
-		internal static Variable ToVariable(this object value)
-		{
-			return new Variable(value);
-		}
+		//internal static Variable ToVariable(this object value)
+		//{
+		//	return new Variable(value);
+		//}
 	}
 
 
@@ -72,43 +72,43 @@ namespace UIEngine.Core
 		MultiSelect
 	}
 
-	internal class Expression
-	{
-		private readonly List<Expression> _Arguments = new List<Expression>();
-		internal virtual Delegate Body { get; set; }
-		internal int MaxArguments { get; set; }
+	//internal class Expression
+	//{
+	//	private readonly List<Expression> _Arguments = new List<Expression>();
+	//	internal virtual Delegate Body { get; set; }
+	//	internal int MaxArguments { get; set; }
 
-		internal bool AddArgument(Expression argument)
-		{
-			if (_Arguments.Count < MaxArguments)
-			{
-				_Arguments.Add(argument);
-				return true;
-			}
-			else
-			{
-				return false;
-			}
-		}
+	//	internal bool AddArgument(Expression argument)
+	//	{
+	//		if (_Arguments.Count < MaxArguments)
+	//		{
+	//			_Arguments.Add(argument);
+	//			return true;
+	//		}
+	//		else
+	//		{
+	//			return false;
+	//		}
+	//	}
 
-		internal virtual object Invoke()
-		{
-			return Body.DynamicInvoke(_Arguments.Select(a => a.Invoke()).ToArray());
-		}
-	}
+	//	internal virtual object Invoke()
+	//	{
+	//		return Body.DynamicInvoke(_Arguments.Select(a => a.Invoke()).ToArray());
+	//	}
+	//}
 
-	internal class Variable : Expression
-	{
-		internal Variable(object value)
-		{
-			Value = value;
-		}
+	//internal class Variable : Expression
+	//{
+	//	internal Variable(object value)
+	//	{
+	//		Value = value;
+	//	}
 
-		internal object Value { get; set; }
-		internal override Delegate Body => throw new InvalidOperationException();
+	//	internal object Value { get; set; }
+	//	internal override Delegate Body => throw new InvalidOperationException();
 
-		internal override object Invoke() => Value;
-	}
+	//	internal override object Invoke() => Value;
+	//}
 
 	/// <summary>
 	///		The purpose of this class is to wrap up a struct into a reference type 
