@@ -42,17 +42,41 @@ Completed and developing features.
 
 ## Collection Node
 
-- [ ] ==2-dimensional collection (i.e. table) support==
-- [ ] ==Dictionary support==
 - [x] Two way collection binding
 - [ ] ==Collection node assignment==
 
-## LINQ Node
+## Extension Function Node
 
-- [ ] ==Where==
+- [ ] ==Filter==
     - [ ] ==composite expression==
 - [ ] Sort
     - [ ] composite expression
-- [ ] Select
+- [ ] Map
     - [ ] multiple expressions, and combine them to a single table (collection)
 - [ ] Foreach
+
+## Automation
+
+- [ ] Serialize/Deserialize chain of `ObjectNode` to code, which grammar is suggested below: 
+
+    ``` 
+    Expr ::= ObjectNodeName
+           | Expr.Expr
+           | Expr[Val]
+           | MethodName(ExprList)
+           | CollectionNodeName
+           | CollectionNodeName.ExtensionFunctionNode
+    Val ::= Int
+    	  | String
+    ExprList ::= Expr
+    		  | Expr, ExprList
+    BoolExpr ::= BoolExpr AND BoolExpr
+    		  | BoolExpr OR BoolExpr
+    		  | NOT BoolExpr
+    ExtensionFunctionNode ::= Filter(TemplatedObjectNode, BoolExpr)
+    					  | Sort(TemplatedObjectNode, IComparable)
+    					  | Map(TemplatedObjectNode, Expr)
+    					  | Foreach(TemplatedObjectNode, Expr.MethodNodeName(ExprList))
+    ```
+
+    
