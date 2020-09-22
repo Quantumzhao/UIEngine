@@ -6,6 +6,7 @@ namespace UIEngine.Core
 {
 	/// <summary>
 	///		A special class in UIEngine. It will not be interpreted as a tree of nodes
+	///		Note: Deprecated
 	/// </summary>
 	/// <typeparam name="T">The class that has been flattened</typeparam>
 	public class FlattenedClass<T>

@@ -83,10 +83,7 @@ namespace UIEngine.Nodes
 		protected ObjectNode(ObjectNode parent, DescriptiveInfoAttribute attribute = null)
 		{
 			Parent = parent;
-			if (attribute != null)
-			{
-				TryGetDescriptiveInfo(attribute);
-			}
+			TryGetDescriptiveInfo(attribute);
 		}
 
 		internal bool IsEmpty => _ObjectData == null;
@@ -455,13 +452,20 @@ namespace UIEngine.Nodes
 		// This method is for accessing info via compile-time attributes
 		private void TryGetDescriptiveInfo(DescriptiveInfoAttribute attribute)
 		{
-			Name = attribute.Name;
-			Header = attribute.Header;
-			Description = attribute.Description;
-			if (attribute is VisibleAttribute visible)
+			if (attribute != null)
 			{
-				PreviewExpression = visible.PreviewExpression;
-				IsEnabled = visible.IsControlEnabled;
+				Name = attribute.Name;
+				Header = attribute.Header;
+				Description = attribute.Description;
+				if (attribute is VisibleAttribute visible)
+				{
+					PreviewExpression = visible.PreviewExpression;
+					IsEnabled = visible.IsControlEnabled;
+				}
+			}
+			else
+			{
+				Name = Misc.GenerateNameForObjectNode();
 			}
 		}
 		// This is for accessing run-time info (i.e. interfaces and object table)
@@ -487,6 +491,7 @@ namespace UIEngine.Nodes
 			else if (string.IsNullOrEmpty(Header))
 			{
 				this.Header = _ObjectData.ToString();
+				this.Name = Misc.GenerateNameForObjectNode();
 			}
 		}
 	}

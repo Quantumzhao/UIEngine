@@ -15,8 +15,7 @@ namespace UIEngine.Nodes
 	public abstract class Node : INotifyPropertyChanged
 	{
 		/// <summary>
-		///		The unique name that is used to locate and find a node. 
-		///		It is optional, but the node cannot be found if it is left blank
+		///		The UNIQUE name that is used to locate and find a node. 
 		/// </summary>
 		public string Name { get; set; } = string.Empty;
 		/// <summary>

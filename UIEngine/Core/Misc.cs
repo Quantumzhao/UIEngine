@@ -41,6 +41,8 @@ namespace UIEngine.Core
 		internal static readonly ConditionalWeakTable<object, DescriptiveInfoAttribute> ObjectTable 
 			= new ConditionalWeakTable<object, DescriptiveInfoAttribute>();
 
+		private static ulong _ObjectNodeCounter = 0;
+
 		internal static IEnumerable<PropertyInfo> GetVisibleProperties(this Type type, BindingFlags flags)
 		{
 			return type.GetProperties(flags).Where(p =>
@@ -59,10 +61,7 @@ namespace UIEngine.Core
 			});
 		}
 
-		//internal static Variable ToVariable(this object value)
-		//{
-		//	return new Variable(value);
-		//}
+		internal static string GenerateNameForObjectNode() => $"ObjectNode{_ObjectNodeCounter++:X}";
 	}
 
 
