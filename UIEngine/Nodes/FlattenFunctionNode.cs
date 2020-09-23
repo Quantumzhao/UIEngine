@@ -8,11 +8,11 @@ namespace UIEngine.Nodes
 	{
 		public FlattenFunctionNode(CollectionNode collectionNode) : base(collectionNode) { }
 		protected override string Preview { get; set; }
+
 		/// <summary>
-		///		Node templates that WILL be instantiated in the resultant FlattenedClass object. 
-		///		It's more of a manifest
+		///		Stores the specified object nodes
 		/// </summary>
-		internal readonly List<ObjectNode> SubNodes = new List<ObjectNode>();
+		public readonly List<ObjectNode> SubNodes = new List<ObjectNode>();
 
 		public void AddSubNode(ObjectNode objectNode)
 		{

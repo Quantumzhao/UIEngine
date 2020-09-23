@@ -55,8 +55,6 @@ namespace UIEngine.Nodes
 		}
 	}
 
-	// nested Linq expression should not be allowed. 
-	// i.e. c0.Select(c1 => c1.Where(c2 => c2.p0).First());
 	[Obsolete]
 	public abstract class LinqNode : Node
 	{
