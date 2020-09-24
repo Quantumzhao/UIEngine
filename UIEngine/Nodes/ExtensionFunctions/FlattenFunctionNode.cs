@@ -2,9 +2,9 @@
 using System.Collections.Generic;
 using System.Text;
 
-namespace UIEngine.Nodes
+namespace UIEngine.Nodes.ExtensionFunctions
 {
-	public class FlattenFunctionNode : ExtensionFunctionNode
+	public class FlattenFunctionNode : CollectionExtensionFunctionNode
 	{
 		public FlattenFunctionNode(CollectionNode collectionNode) : base(collectionNode) { }
 		protected override string Preview { get; set; }

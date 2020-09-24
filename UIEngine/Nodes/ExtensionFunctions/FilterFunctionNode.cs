@@ -5,9 +5,9 @@ using System.Linq;
 using System.Text;
 using UIEngine.Core;
 
-namespace UIEngine.Nodes
+namespace UIEngine.Nodes.ExtensionFunctions
 {
-	public class FilterFunctionNode : ExtensionFunctionNode
+	public class FilterFunctionNode : CollectionExtensionFunctionNode
 	{
 		private const string _INVALID_RETURN_TYPE = "Current expression does not qualify return type requirement";
 		public static FilterFunctionNode Create(CollectionNode collection) 
@@ -15,8 +15,8 @@ namespace UIEngine.Nodes
 		private FilterFunctionNode(CollectionNode collection) : base(collection) 
 			=> Predicate = new Val(Enumerator);
 
+		public override CollectionNode ReturnNode => Succession as CollectionNode;
 		public Expr Predicate { get; }
-		public CollectionNode ReturnNode => Succession as CollectionNode;
 		protected override string Preview { get; set; }
 
 		/// <summary>
