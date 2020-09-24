@@ -55,64 +55,64 @@ namespace UIEngine.Nodes
 		}
 	}
 
-	[Obsolete]
-	public abstract class LinqNode : Node
-	{
-		private const string _INVALID_OPERATION_WARNING = "LINQ nodes do not have succession";
-		internal protected LinqNode(CollectionNode collection)
-		{
-			SourceCollection = collection;
-		}
+	//[Obsolete]
+	//public abstract class LinqNode : Node
+	//{
+	//	private const string _INVALID_OPERATION_WARNING = "LINQ nodes do not have succession";
+	//	internal protected LinqNode(CollectionNode collection)
+	//	{
+	//		SourceCollection = collection;
+	//	}
 
-		public CollectionNode SourceCollection { get; private set; }
-		internal protected ObjectNode Enumerator { get; set; }
-		public CollectionNode ReturnCollectionNode { get; private set; }
-		protected override string Preview { get => throw new NotImplementedException(); 
-			set => throw new NotImplementedException(); }
-		internal abstract CollectionNode Execute();
-		internal abstract bool IsSatisfySignature { get; }
-		internal override ObjectNode InstantiateSuccession()
-		{
-			Dashboard.RaiseWarningMessage(this, _INVALID_OPERATION_WARNING);
-			return null;
-		}
-		public abstract void AddPredicate(ObjectNode predicate);
-	}
+	//	public CollectionNode SourceCollection { get; private set; }
+	//	internal protected ObjectNode Enumerator { get; set; }
+	//	public CollectionNode ReturnCollectionNode { get; private set; }
+	//	protected override string Preview { get => throw new NotImplementedException(); 
+	//		set => throw new NotImplementedException(); }
+	//	internal abstract CollectionNode Execute();
+	//	internal abstract bool IsSatisfySignature { get; }
+	//	internal override ObjectNode InstantiateSuccession()
+	//	{
+	//		Dashboard.RaiseWarningMessage(this, _INVALID_OPERATION_WARNING);
+	//		return null;
+	//	}
+	//	public abstract void AddPredicate(ObjectNode predicate);
+	//}
 
-	public class ForEachNode : LinqNode
-	{
-		private const string _SINGLE_PREDICATE_WARNING = "For each node has only one predicate";
-		public static ForEachNode Create(CollectionNode collection) => new ForEachNode(collection);
-		private List<ObjectNode> _Predicate { get; } = new List<ObjectNode>();
+	//public class ForEachNode : UIEngine.Nodes.ExtensionFunctions.ExtensionFunctionNode
+	//{
+	//	private const string _SINGLE_PREDICATE_WARNING = "For each node has only one predicate";
+	//	public static ForEachNode Create(CollectionNode collection) => new ForEachNode(collection);
+	//	private List<ObjectNode> _Predicate { get; } = new List<ObjectNode>();
 
-		private ForEachNode(CollectionNode collection) : base(collection) 
-		{
-			// For each only has one predicate
-			_Predicate.Add(ObjectNode.Create(collection.ElementType.ReflectedType, new VisibleAttribute(collection.Name)));
-		}
+	//	private ForEachNode(CollectionNode collection) : base(collection) 
+	//	{
+	//		// For each only has one predicate
+	//		_Predicate.Add(ObjectNode.Create(collection.ElementType.ReflectedType, new VisibleAttribute(collection.Name)));
+	//	}
 
-		internal override bool IsSatisfySignature => true;
+	//	internal override bool IsSatisfySignature => true;
 
-		internal override CollectionNode Execute()
-		{
-			foreach (var list in SourceCollection.Collection/*2D*/)
-			{
-				//foreach (var enumerator in list)
-				//{
-					_Predicate[0].SetReferenceTo(list/*enumerator*/);
-					_Predicate[0].InstantiateSuccession();
-				//}
-			}
+	//	internal override CollectionNode Execute()
+	//	{
+	//		foreach (var list in SourceCollection.Collection/*2D*/)
+	//		{
+	//			//foreach (var enumerator in list)
+	//			//{
+	//				_Predicate[0].SetReferenceTo(list/*enumerator*/);
+	//				_Predicate[0].InstantiateSuccession();
+	//			//}
+	//		}
 
-			return null;
-		}
+	//		return null;
+	//	}
 
-		public override void AddPredicate(ObjectNode predicate)
-		{
-			Dashboard.RaiseWarningMessage(this, _SINGLE_PREDICATE_WARNING);
-			throw new InvalidOperationException(_SINGLE_PREDICATE_WARNING);
-		}
-	} 
+	//	public override void AddPredicate(ObjectNode predicate)
+	//	{
+	//		Dashboard.RaiseWarningMessage(this, _SINGLE_PREDICATE_WARNING);
+	//		throw new InvalidOperationException(_SINGLE_PREDICATE_WARNING);
+	//	}
+	//} 
 
 	//public class WhereNode : LinqNode
 	//{
@@ -229,41 +229,41 @@ namespace UIEngine.Nodes
 	//	}
 	//}
 
-	public class SelectNode : LinqNode
-	{
-		public static SelectNode Create(CollectionNode collection) => new SelectNode(collection);
+	//public class SelectNode : LinqNode
+	//{
+	//	public static SelectNode Create(CollectionNode collection) => new SelectNode(collection);
 
-		private SelectNode(CollectionNode collection) : base(collection) { }
+	//	private SelectNode(CollectionNode collection) : base(collection) { }
 
-		internal override bool IsSatisfySignature => throw new NotImplementedException();
+	//	internal override bool IsSatisfySignature => throw new NotImplementedException();
 
-		internal override CollectionNode Execute()
-		{
-			throw new NotImplementedException();
-		}
+	//	internal override CollectionNode Execute()
+	//	{
+	//		throw new NotImplementedException();
+	//	}
 
-		public override void AddPredicate(ObjectNode predicate)
-		{
-			throw new NotImplementedException();
-		}
-	}
+	//	public override void AddPredicate(ObjectNode predicate)
+	//	{
+	//		throw new NotImplementedException();
+	//	}
+	//}
 
-	public class SortNode : LinqNode
-	{
-		public static SortNode Create(CollectionNode collection) => new SortNode(collection);
+	//public class SortNode : LinqNode
+	//{
+	//	public static SortNode Create(CollectionNode collection) => new SortNode(collection);
 
-		private SortNode(CollectionNode collection) : base(collection) { }
+	//	private SortNode(CollectionNode collection) : base(collection) { }
 
-		internal override bool IsSatisfySignature => throw new NotImplementedException();
+	//	internal override bool IsSatisfySignature => throw new NotImplementedException();
 
-		internal override CollectionNode Execute()
-		{
-			throw new NotImplementedException();
-		}
+	//	internal override CollectionNode Execute()
+	//	{
+	//		throw new NotImplementedException();
+	//	}
 
-		public override void AddPredicate(ObjectNode predicate)
-		{
-			throw new NotImplementedException();
-		}
-	}
+	//	public override void AddPredicate(ObjectNode predicate)
+	//	{
+	//		throw new NotImplementedException();
+	//	}
+	//}
 }
