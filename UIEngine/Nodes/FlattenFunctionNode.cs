@@ -13,6 +13,7 @@ namespace UIEngine.Nodes
 		///		Stores the specified object nodes
 		/// </summary>
 		public readonly List<ObjectNode> SubNodes = new List<ObjectNode>();
+		internal readonly List<string> Path = new List<string>();
 
 		public void AddSubNode(ObjectNode objectNode)
 		{
