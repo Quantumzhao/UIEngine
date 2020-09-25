@@ -35,8 +35,8 @@ namespace UIEngine.Nodes
 				var objectNode = new ObjectNode(parent, propertyInfo.GetCustomAttribute<VisibleAttribute>());
 				objectNode.SourceObjectInfo = new PropertyDomainModelRefInfo(propertyInfo);
 				var setter = propertyInfo.SetMethod;
-				objectNode.DoesAcceptInput = setter != null && setter.IsPublic && (setter.GetCustomAttribute<VisibleAttribute>()?.IsFeatureEnabled ?? true);
-				objectNode._IsEnabled = objectNode.DoesAcceptInput;
+				objectNode.IsReadOnly = setter == null || !setter.IsPublic || !(setter.GetCustomAttribute<VisibleAttribute>()?.IsFeatureEnabled ?? true);
+				objectNode._IsEnabled = !objectNode.IsReadOnly;
 
 				return objectNode;
 			}
@@ -88,12 +88,13 @@ namespace UIEngine.Nodes
 
 		internal bool IsEmpty => _ObjectData == null;
 		internal DomainModelRefInfo SourceObjectInfo { get; set; }
-		public bool DoesAcceptInput { get; private set; }
+		// IsReadOnly => !IsEnabled
+		public bool IsReadOnly { get; private set; }
 		public bool IsLeaf => Properties?.Count == 0;
 
 		private bool _IsEnabled;
 		/// <summary>
-		///		By default, it is the same value as <see cref="DoesAcceptInput"/>. 
+		///		By default, it is the same value as <see cref="IsReadOnly"/>. 
 		///		When it is set to true, the object node can be read and written. 
 		///		When false, the object node is still accessible but becomes read only, 
 		///		similar to conventional user controls
@@ -103,7 +104,7 @@ namespace UIEngine.Nodes
 			get => _IsEnabled;
 			set
 			{
-				if (DoesAcceptInput)
+				if (!IsReadOnly)
 				{
 					_IsEnabled = value;
 				}
@@ -158,14 +159,13 @@ namespace UIEngine.Nodes
 			}
 			set
 			{
-				if (IsEnabled)
+				if (!IsReadOnly)
 				{
 					if (value != _ObjectData)
 					{
 						_ObjectData = value;
 						SetValueToSourceObject();
 						InvokePropertyChanged(this, new PropertyChangedEventArgs(nameof(ObjectData)));
-
 					}
 				}
 				else
@@ -198,26 +198,12 @@ namespace UIEngine.Nodes
 		}
 
 		/// <summary>
-		///		Use this to state if <see cref="ObjectData"/> is type of <see cref="T"/> to avoid loading it. 
-		/// </summary>
-		/// <typeparam name="T">The comparing type</typeparam>
-		/// <returns>true if the <see cref="ObjectData"/> is type of <see cref="T"/></returns>
-		public bool IsTypeOf<T>() => SourceObjectInfo.ReflectedType == typeof(T);
-		/// <summary>
-		///		Use this to state if <see cref="ObjectData"/> is derived from <see cref="T"/> to avoid loading it. 
-		/// </summary>
-		/// <typeparam name="T">The comparing type</typeparam>
-		/// <returns>true if the <see cref="ObjectData"/> is derived from <see cref="T"/></returns>
-		public bool IsDerivedFrom<T>() => typeof(T).IsAssignableFrom(SourceObjectInfo.ReflectedType);
-		public bool IsAssignableFrom<T>() => IsAssignableFrom(typeof(T));
-		internal bool IsAssignableFrom(Type type) => SourceObjectInfo.ReflectedType.IsAssignableFrom(type);
-		/// <summary>
 		///		Finds the property with the specified name. 
 		/// </summary>
 		/// <remarks>Properties with no names attached cannot be found with this function</remarks>
 		/// <param name="name">property name</param>
 		/// <returns>null if not found</returns>
-		public ObjectNode this[string name] => Properties.SingleOrDefault(p => p.Name == name);
+		public virtual ObjectNode this[string name] => Properties.SingleOrDefault(p => p.Name == name);
 
 		public string TypeName => SourceObjectInfo.ReflectedType.ToString();
 
@@ -298,6 +284,21 @@ namespace UIEngine.Nodes
 				return mode == SelectionMode.MultiSelect && isMS;
 			}
 		}
+
+		/// <summary>
+		///		Use this to state if <see cref="ObjectData"/> is type of <see cref="T"/> to avoid loading it. 
+		/// </summary>
+		/// <typeparam name="T">The comparing type</typeparam>
+		/// <returns>true if the <see cref="ObjectData"/> is type of <see cref="T"/></returns>
+		public bool IsTypeOf<T>() => SourceObjectInfo.ReflectedType == typeof(T);
+		/// <summary>
+		///		Use this to state if <see cref="ObjectData"/> is derived from <see cref="T"/> to avoid loading it. 
+		/// </summary>
+		/// <typeparam name="T">The comparing type</typeparam>
+		/// <returns>true if the <see cref="ObjectData"/> is derived from <see cref="T"/></returns>
+		public bool IsDerivedFrom<T>() => typeof(T).IsAssignableFrom(SourceObjectInfo.ReflectedType);
+		public bool IsAssignableFrom<T>() => IsAssignableFrom(typeof(T));
+		internal bool IsAssignableFrom(Type type) => SourceObjectInfo.ReflectedType.IsAssignableFrom(type);
 		#endregion
 
 		protected virtual void LoadObjectData()

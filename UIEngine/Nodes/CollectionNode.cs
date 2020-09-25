@@ -25,6 +25,9 @@ namespace UIEngine.Nodes
 		public event NotifyCollectionChangedEventHandler CollectionChanged;
 
 		private ObservableCollection<ObjectNode> _Collection = null;
+		/// <summary>
+		///		Do not generate collection nodes from these types
+		/// </summary>
 		internal static List<Type> NotEnumerables { get; } = new List<Type> { typeof(string) };
 		/// <summary>
 		///		Unless you know what you are doing, otherwise don't use this property
