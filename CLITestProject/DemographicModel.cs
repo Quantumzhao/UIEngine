@@ -22,8 +22,8 @@ namespace CLITestProject
 
 		private readonly HashSet<Person> _Dead = new HashSet<Person>();
 
-		private static Random _Random = new Random();
-		public static bool _GetRandom(double prob)
+		private static readonly Random _Random = new Random();
+		public static bool GetRandom(double prob)
 		{
 			double rnd = _Random.NextDouble();
 			return rnd < prob;
@@ -47,20 +47,8 @@ namespace CLITestProject
 				People.Add(person.AppendVisibleAttribute(new VisibleAttribute("person")));
 			}
 
-			//var m = new Person(Gender.Male, null, null);
-			//var f = new Person(Gender.Female, null, null);
-			//m.Age = f.Age = 20;
-			//m.Prob_Die = f.Prob_Die = 0.005;
-			//m.Prob_Reproduce = f.Prob_Reproduce = 0.5;
-			//m.Spouse = f;
-			//f.Spouse = m;
-			//m.Is_Married = f.Is_Married = true;
-			//People.Add(m);
-			//People.Add(f);
-
 			Person.Died += me =>
 			{
-				//People.Remove(me);
 				_Dead.Add(me);
 				if (me.Spouse != null)
 				{
@@ -97,7 +85,7 @@ namespace CLITestProject
 			Person.Reproduce += (husband, wife) =>
 			{
 				Person child;
-				if (_GetRandom(0.5))
+				if (GetRandom(0.5))
 				{
 					child = new Person(Gender.Male, husband, wife);
 				}
@@ -141,7 +129,7 @@ namespace CLITestProject
 			Mother = mother;
 		}
 
-		public bool IsWillingToMarry() => DemographicModel._GetRandom(prob_Marry);
+		public bool IsWillingToMarry() => DemographicModel.GetRandom(_Prob_Marry);
 
 		private int _Age = 0;
 		[Visible(nameof(Age))]
@@ -216,7 +204,7 @@ namespace CLITestProject
 		}
 
 		private Person _Spouse;
-		[VisibleAttribute(nameof(Spouse))]
+		[Visible(nameof(Spouse))]
 		public Person Spouse
 		{
 			get => _Spouse;
@@ -257,21 +245,21 @@ namespace CLITestProject
 			}
 		}
 
-		private double prob_Marry = 0;
+		private double _Prob_Marry = 0;
 		[Visible(nameof(Prob_Marry))]
 		public double Prob_Marry
 		{
-			get => prob_Marry;
+			get => _Prob_Marry;
 			private set
 			{
 				if (value >= 0)
 				{
-					prob_Marry = value;
+					_Prob_Marry = value;
 					//Dashboard.NotifyPropertyChanged(this, nameof(Prob_Marry), value);
 				}
 				else
 				{
-					prob_Marry = 0;
+					_Prob_Marry = 0;
 
 					//Dashboard.NotifyPropertyChanged(this, nameof(Prob_Marry), value);
 				}
@@ -312,19 +300,19 @@ namespace CLITestProject
 			IncrementReproduceProb();
 			IncrementDeathProb();
 
-			if (DemographicModel._GetRandom(Prob_Die))
+			if (DemographicModel.GetRandom(Prob_Die))
 			{
 				Died?.Invoke(this);
 			}
 
-			if (DemographicModel._GetRandom(Prob_Marry))
+			if (DemographicModel.GetRandom(Prob_Marry))
 			{
 				FindForSpouse?.Invoke(this);
 			}
 
 			if (Spouse != null && 
 				Is_Married &&
-				DemographicModel._GetRandom(
+				DemographicModel.GetRandom(
 				Math.Sqrt(Prob_Reproduce * Spouse.Prob_Reproduce)))
 			{
 				if (Gender == Gender.Male)
@@ -376,7 +364,7 @@ namespace CLITestProject
 		{
 			if (Is_Married)
 			{
-				prob_Marry = 0;
+				_Prob_Marry = 0;
 				return;
 			}
 
