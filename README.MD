@@ -31,7 +31,7 @@ Property Accessing (Reading and Writing)
 
 ### Phase 2
 
-Method/Function Accessing and invoking
+Method/Function Accessing and Invoking
 
 - [X] Read and load function information
 - [X] load function signature and return type
@@ -40,9 +40,9 @@ Method/Function Accessing and invoking
 
 ### Phase 3
 
-LINQ Accessing and invoking
+High Order Functions (aka. Exrension Functions)
 
-- [X] LINQ expression Tree
+- [ ] Related nodes
 - [ ] Integration with method and property accessing system
 
 ### Phase 4
