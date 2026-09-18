@@ -115,7 +115,7 @@ namespace UIEngine
 		public static T AppendVisibleAttribute<T>(this T target, DescriptiveInfoAttribute descriptiveInfoAttribute)
 			where T : class
 		{
-			Misc.ObjectTable.Add(target, descriptiveInfoAttribute);
+			Misc.OBJECT_TABLE.Add(target, descriptiveInfoAttribute);
 			return target;
 		}
 

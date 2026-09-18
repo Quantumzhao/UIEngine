@@ -6,19 +6,19 @@ namespace UIEngine.Legacy.Characterization.Tests;
 
 public sealed class LegacyDashboardFixture
 {
-    private readonly CharacterizedModel _model;
+    private readonly CharacterizedModel _Model;
 
     public LegacyDashboardFixture()
     {
-        _model = new CharacterizedModel();
-        LegacyEntryPoints.Model = _model;
+        _Model = new CharacterizedModel();
+        LegacyEntryPoints.Model = _Model;
         Dashboard.ImportEntryObjects(typeof(LegacyEntryPoints));
 
         Root = Dashboard.GetRootNode<ObjectNode>(nameof(LegacyEntryPoints.Model))
             ?? throw new InvalidOperationException("The characterized root was not discovered.");
     }
 
-    public CharacterizedModel Model => _model;
+    public CharacterizedModel Model => _Model;
 
     public ObjectNode Root { get; }
 
@@ -34,7 +34,7 @@ public sealed class LegacyDashboardFixture
 
     public sealed class CharacterizedModel : INotifyPropertyChanged
     {
-        private int _value;
+        private int _Value;
 
         public CharacterizedModel()
         {
@@ -47,15 +47,15 @@ public sealed class LegacyDashboardFixture
         [Visible(nameof(Value))]
         public int Value
         {
-            get => _value;
+            get => _Value;
             set
             {
-                if (_value == value)
+                if (_Value == value)
                 {
                     return;
                 }
 
-                _value = value;
+                _Value = value;
                 PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(Value)));
             }
         }

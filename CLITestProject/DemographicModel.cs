@@ -22,10 +22,10 @@ namespace CLITestProject
 
 		private readonly HashSet<Person> _Dead = new HashSet<Person>();
 
-		private static readonly Random _Random = new Random();
+		private static readonly Random _RANDOM = new Random();
 		public static bool GetRandom(double prob)
 		{
-			double rnd = _Random.NextDouble();
+			double rnd = _RANDOM.NextDouble();
 			return rnd < prob;
 		}
 
@@ -38,7 +38,7 @@ namespace CLITestProject
 		{
 			for (int i = 0; i < _MAX_INIT_PEOPLE; i++)
 			{
-				var person = new Person(i % 2 == 0 ? Gender.Male : Gender.Female, null, null) 
+				var person = new Person(i % 2 == 0 ? Gender.MALE : Gender.FEMALE, null, null)
 				{ 
 					Age = 20, 
 					Prob_Die = 0.005, 
@@ -55,7 +55,7 @@ namespace CLITestProject
 					me.Spouse.Spouse = null;
 				}
 				me.Children.ForEach(c => {
-					if (me.Gender == Gender.Male)
+					if (me.Gender == Gender.MALE)
 					{
 						c.Father = null;
 					}
@@ -87,11 +87,11 @@ namespace CLITestProject
 				Person child;
 				if (GetRandom(0.5))
 				{
-					child = new Person(Gender.Male, husband, wife);
+					child = new Person(Gender.MALE, husband, wife);
 				}
 				else
 				{
-					child = new Person(Gender.Female, husband, wife);
+					child = new Person(Gender.FEMALE, husband, wife);
 				}
 				husband.Children.Add(child.AppendVisibleAttribute(new VisibleAttribute("person", "")));
 				wife.Children.Add(child);
@@ -129,7 +129,7 @@ namespace CLITestProject
 			Mother = mother;
 		}
 
-		public bool IsWillingToMarry() => DemographicModel.GetRandom(_Prob_Marry);
+		public bool IsWillingToMarry() => DemographicModel.GetRandom(_ProbMarry);
 
 		private int _Age = 0;
 		[Visible(nameof(Age))]
@@ -158,14 +158,14 @@ namespace CLITestProject
 			}
 		}
 
-		private bool _Is_Married = false;
+		private bool _IsMarried = false;
 		[Visible(nameof(Is_Married))]
 		public bool Is_Married
 		{
-			get => _Is_Married;
+			get => _IsMarried;
 			set
 			{
-				_Is_Married = value;
+				_IsMarried = value;
 
 				PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(Is_Married)));
 				//Dashboard.NotifyPropertyChanged(this, nameof(Is_Married), value);
@@ -231,35 +231,35 @@ namespace CLITestProject
 			}
 		}
 
-		private double _Prob_Die = 0.2;
+		private double _ProbDie = 0.2;
 		[Visible(nameof(Prob_Die))]
 		public double Prob_Die
 		{
-			get => _Prob_Die;
+			get => _ProbDie;
 			set
 			{
-				_Prob_Die = value;
+				_ProbDie = value;
 
 				PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(Prob_Die)));
 				//Dashboard.NotifyPropertyChanged(this, nameof(Prob_Die), value);
 			}
 		}
 
-		private double _Prob_Marry = 0;
+		private double _ProbMarry = 0;
 		[Visible(nameof(Prob_Marry))]
 		public double Prob_Marry
 		{
-			get => _Prob_Marry;
+			get => _ProbMarry;
 			private set
 			{
 				if (value >= 0)
 				{
-					_Prob_Marry = value;
+					_ProbMarry = value;
 					//Dashboard.NotifyPropertyChanged(this, nameof(Prob_Marry), value);
 				}
 				else
 				{
-					_Prob_Marry = 0;
+					_ProbMarry = 0;
 
 					//Dashboard.NotifyPropertyChanged(this, nameof(Prob_Marry), value);
 				}
@@ -268,14 +268,14 @@ namespace CLITestProject
 		}
 
 
-		private double _Prob_Reproduce = 0;
+		private double _ProbReproduce = 0;
 		[Visible(nameof(Prob_Reproduce))]
 		public double Prob_Reproduce
 		{
-			get => _Prob_Reproduce;
+			get => _ProbReproduce;
 			set
 			{
-				_Prob_Reproduce = value;
+				_ProbReproduce = value;
 
 				PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(Prob_Reproduce)));
 				//Dashboard.NotifyPropertyChanged(this, nameof(Prob_Reproduce), value);
@@ -296,9 +296,9 @@ namespace CLITestProject
 		public void Grow()
 		{
 			Age++;
-			IncrementMarriageProb();
-			IncrementReproduceProb();
-			IncrementDeathProb();
+			_IncrementMarriageProb();
+			_IncrementReproduceProb();
+			_IncrementDeathProb();
 
 			if (DemographicModel.GetRandom(Prob_Die))
 			{
@@ -315,7 +315,7 @@ namespace CLITestProject
 				DemographicModel.GetRandom(
 				Math.Sqrt(Prob_Reproduce * Spouse.Prob_Reproduce)))
 			{
-				if (Gender == Gender.Male)
+				if (Gender == Gender.MALE)
 				{
 					Reproduce?.Invoke(this, Spouse);
 				}
@@ -326,7 +326,7 @@ namespace CLITestProject
 			}
 		}
 
-		private void IncrementDeathProb()
+		private void _IncrementDeathProb()
 		{
 			if (Age < 3)
 			{
@@ -360,11 +360,11 @@ namespace CLITestProject
 			}
 		}
 
-		private void IncrementMarriageProb()
+		private void _IncrementMarriageProb()
 		{
 			if (Is_Married)
 			{
-				_Prob_Marry = 0;
+				_ProbMarry = 0;
 				return;
 			}
 
@@ -390,7 +390,7 @@ namespace CLITestProject
 			}
 		}
 
-		private void IncrementReproduceProb()
+		private void _IncrementReproduceProb()
 		{
 			if (Age < 20)
 			{
@@ -425,7 +425,7 @@ namespace CLITestProject
 	}
 	public enum Gender
 	{
-		Male,
-		Female
+		MALE,
+		FEMALE
 	}
 }

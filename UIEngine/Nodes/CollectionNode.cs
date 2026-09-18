@@ -96,14 +96,14 @@ namespace UIEngine.Nodes
 			: base(parent, propertyInfo.GetCustomAttribute<VisibleAttribute>())
 		{
 			SourceObjectInfo = new PropertyDomainModelRefInfo(propertyInfo);
-			Initialize();
+			_Initialize();
 		}
 		private CollectionNode(Type type) : base(null)
 		{
-			SourceObjectInfo = new OtherDomainModelRefInfo(type, SourceReferenceType.parameter);
-			Initialize();
+			SourceObjectInfo = new OtherDomainModelRefInfo(type, SourceReferenceType.PARAMETER);
+			_Initialize();
 		}
-		private void Initialize()
+		private void _Initialize()
 		{
 			ElementType = SourceObjectInfo.ReflectedType.GenericTypeArguments[0];
 			// disable for now
@@ -116,11 +116,11 @@ namespace UIEngine.Nodes
 		protected override void LoadObjectData()
 		{
 			base.LoadObjectData();
-			SetBinding();
-			LoadFormattedData();
+			_SetBinding();
+			_LoadFormattedData();
 		}
 
-		private void SetBinding()
+		private void _SetBinding()
 		{
 			if (ObjectData is INotifyCollectionChanged notifiable)
 			{
@@ -137,7 +137,7 @@ namespace UIEngine.Nodes
 						break;
 
 					case NotifyCollectionChangedAction.Remove:
-						Remove(e.OldItems[0]);
+						_Remove(e.OldItems[0]);
 						break;
 
 					case NotifyCollectionChangedAction.Replace:
@@ -154,7 +154,7 @@ namespace UIEngine.Nodes
 			}
 		}
 
-		private void LoadFormattedData()
+		private void _LoadFormattedData()
 		{
 			_Collection = new ObservableCollection<ObjectNode>();
 
@@ -210,7 +210,7 @@ namespace UIEngine.Nodes
 			CollectionChanged?.Invoke(this, new NotifyCollectionChangedEventArgs(
 				NotifyCollectionChangedAction.Remove, objectNode));
 		}
-		private void Remove(object NodeWithObjectData)
+		private void _Remove(object NodeWithObjectData)
 		{
 			try
 			{

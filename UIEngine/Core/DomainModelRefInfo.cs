@@ -28,7 +28,7 @@ namespace UIEngine.Core
 		public readonly PropertyInfo PropertyInfo;
 
 		public PropertyDomainModelRefInfo(PropertyInfo info)
-			: base(info.PropertyType, SourceReferenceType.Property)
+			: base(info.PropertyType, SourceReferenceType.PROPERTY)
 		{
 			PropertyInfo = info;
 			PropertyName = PropertyInfo.Name;
@@ -36,9 +36,9 @@ namespace UIEngine.Core
 	}
 	internal enum SourceReferenceType
 	{
-		Property,
-		Enumerator,
-		ReturnValue,
-		parameter
+		PROPERTY,
+		ENUMERATOR,
+		RETURN_VALUE,
+		PARAMETER
 	}
 }

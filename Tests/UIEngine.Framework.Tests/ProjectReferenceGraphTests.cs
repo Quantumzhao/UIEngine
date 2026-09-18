@@ -5,12 +5,12 @@ namespace UIEngine.Framework.Tests;
 
 public sealed class ProjectReferenceGraphTests
 {
-    private const string LegacyRuntimeProject = "UIEngine/UIEngine.csproj";
+    private const string _LEGACY_RUNTIME_PROJECT = "UIEngine/UIEngine.csproj";
 
     [Fact]
     public void ProjectReferencesFollowIntendedDependencyDirection()
     {
-        var repositoryRoot = FindRepositoryRoot();
+        var repositoryRoot = _FindRepositoryRoot();
         var expectedReferences = new Dictionary<string, string[]>(StringComparer.Ordinal)
         {
             ["Framework/UIEngine.Frontend.Cli/UIEngine.Frontend.Cli.csproj"] =
@@ -26,7 +26,7 @@ public sealed class ProjectReferenceGraphTests
 
         var implementationProjects = Directory
             .EnumerateFiles(repositoryRoot, "*.csproj", SearchOption.AllDirectories)
-            .Select(path => NormalizePath(Path.GetRelativePath(repositoryRoot, path)))
+            .Select(path => _NormalizePath(Path.GetRelativePath(repositoryRoot, path)))
             .Where(path =>
                 path.StartsWith("Framework/", StringComparison.Ordinal) ||
                 path.StartsWith("Samples/", StringComparison.Ordinal))
@@ -39,15 +39,15 @@ public sealed class ProjectReferenceGraphTests
 
         foreach (var project in expectedReferences)
         {
-            var actualReferences = ReadProjectReferences(repositoryRoot, project.Key);
+            var actualReferences = _ReadProjectReferences(repositoryRoot, project.Key);
             var expected = project.Value.OrderBy(static path => path, StringComparer.Ordinal);
 
             Assert.Equal(expected, actualReferences);
-            Assert.DoesNotContain(LegacyRuntimeProject, actualReferences);
+            Assert.DoesNotContain(_LEGACY_RUNTIME_PROJECT, actualReferences);
         }
     }
 
-    private static string FindRepositoryRoot()
+    private static string _FindRepositoryRoot()
     {
         DirectoryInfo? directory = new(AppContext.BaseDirectory);
 
@@ -64,7 +64,7 @@ public sealed class ProjectReferenceGraphTests
         throw new InvalidOperationException("Could not locate the repository root.");
     }
 
-    private static string[] ReadProjectReferences(string repositoryRoot, string projectPath)
+    private static string[] _ReadProjectReferences(string repositoryRoot, string projectPath)
     {
         var projectFile = Path.Combine(repositoryRoot, projectPath);
         var projectDirectory = Path.GetDirectoryName(projectFile)
@@ -76,10 +76,10 @@ public sealed class ProjectReferenceGraphTests
             .Select(element => element.Attribute("Include")?.Value)
             .OfType<string>()
             .Select(reference => Path.GetFullPath(Path.Combine(projectDirectory, reference)))
-            .Select(reference => NormalizePath(Path.GetRelativePath(repositoryRoot, reference)))
+            .Select(reference => _NormalizePath(Path.GetRelativePath(repositoryRoot, reference)))
             .OrderBy(static path => path, StringComparer.Ordinal)
             .ToArray();
     }
 
-    private static string NormalizePath(string path) => path.Replace('\\', '/');
+    private static string _NormalizePath(string path) => path.Replace('\\', '/');
 }

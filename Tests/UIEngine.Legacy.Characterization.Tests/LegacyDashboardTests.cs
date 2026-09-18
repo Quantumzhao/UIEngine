@@ -4,46 +4,46 @@ using Xunit;
 
 namespace UIEngine.Legacy.Characterization.Tests;
 
-[Collection(LegacyDashboardTestGroup.Name)]
+[Collection(LegacyDashboardTestGroup.NAME)]
 public sealed class LegacyDashboardTests
 {
-    private static readonly string[] ExpectedItems = { "alpha", "beta" };
+    private static readonly string[] _EXPECTED_ITEMS = { "alpha", "beta" };
 
-    private readonly LegacyDashboardFixture _fixture;
+    private readonly LegacyDashboardFixture _Fixture;
 
     public LegacyDashboardTests(LegacyDashboardFixture fixture)
     {
-        _fixture = fixture;
-        _fixture.Reset();
+        _Fixture = fixture;
+        _Fixture.Reset();
     }
 
     [Fact]
     public void ImportEntryObjectsDiscoversOnlyExplicitlyVisibleRootsAndMembers()
     {
         Assert.Null(Dashboard.GetRootNode<ObjectNode>(nameof(LegacyDashboardFixture.LegacyEntryPoints.HiddenModel)));
-        Assert.Contains(_fixture.Root.Properties, node => node.Name == nameof(LegacyDashboardFixture.CharacterizedModel.Value));
-        Assert.Contains(_fixture.Root.Properties, node => node.Name == nameof(LegacyDashboardFixture.CharacterizedModel.Items));
-        Assert.DoesNotContain(_fixture.Root.Properties, node => node.Name == nameof(LegacyDashboardFixture.CharacterizedModel.HiddenValue));
-        Assert.Contains(_fixture.Root.Methods, node => node.Name == nameof(LegacyDashboardFixture.CharacterizedModel.Add));
+        Assert.Contains(_Fixture.Root.Properties, node => node.Name == nameof(LegacyDashboardFixture.CharacterizedModel.Value));
+        Assert.Contains(_Fixture.Root.Properties, node => node.Name == nameof(LegacyDashboardFixture.CharacterizedModel.Items));
+        Assert.DoesNotContain(_Fixture.Root.Properties, node => node.Name == nameof(LegacyDashboardFixture.CharacterizedModel.HiddenValue));
+        Assert.Contains(_Fixture.Root.Methods, node => node.Name == nameof(LegacyDashboardFixture.CharacterizedModel.Add));
     }
 
     [Fact]
     public void ObjectDataReadsAndWritesTheUnderlyingProperty()
     {
-        var valueNode = GetProperty(nameof(LegacyDashboardFixture.CharacterizedModel.Value));
+        var valueNode = _GetProperty(nameof(LegacyDashboardFixture.CharacterizedModel.Value));
 
         Assert.Equal(2, Assert.IsType<int>(valueNode.ObjectData));
 
         valueNode.ObjectData = 11;
 
-        Assert.Equal(11, _fixture.Model.Value);
+        Assert.Equal(11, _Fixture.Model.Value);
         Assert.Equal(11, Assert.IsType<int>(valueNode.ObjectData));
     }
 
     [Fact]
     public void InvokeCallsSynchronousMethodWithAssignedParameter()
     {
-        var method = _fixture.Root.Methods.Single(
+        var method = _Fixture.Root.Methods.Single(
             node => node.Name == nameof(LegacyDashboardFixture.CharacterizedModel.Add));
 
         Assert.True(method.SetParameter(5, 0));
@@ -57,17 +57,17 @@ public sealed class LegacyDashboardTests
     public void CollectionNodeEnumeratesTheUnderlyingCollection()
     {
         var itemsNode = Assert.IsType<CollectionNode>(
-            GetProperty(nameof(LegacyDashboardFixture.CharacterizedModel.Items)));
+            _GetProperty(nameof(LegacyDashboardFixture.CharacterizedModel.Items)));
 
         var items = itemsNode.Select(node => node.GetObjectData<string>()).ToArray();
 
-        Assert.Equal(ExpectedItems, items);
+        Assert.Equal(_EXPECTED_ITEMS, items);
     }
 
     [Fact]
     public void PropertyChangedRefreshesTheMatchingPropertyNode()
     {
-        var valueNode = GetProperty(nameof(LegacyDashboardFixture.CharacterizedModel.Value));
+        var valueNode = _GetProperty(nameof(LegacyDashboardFixture.CharacterizedModel.Value));
         var objectDataChanged = false;
 
         void OnPropertyChanged(object? sender, PropertyChangedEventArgs args)
@@ -78,7 +78,7 @@ public sealed class LegacyDashboardTests
         valueNode.PropertyChanged += OnPropertyChanged;
         try
         {
-            _fixture.Model.Value = 23;
+            _Fixture.Model.Value = 23;
 
             Assert.True(objectDataChanged);
             Assert.Equal(23, Assert.IsType<int>(valueNode.ObjectData));
@@ -89,5 +89,5 @@ public sealed class LegacyDashboardTests
         }
     }
 
-    private ObjectNode GetProperty(string name) => _fixture.Root.Properties.Single(node => node.Name == name);
+    private ObjectNode _GetProperty(string name) => _Fixture.Root.Properties.Single(node => node.Name == name);
 }

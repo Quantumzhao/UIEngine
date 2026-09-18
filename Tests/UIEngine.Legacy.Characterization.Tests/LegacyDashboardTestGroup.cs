@@ -2,8 +2,8 @@ using Xunit;
 
 namespace UIEngine.Legacy.Characterization.Tests;
 
-[CollectionDefinition(Name, DisableParallelization = true)]
+[CollectionDefinition(NAME, DisableParallelization = true)]
 public sealed class LegacyDashboardTestGroup : ICollectionFixture<LegacyDashboardFixture>
 {
-    public const string Name = "Legacy Dashboard";
+    public const string NAME = "Legacy Dashboard";
 }

@@ -44,13 +44,13 @@ namespace UIEngine.Nodes.ExtensionFunctions
 			return ReturnNode.InstantiateSuccession();
 		}
 
-		public static readonly Func<ObjectNode, ObjectNode, bool> And = 
+		public static readonly Func<ObjectNode, ObjectNode, bool> AND =
 			(left, right) => (bool)left.ObjectData && (bool)right.ObjectData;
-		public static readonly Func<ObjectNode, ObjectNode, bool> Or = 
+		public static readonly Func<ObjectNode, ObjectNode, bool> OR =
 			(left, right) => (bool)left.ObjectData || (bool)right.ObjectData;
-		public static readonly Func<ObjectNode, bool> Not = 
+		public static readonly Func<ObjectNode, bool> NOT =
 			value => !(bool)value.ObjectData;
-		public static readonly Func<ObjectNode, ObjectNode, bool> IsEqual =
+		public static readonly Func<ObjectNode, ObjectNode, bool> IS_EQUAL =
 			(left, right) => (bool)left.ObjectData == (bool)right.ObjectData;
 
 		internal override bool DoesSatisfySignature() => throw new NotImplementedException();
@@ -95,19 +95,19 @@ namespace UIEngine.Nodes.ExtensionFunctions
 		{
 			switch (type)
 			{
-				case ExprTypes.And:
+				case ExprTypes.AND:
 					target = new AndExpr(Env);
 					break;
 
-				case ExprTypes.Or:
+				case ExprTypes.OR:
 					target = new OrExpr(Env);
 					break;
 
-				case ExprTypes.Not:
+				case ExprTypes.NOT:
 					target = new NegExpr(Env);
 					break;
 
-				case ExprTypes.Equal:
+				case ExprTypes.EQUAL:
 					target = new EqExpr(Env);
 					break;
 			}
@@ -159,9 +159,9 @@ namespace UIEngine.Nodes.ExtensionFunctions
 
 	public enum ExprTypes
 	{
-		And, 
-		Or, 
-		Not, 
-		Equal
+		AND,
+		OR,
+		NOT,
+		EQUAL
 	}
 }

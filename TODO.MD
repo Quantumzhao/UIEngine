@@ -25,7 +25,7 @@ Detailed first milestone: [Architecture Runway and CLI Walking Skeleton](docs/mi
 - [x] Create the Framework, CLI, sample, and test projects with logical areas organized by namespace.
 - [ ] Implement host-scoped roots and opt-in descriptor discovery.
 - [ ] Implement runtime identity and cycle-safe traversal.
-- [ ] Implement structured interaction results.
+- [x] Implement structured interaction results.
 - [ ] Implement CLI navigation, inspection, get, set, and call commands.
 - [ ] Prove the vertical slice with shared-reference and cyclic fixtures.
 - [ ] Add programmatic exposure and stable domain identity providers.

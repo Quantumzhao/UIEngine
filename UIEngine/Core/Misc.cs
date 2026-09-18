@@ -38,7 +38,7 @@ namespace UIEngine.Core
 
 	public static class Misc
 	{
-		internal static readonly ConditionalWeakTable<object, DescriptiveInfoAttribute> ObjectTable 
+		internal static readonly ConditionalWeakTable<object, DescriptiveInfoAttribute> OBJECT_TABLE
 			= new ConditionalWeakTable<object, DescriptiveInfoAttribute>();
 
 		private static ulong _ObjectNodeCounter = 0;
@@ -67,8 +67,8 @@ namespace UIEngine.Core
 
 	public enum SelectionMode
 	{
-		SingleSelect, 
-		MultiSelect
+		SINGLE_SELECT,
+		MULTI_SELECT
 	}
 
 	//internal class Expression

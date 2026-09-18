@@ -53,18 +53,18 @@ namespace UIEngine.Nodes
 			if (parent is CollectionNode)
 			{
 				objectNode.SourceObjectInfo = new OtherDomainModelRefInfo(objectData.GetType(),
-					SourceReferenceType.Enumerator);
+					SourceReferenceType.ENUMERATOR);
 			}
 			// questionable, consider revision
 			else
 			// parent is null, in the case of return value
 			{
 				objectNode.SourceObjectInfo = new OtherDomainModelRefInfo(objectData.GetType(),
-					SourceReferenceType.ReturnValue);
+					SourceReferenceType.RETURN_VALUE);
 			}
 			objectNode._ObjectData = objectData;
-			objectNode.TryGetDescriptiveInfo();
-			objectNode.SetBinding(objectData);
+			objectNode._TryGetDescriptiveInfo();
+			objectNode._SetBinding(objectData);
 
 			return objectNode;
 		}
@@ -75,7 +75,7 @@ namespace UIEngine.Nodes
 		internal static ObjectNode Create(Type type, DescriptiveInfoAttribute descriptiveInfo)
 		{
 			var objectNode = new ObjectNode(null, descriptiveInfo);
-			objectNode.SourceObjectInfo = new OtherDomainModelRefInfo(type, SourceReferenceType.parameter);
+			objectNode.SourceObjectInfo = new OtherDomainModelRefInfo(type, SourceReferenceType.PARAMETER);
 			return objectNode;
 		}
 
@@ -83,7 +83,7 @@ namespace UIEngine.Nodes
 		protected ObjectNode(ObjectNode parent, DescriptiveInfoAttribute attribute = null)
 		{
 			Parent = parent;
-			TryGetDescriptiveInfo(attribute);
+			_TryGetDescriptiveInfo(attribute);
 		}
 
 		internal bool IsEmpty => _ObjectData == null;
@@ -121,7 +121,7 @@ namespace UIEngine.Nodes
 			{
 				if (_Properties == null)
 				{
-					LoadProperties();
+					_LoadProperties();
 				}
 				return _Properties;
 			}
@@ -134,7 +134,7 @@ namespace UIEngine.Nodes
 			{
 				if (_Methods == null)
 				{
-					LoadMethods();
+					_LoadMethods();
 				}
 				return _Methods;
 			}
@@ -281,7 +281,7 @@ namespace UIEngine.Nodes
 			else
 			{
 				var isMS = SourceObjectInfo.ReflectedType.GetCustomAttribute(typeof(FlagsAttribute)) == null;
-				return mode == SelectionMode.MultiSelect && isMS;
+				return mode == SelectionMode.MULTI_SELECT && isMS;
 			}
 		}
 
@@ -312,19 +312,19 @@ namespace UIEngine.Nodes
 					//Preview = PreviewExpression?.Invoke(ObjectData);
 				}
 
-				TryGetDescriptiveInfo();
-				SetBinding(_ObjectData);
+				_TryGetDescriptiveInfo();
+				_SetBinding(_ObjectData);
 			}
 		}
 		protected virtual void SetValueToSourceObject()
 		{
 			switch (SourceObjectInfo.SourceReferenceType)
 			{
-				case SourceReferenceType.Property:
+				case SourceReferenceType.PROPERTY:
 					((PropertyDomainModelRefInfo)SourceObjectInfo).PropertyInfo.SetValue(Parent?.ObjectData, ObjectData);
 					break;
 
-				case SourceReferenceType.Enumerator:
+				case SourceReferenceType.ENUMERATOR:
 					if (Parent.ObjectData is IList)
 					{
 						var collection = Parent.ObjectData as IList;
@@ -336,10 +336,10 @@ namespace UIEngine.Nodes
 					}
 					break;
 
-				case SourceReferenceType.ReturnValue:
+				case SourceReferenceType.RETURN_VALUE:
 					throw new InvalidOperationException("return value is read only");
 
-				case SourceReferenceType.parameter:
+				case SourceReferenceType.PARAMETER:
 					break;
 
 				default:
@@ -347,7 +347,7 @@ namespace UIEngine.Nodes
 			}
 		}
 
-		private void LoadProperties()
+		private void _LoadProperties()
 		{
 			if (_ObjectData == null)
 			{
@@ -356,7 +356,7 @@ namespace UIEngine.Nodes
 			_Properties = SourceObjectInfo.ReflectedType.GetVisibleProperties(BindingFlags.Public | BindingFlags.Instance)
 				.Select(pi => Create(this, pi)).ToList();
 		}
-		private void LoadMethods()
+		private void _LoadMethods()
 		{
 			if (_ObjectData == null)
 			{
@@ -395,7 +395,7 @@ namespace UIEngine.Nodes
 		internal void Refresh()
 		{
 			LoadObjectData();
-			LoadProperties();
+			_LoadProperties();
 		}
 
 		/// <summary>
@@ -423,7 +423,7 @@ namespace UIEngine.Nodes
 		}
 
 		// magic, I don't want to touch it any more
-		private void SetBinding(object objectData, INotifyPropertyChanged prevObject = null)
+		private void _SetBinding(object objectData, INotifyPropertyChanged prevObject = null)
 		{
 			if (prevObject != objectData)
 			{
@@ -451,7 +451,7 @@ namespace UIEngine.Nodes
 		}
 
 		// This method is for accessing info via compile-time attributes
-		private void TryGetDescriptiveInfo(DescriptiveInfoAttribute attribute)
+		private void _TryGetDescriptiveInfo(DescriptiveInfoAttribute attribute)
 		{
 			if (attribute != null)
 			{
@@ -470,7 +470,7 @@ namespace UIEngine.Nodes
 			}
 		}
 		// This is for accessing run-time info (i.e. interfaces and object table)
-		private void TryGetDescriptiveInfo()
+		private void _TryGetDescriptiveInfo()
 		{
 			if (_ObjectData == null)
 			{
@@ -482,7 +482,7 @@ namespace UIEngine.Nodes
 				this.Name = visible.Name;
 				this.Description = visible.Description;
 			}
-			else if (Misc.ObjectTable.TryGetValue(_ObjectData, out DescriptiveInfoAttribute descriptiveInfoAttribute))
+			else if (Misc.OBJECT_TABLE.TryGetValue(_ObjectData, out DescriptiveInfoAttribute descriptiveInfoAttribute))
 			{
 				this.Header = descriptiveInfoAttribute.Header;
 				this.Name = descriptiveInfoAttribute.Name;

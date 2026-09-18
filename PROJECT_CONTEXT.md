@@ -100,6 +100,8 @@ Persistent user-composed layouts, batch operations, arbitrary scripting, automat
 
 New code should use the fewest project boundaries that preserve actual runtime and tooling separation. Namespace and directory structure expresses logical architecture; it does not imply one assembly per area.
 
+A short summary comment explaining the role of each class or struct is encouraged. Name private members with an underscore followed by PascalCase, such as `_Field`, `_Property`, and `_Method`; constructors and language- or runtime-mandated names such as `Main` retain their required spelling. Name every constant and static-readonly field in `UPPER_SNAKE_CASE`, using a leading underscore only for private fields (for example, `PUBLIC_FIELD` and `_PRIVATE_FIELD`). Enum members also use `UPPER_SNAKE_CASE`, such as `InteractionErrorCode.INVALID_ROOT_IDENTIFIER`. Analyzer rule CA1707 is disabled solution-wide because its underscore prohibition conflicts with these conventions.
+
 The framework MVP starts with:
 
 - `UIEngine.Framework` — one library containing the `UIEngine.Core`, `UIEngine.Attributes`, and `UIEngine.Reflection` namespaces and directories;
