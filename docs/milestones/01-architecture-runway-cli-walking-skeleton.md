@@ -24,9 +24,7 @@ This milestone excludes asynchronous invocation, observation, paging and virtual
 - Add GitHub Actions checks for clean restore, build, and test, plus a current-working-tree secret scan. Historical secret scanning and Git-history rewriting remain outside this milestone.
 - Organize the solution into `Legacy`, `Framework`, `Samples`, and `Tests` solution folders without moving the existing legacy files.
 - Add these new projects:
-  - `UIEngine.Core`
-  - `UIEngine.Attributes`
-  - `UIEngine.Reflection`
+  - `UIEngine.Framework`, with Core, Attributes, and Reflection organized as namespaces and directories
   - `UIEngine.Frontend.Cli`
   - a deterministic sample-domain project
   - a legacy characterization-test project
@@ -121,14 +119,69 @@ Do not encode known broken collection mutation, global-state behavior, node iden
 - No package is generated, and no TUI or post-MVP subsystem has been started.
 - Only genuinely completed items are checked in [TODO.MD](../../TODO.MD).
 
-## Implementation Order
+## Implementation Steps
 
-1. Confirm external credential revocation.
-2. Establish SDK selection, strict defaults for new code, CI, and legacy characterization tests.
-3. Add the new projects and enforce their dependency direction.
-4. Implement attributes, descriptor contracts, host scope, identity, and reflection discovery.
-5. Implement live value, collection-snapshot, and synchronous action operations.
-6. Implement the CLI and deterministic cyclic sample.
-7. Complete contract, integration, dependency, and repository acceptance checks.
+Keep the repository buildable after every step. Each step should include its smallest relevant tests; the final acceptance pass verifies the steps together rather than introducing untested behavior.
+
+### 1. Close the safety prerequisite
+
+1. Confirm that the removed package credential has been revoked through its provider.
+2. Verify that the credential is absent from the current working tree and record only the confirmation, never the credential itself.
+
+Stop here if revocation cannot be confirmed.
+
+### 2. Capture the legacy baseline
+
+1. Add the legacy characterization-test project and configure tests that touch the static `Dashboard` state to run serially.
+2. Add narrow tests for explicit discovery, property reads and writes, synchronous invocation, simple collection enumeration, and `INotifyPropertyChanged` propagation.
+3. Run the characterization tests against the unchanged legacy implementation.
+
+### 3. Establish the build runway
+
+1. Add `global.json` for the selected .NET 8 SDK feature band.
+2. Enable nullable analysis, implicit usings, and analyzers for new projects while keeping any legacy exceptions local.
+3. Add restore, build, test, and current-working-tree secret-scan checks to GitHub Actions.
+4. Verify that packaging remains disabled and a normal build produces no `.nupkg` files.
+
+### 4. Create the new project skeleton
+
+1. Add the `Framework`, `Samples`, and `Tests` solution folders while leaving the legacy files in place under `Legacy`.
+2. Add the Framework and CLI projects, organize Core, Attributes, and Reflection within the framework by namespace and directory, and add the deterministic sample-domain, framework-test, and CLI-test projects.
+3. Add only the intended one-way project references and a guard test or inspection check that rejects references from new implementation projects to legacy assemblies.
+4. Build the empty project graph before adding runtime behavior.
+
+### 5. Introduce contracts and host scope
+
+1. Add the initial opt-in attributes and tests proving that unannotated members remain hidden.
+2. Add semantic descriptor contracts and `InteractionResult<T>` with stable error codes.
+3. Add `UIEngineHost`, explicit root registration, and structured duplicate-root failures.
+4. Add host-scoped `ObjectIdentity` and `ObjectHandle`, with tests for repeated references and cross-host isolation.
+
+### 6. Add reflection discovery and graph traversal
+
+1. Implement type-level reflection metadata caching for explicitly exposed public instance members.
+2. Classify exposed members as scalar values, navigable references, collections, or actions.
+3. Produce deterministic, unique descriptor identifiers within each object descriptor.
+4. Resolve references lazily through handles and prove that cycles terminate without recursively expanding a tree.
+
+### 7. Add live operations
+
+1. Implement live value reads, read-only detection, and writes against current domain state.
+2. Add conversion for strings, primitive numeric types, booleans, nullable forms, and enums, including structured conversion and validation failures.
+3. Implement explicitly requested finite collection snapshots whose object elements retain host-scoped identity.
+4. Implement named-parameter binding and synchronous action invocation through the asynchronous-shaped contract, including structured invalid-input and domain-exception results.
+
+### 8. Prove the slice through the CLI
+
+1. Add the deterministic cyclic sample and verify that `World -> Nation -> Capital City -> Owner Nation` returns to the original nation identity.
+2. Implement tokenization and command dispatch for quoted strings, case-insensitive verbs, case-sensitive member identifiers, and numeric collection indices.
+3. Add `ls`, absolute and parent `cd`, `inspect`, `get`, `set`, `call`, and `exit` one at a time with focused integration tests.
+4. Verify that malformed commands and structured operation failures are printed without terminating the session.
+
+### 9. Run milestone acceptance
+
+1. Run the complete contract, identity, exposure, value, action, collection, CLI, dependency, and repository test set.
+2. Run a clean restore and `dotnet build UIEngine.sln`, requiring zero warnings and errors.
+3. Confirm every exit criterion above and check only genuinely completed items in [TODO.MD](../../TODO.MD).
 
 Later framework hardening begins only after this milestone satisfies every exit criterion.

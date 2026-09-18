@@ -1214,23 +1214,26 @@ Property-based tests are especially appropriate for path resolution, graph trave
 
 ---
 
-# 24. Proposed Package Structure
+# 24. Proposed Logical Structure
+
+These names describe namespaces and capability areas, not a requirement for one project or package per entry. The framework MVP begins with one `UIEngine.Framework` library containing the Core, Attributes, and Reflection areas, while frontend executables remain separate. Split another assembly only when a concrete dependency, deployment, packaging, target-framework, or tooling boundary requires it.
 
 ```text
-UIEngine.Core
-    descriptors
-    object identity
-    binding
-    validation
-    actions
-    collections
-    change notifications
+UIEngine.Framework
+    UIEngine.Core
+        descriptors
+        object identity
+        binding
+        validation
+        actions
+        collections
+        change notifications
 
-UIEngine.Attributes
-    exposure attributes
+    UIEngine.Attributes
+        exposure attributes
 
-UIEngine.Reflection
-    reflection-based descriptor discovery
+    UIEngine.Reflection
+        reflection-based descriptor discovery
 
 UIEngine.Generators
     Roslyn source generators

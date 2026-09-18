@@ -49,6 +49,7 @@ The legacy implementation is reference material and a source of candidate fixtur
 - **Batch operations:** use constrained serializable descriptors, predefined filters, compatibility preview, and sequential execution by default.
 - **Transactions:** do not promise rollback for arbitrary domain side effects; report partial success explicitly.
 - **Packaging:** publish nothing until APIs, tests, licensing, versioning, and release policy are ready.
+- **Project granularity:** begin with one `UIEngine.Framework` library containing the core, attributes, and reflection areas as directories and namespaces. Keep executable frontends separate, but do not create a project merely to mirror a namespace or architectural label. Add an assembly boundary only when dependency isolation, deployment, packaging, target-framework, or tooling requirements justify it.
 
 ## Architectural Invariants
 
@@ -97,19 +98,17 @@ Persistent user-composed layouts, batch operations, arbitrary scripting, automat
 
 ## Implementation Direction
 
-New code should be organized around UIEngine-branded packages or projects with one-way dependencies from frontends and optional subsystems toward the core. The intended areas are:
+New code should use the fewest project boundaries that preserve actual runtime and tooling separation. Namespace and directory structure expresses logical architecture; it does not imply one assembly per area.
 
-- `UIEngine.Core` — descriptors, identity, paths, binding contracts, results, validation, actions, collections, and change contracts;
-- `UIEngine.Attributes` — opt-in exposure metadata;
-- `UIEngine.Reflection` — reflection discovery and descriptor factories;
-- `UIEngine.Frontend.Cli` — the framework MVP frontend;
-- `UIEngine.Hosting` — host construction, logging, and dispatch integration;
-- `UIEngine.Layouts` — versioned layout and binding persistence;
-- `UIEngine.Batch` — batch plans, preview, compatibility, execution, and results;
-- `UIEngine.Frontend.Tui` — the product MVP frontend;
-- `UIEngine.Generators` — deferred source-generation support.
+The framework MVP starts with:
 
-Exact public type names and package boundaries may be refined during their roadmap phase, but frontend independence and dependency direction are not negotiable.
+- `UIEngine.Framework` — one library containing the `UIEngine.Core`, `UIEngine.Attributes`, and `UIEngine.Reflection` namespaces and directories;
+- `UIEngine.Frontend.Cli` — a separate executable that depends on `UIEngine.Framework`;
+- dedicated sample and test projects where executable or test-host boundaries require them.
+
+Future hosting, layouts, batch, and similar capabilities begin as logical areas and namespaces unless a concrete dependency or deployment requirement justifies another project. The product TUI remains a separate frontend executable. Source generators may require their own tooling project because they have a distinct compiler-facing target and dependency model.
+
+Exact public type names and justified assembly or package boundaries may be refined during their roadmap phase, but frontend independence and dependency direction are not negotiable.
 
 Build the new implementation beside the legacy projects. Extract deterministic fixtures and narrow characterization tests before removing legacy code, but do not preserve accidental legacy API behavior merely for compatibility.
 
@@ -119,7 +118,7 @@ Build the new implementation beside the legacy projects. Extract deterministic f
 2. Add characterization tests for legacy behavior worth carrying forward.
 3. Enable nullable analysis and analyzers deliberately, fixing rather than suppressing findings.
 4. Add CI for clean restore, build, tests, checks, and secret scanning.
-5. Start the Core/Attributes/Reflection/CLI vertical slice defined in `REBOOT_PLAN.md`.
+5. Start the Framework/CLI vertical slice defined in `REBOOT_PLAN.md`.
 
 Use `dotnet build UIEngine.sln` as the minimum repository verification. Add the smallest relevant automated tests for every behavior change once a test project exists.
 

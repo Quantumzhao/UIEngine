@@ -1,0 +1,46 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Scan working tree for secrets
+        uses: docker://ghcr.io/gitleaks/gitleaks:v8.30.1
+        with:
+          args: dir --redact --verbose /github/workspace
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v6
+        with:
+          global-json-file: global.json
+
+      - name: Restore
+        run: dotnet restore UIEngine.sln
+
+      - name: Build
+        run: dotnet build UIEngine.sln --configuration Release --no-restore
+
+      - name: Test
+        run: dotnet test UIEngine.sln --configuration Release --no-build --no-restore
+
+      - name: Verify packaging remains disabled
+        shell: bash
+        run: |
+          if find . -type f -name '*.nupkg' -print -quit | grep -q .; then
+            echo 'A package was generated even though packaging is disabled.' >&2
+            exit 1
+          fi

@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <IsTestProject>true</IsTestProject>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.10.1" />
+    <PackageReference Include="xunit" Version="2.9.3" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="4.0.0">
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+      <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../../Framework/UIEngine.Frontend.Cli/UIEngine.Frontend.Cli.csproj" />
+    <ProjectReference Include="../../Framework/UIEngine.Framework/UIEngine.Framework.csproj" />
+    <ProjectReference Include="../../Samples/UIEngine.Samples.CyclicDomain/UIEngine.Samples.CyclicDomain.csproj" />
+  </ItemGroup>
+</Project>

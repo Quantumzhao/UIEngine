@@ -14,15 +14,15 @@ See [REBOOT_PLAN.md](REBOOT_PLAN.md) for rationale, dependencies, risks, and exi
 - [x] Remove obsolete Docker, container-tool, and VS Code configuration.
 - [x] Retarget the legacy solution to .NET 8.
 - [ ] Revoke the removed package credential through its provider.
-- [ ] Add characterization tests for legacy behavior worth preserving.
-- [ ] Enable nullable analysis and analyzers.
-- [ ] Add CI and clean-checkout verification.
+- [x] Add characterization tests for legacy behavior worth preserving.
+- [x] Enable nullable analysis and analyzers.
+- [x] Add CI and clean-checkout verification.
 
 ## Framework MVP — Core and CLI
 
 Detailed first milestone: [Architecture Runway and CLI Walking Skeleton](docs/milestones/0001-architecture-runway-cli-walking-skeleton.md).
 
-- [ ] Create the Core, Attributes, Reflection, CLI, and test projects.
+- [x] Create the Framework, CLI, sample, and test projects with logical areas organized by namespace.
 - [ ] Implement host-scoped roots and opt-in descriptor discovery.
 - [ ] Implement runtime identity and cycle-safe traversal.
 - [ ] Implement structured interaction results.
