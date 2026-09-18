@@ -1,32 +1,5 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
-
+<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <TargetFramework>netstandard2.0</TargetFramework>
-    <PackageRequireLicenseAcceptance>false</PackageRequireLicenseAcceptance>
-    <AssemblyVersion>0.0.1.0</AssemblyVersion>
-    <FileVersion>0.0.1.0</FileVersion>
-    <PackageIcon>icon_1024.png</PackageIcon>
-    <PackageIconUrl />
-    <PackageProjectUrl>https://github.com/Quantumzhao/UIEngine</PackageProjectUrl>
-    <RepositoryUrl>https://github.com/Quantumzhao/UIEngine</RepositoryUrl>
-    <Authors>Quantum Zhao</Authors>
-    <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
-    <OutputType>Library</OutputType>
-    <PackageId>UIEngine</PackageId>
-    <Version>0.2.3</Version>
-    <Company>Quantum</Company>
-    <PackageDescription>UIEngine</PackageDescription>
+    <TargetFramework>net8.0</TargetFramework>
   </PropertyGroup>
-
-  <ItemGroup>
-    <Folder Include="icon\" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <None Include="icon\icon_1024.png">
-      <Pack>True</Pack>
-      <PackagePath></PackagePath>
-    </None>
-  </ItemGroup>
-
 </Project>

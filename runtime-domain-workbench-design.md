@@ -1,4 +1,4 @@
-# Runtime Domain Workbench for .NET
+# UIEngine
 
 **Status:** Design specification / technical proposal  
 **Audience:** Framework implementers, frontend authors, .NET library authors, advanced users  
@@ -629,7 +629,7 @@ A repair workflow MAY offer compatible candidates.
 
 The framework MAY provide default semantic mappings:
 
-| Domain Type / Metadata | Descriptor | Example GUI Rendering |
+| Domain Type / Metadata | Descriptor | Example Frontend Rendering |
 |---|---|---|
 | `bool` | editable scalar | checkbox/toggle |
 | `int`, `double`, `decimal` | numeric value | numeric field |
@@ -1031,7 +1031,7 @@ public interface IInteractionDispatcher
 Examples:
 
 - WPF dispatcher;
-- Avalonia UI thread;
+- TUI event loop;
 - game-engine main thread;
 - simulation thread;
 - single-threaded actor scheduler;
@@ -1123,9 +1123,9 @@ The initial product SHOULD NOT attempt equal support for GUI, CLI, TUI, web, and
 
 Recommended initial support:
 
-1. **Desktop GUI:** primary reference frontend.
-2. **CLI:** secondary reference frontend to validate the abstraction and support headless usage.
-3. **TUI:** later if demanded.
+1. **CLI:** framework MVP frontend used to validate the abstraction and support headless usage.
+2. **TUI:** product MVP and primary reference frontend.
+3. **Desktop GUI:** later if product demand justifies it.
 4. **Web:** later if remote/shared deployment becomes important.
 5. **Voice:** later, after confirmation and ambiguity semantics are mature.
 
@@ -1157,7 +1157,7 @@ If the core can express these interactions without GUI-specific leakage, the sep
 Recommended implementation stack:
 
 - C#;
-- current supported .NET LTS target;
+- .NET 8 target;
 - nullable reference types enabled;
 - analyzers enabled;
 - source generator project for compile-time metadata;
@@ -1168,27 +1168,21 @@ Recommended implementation stack:
 
 The core SHOULD avoid dependencies on any desktop UI toolkit.
 
-## 23.2 Desktop Reference Frontend
+## 23.2 TUI Reference Frontend
 
-Recommended choices:
+The product MVP frontend is a terminal user interface.
 
-### Avalonia
+The concrete TUI toolkit remains an implementation-phase decision. Selection SHOULD favor:
 
-Advantages:
+- active .NET 8 support;
+- cross-platform terminal behavior;
+- keyboard-first navigation;
+- composable views and modal forms;
+- asynchronous updates without blocking the UI loop;
+- deterministic testability;
+- a clean adapter boundary that keeps toolkit types out of the core.
 
-- cross-platform desktop support;
-- strong retained-mode layout system;
-- natural fit for modular panes and persistent workbench layouts.
-
-### WPF
-
-Advantages:
-
-- mature .NET desktop ecosystem;
-- strong data-binding model;
-- useful if Windows-only support is acceptable.
-
-The reference frontend SHOULD be implemented behind adapter interfaces so the core does not depend on either.
+The TUI SHOULD consume the same descriptors and operations as the CLI. Terminal geometry, focus, key bindings, and rendering state remain frontend-owned.
 
 ## 23.3 CLI Reference Frontend
 
@@ -1223,7 +1217,7 @@ Property-based tests are especially appropriate for path resolution, graph trave
 # 24. Proposed Package Structure
 
 ```text
-RuntimeWorkbench.Core
+UIEngine.Core
     descriptors
     object identity
     binding
@@ -1232,35 +1226,35 @@ RuntimeWorkbench.Core
     collections
     change notifications
 
-RuntimeWorkbench.Attributes
+UIEngine.Attributes
     exposure attributes
 
-RuntimeWorkbench.Reflection
+UIEngine.Reflection
     reflection-based descriptor discovery
 
-RuntimeWorkbench.Generators
+UIEngine.Generators
     Roslyn source generators
 
-RuntimeWorkbench.Layouts
+UIEngine.Layouts
     layout model
     binding persistence
     migration
 
-RuntimeWorkbench.Batch
+UIEngine.Batch
     batch plan
     compatibility
     preview
     execution
 
-RuntimeWorkbench.Hosting
+UIEngine.Hosting
     dependency injection
     logging
     dispatchers
 
-RuntimeWorkbench.Frontend.Avalonia
-    reference GUI
+UIEngine.Frontend.Tui
+    product MVP TUI
 
-RuntimeWorkbench.Frontend.Cli
+UIEngine.Frontend.Cli
     reference CLI
 ```
 
@@ -1326,14 +1320,14 @@ public sealed class Nation : IStableDomainIdentity
 }
 ```
 
-A GUI frontend might generate:
+A TUI frontend might generate:
 
 - object browser for `WorldSimulation`;
 - nation list with summaries;
 - numeric editor for `TaxRate`;
 - read-only label for `GDP`;
 - chart for `GDPHistory`;
-- buttons/forms for actions.
+- commands and modal forms for actions.
 
 A CLI frontend might expose:
 
@@ -1501,54 +1495,51 @@ A frontend SHOULD be able to display a meaningful user-facing reason without par
 
 ---
 
-# 32. MVP Definition
+# 32. MVP Definitions
 
-A credible MVP SHOULD prove the following six properties.
+UIEngine distinguishes a framework MVP from a product MVP.
 
-## 32.1 Core
+## 32.1 Framework MVP — Core
 
 - expose properties and methods using attributes;
 - navigate a cyclic live object graph;
-- preserve object identity;
-- read/write values;
+- preserve shared-reference object identity;
+- read/write values with structured validation and failures;
 - invoke parameterized sync/async methods;
-- observe selected state changes.
+- report progress and cancellation when supported;
+- observe selected state changes;
+- browse collections without requiring eager materialization.
 
-## 32.2 GUI
+## 32.2 Framework MVP — CLI
+
+- navigate logical paths;
+- inspect objects and descriptors;
+- get/set values;
+- call sync/async actions;
+- show progress, cancellation, and structured failures;
+- list collection elements;
+- exercise the same semantic contracts intended for other frontends.
+
+## 32.3 Product MVP — TUI
 
 - object browser;
-- breadcrumb navigation;
-- generated editors;
+- navigation history or breadcrumbs;
+- generated value editors;
 - generated action forms;
-- async progress UI;
-- create/delete/rebind components;
-- save/load layouts;
-- broken binding visualization.
+- collection browsing;
+- async progress and cancellation presentation;
+- explicit unavailable, missing, mismatched, and failed states;
+- an end-to-end workflow over the same cyclic fixture as the CLI.
 
-## 32.3 Batch
-
-- choose a collection;
-- choose a template item;
-- select an exposed writable member or action;
-- compatibility preview;
-- sequential execution;
-- per-item results.
-
-## 32.4 CLI
-
-- navigate;
-- inspect;
-- get/set;
-- call actions;
-- basic collection listing.
+Persistent layouts and batch operations remain required product capabilities, but they are scheduled after the product MVP.
 
 ---
 
-# 33. Post-MVP Roadmap
+# 33. Implementation Roadmap
 
 Recommended order:
 
-### Phase 1 — Runtime Core
+### Phase 1 — Runtime Core and CLI Vertical Slice
 
 - descriptors;
 - attributes;
@@ -1556,18 +1547,37 @@ Recommended order:
 - identity;
 - paths;
 - cyclic traversal;
-- sync actions.
+- sync actions;
+- basic CLI navigation, inspection, get/set, and calls.
 
-### Phase 2 — Desktop Workbench
+### Phase 2 — Framework MVP Hardening
 
-- object browser;
-- value editors;
-- action invocation;
-- async progress;
-- layout composition;
-- persistence.
+- programmatic exposure;
+- domain identity and binding states;
+- validation and structured failures;
+- dispatched access and change observation;
+- collection paging/virtualization contracts;
+- async actions, progress, and cancellation;
+- complete CLI framework-MVP workflow.
 
-### Phase 3 — Batch Operations
+### Phase 3 — TUI Product MVP
+
+- object browser and navigation history;
+- generated value editors and action forms;
+- collection browsing;
+- progress, cancellation, and failure presentation;
+- CLI/TUI capability validation over the same fixture.
+
+### Phase 4 — Layouts and Advanced Binding
+
+- domain identity recovery;
+- migrations;
+- search;
+- repaired bindings;
+- component composition and persistence;
+- reusable layout templates.
+
+### Phase 5 — Batch Operations
 
 - collection snapshots;
 - compatibility analysis;
@@ -1575,21 +1585,6 @@ Recommended order:
 - sequential execution;
 - filters;
 - per-item results.
-
-### Phase 4 — CLI
-
-- path navigation;
-- get/set/call;
-- autocomplete;
-- structured output.
-
-### Phase 5 — Advanced Binding
-
-- domain identity recovery;
-- migrations;
-- search;
-- repaired bindings;
-- reusable layout templates.
 
 ### Phase 6 — Advanced Analysis
 
@@ -1608,7 +1603,7 @@ Recommended order:
 
 ### Phase 8 — Additional Frontends
 
-- TUI;
+- desktop GUI;
 - web;
 - voice;
 - domain-specific frontends.
@@ -1617,9 +1612,9 @@ Recommended order:
 
 # 34. Design Decisions That Should Remain Intentionally Deferred
 
-The following are legitimate future decisions and SHOULD NOT block the MVP:
+The following are legitimate future decisions and SHOULD NOT block the framework MVP. The TUI toolkit and terminal composition model MUST be selected before implementing the product MVP; the remaining decisions may stay deferred until their relevant phase.
 
-- exact GUI toolkit;
+- exact TUI toolkit and terminal composition model;
 - exact path grammar syntax;
 - exact attribute names;
 - remote transport protocol;
@@ -1642,12 +1637,12 @@ To avoid underspecified implementation, this document adopts the following expli
    Remote operation is a later transport layer.
 
 2. **The core is frontend-agnostic.**  
-   No GUI toolkit types appear in the core API.
+   No CLI or TUI toolkit types appear in the core API.
 
-3. **The primary reference product is a desktop workbench.**  
-   Multimodal support is an architectural property, not an MVP requirement.
+3. **The framework MVP is the core plus a minimal CLI.**
 
-4. **The CLI is a secondary reference frontend.**
+4. **The product MVP is a TUI.**
+   Additional frontend support is an architectural property, not an MVP requirement.
 
 5. **Cyclic references are mandatory.**
 
@@ -1674,78 +1669,50 @@ To avoid underspecified implementation, this document adopts the following expli
 
 ---
 
-# 36. Remaining Decisions Requiring Product Owner Input
+# 36. Confirmed Design Defaults
 
-The design is implementable without these answers, but resolving them will affect public API design.
+The following product decisions are settled. Changes require updating `PROJECT_CONTEXT.md`, this design, the reboot plan, and the progress tracker together.
 
 ## 36.1 Exposure Default
 
-Should members be:
-
-- opt-in only (`[Expose]` required), or
-- public-by-default with opt-out?
-
-**Recommendation:** opt-in only. This is safer and produces a more intentional interaction surface.
+Members are opt-in only (`[Expose]` or equivalent registration required). This produces an intentional interaction surface.
 
 ## 36.2 Field Support
 
-Should public fields be first-class exposed members, or should the framework prefer properties?
-
-**Recommendation:** support fields, but encourage properties for validation and stable API semantics.
+Support fields, but encourage properties for validation and stable API semantics.
 
 ## 36.3 Layout Ownership
 
-Should layouts belong to:
-
-- a specific application instance;
-- an application type/version;
-- an individual user profile;
-- a portable file independent of user identity?
-
-**Recommendation:** portable serialized files with optional application/user metadata.
+Layouts are portable serialized files with optional application/user metadata.
 
 ## 36.4 Stable Domain Identity Contract
 
-Should persistent identity be supplied by:
-
-- interface;
-- attribute;
-- registry callback;
-- all of the above?
-
-**Recommendation:** support all three through a normalized identity provider interface.
+Persistent identity may be supplied by interface, attribute, or registry callback through a normalized identity provider.
 
 ## 36.5 Batch Filter Language
 
-Should the first release support:
-
-- only predefined member comparisons, or
-- a typed expression DSL?
-
-**Recommendation:** predefined comparisons first. A typed expression DSL can be added later.
+The first batch release supports predefined member comparisons. A typed expression DSL may be added later.
 
 ## 36.6 Component Nesting Semantics
 
-Should component nesting be purely frontend-defined, or should the core layout model define containment semantics?
-
-**Recommendation:** the core should define generic component containment and binding metadata; exact geometry remains frontend-specific.
+The core defines generic component containment and binding metadata; exact geometry remains frontend-specific.
 
 ---
 
 # 37. Success Criteria
 
-The framework should be considered successful if a developer can take a non-trivial .NET simulation or backend model and, with minimal annotations and no bespoke application UI, obtain all of the following:
+The framework MVP should be considered successful if a developer can take a non-trivial .NET simulation or backend model and, with minimal annotations and no bespoke application UI, obtain all of the following through the CLI:
 
 1. navigate the exposed domain graph;
 2. inspect live values;
 3. modify writable values;
 4. invoke domain actions with parameters;
 5. observe async progress;
-6. create custom workbench panels bound to arbitrary exposed values;
-7. save and reload those panels;
-8. perform safe previewed batch operations on collections;
-9. use the same exposed model through at least one non-GUI frontend;
-10. do all of the above without copying the domain model into a separate UI-specific data model.
+6. do all of the above without copying the domain model into a separate frontend-specific data model.
+
+The product MVP should be considered successful when a TUI provides the same operations as a coherent keyboard-first product without introducing TUI-specific contracts into the core.
+
+Longer-term product success additionally includes persistent user-composed workspaces and safe previewed batch operations over collections.
 
 If these properties hold, the framework is no longer merely an object inspector. It becomes a reusable **runtime domain workbench infrastructure** for .NET applications.
 
@@ -1759,7 +1726,7 @@ A concise technical positioning statement:
 
 A more product-oriented positioning statement:
 
-> **Build operational workbenches for complex .NET systems without building the workbench by hand. Annotate the domain model, bind reusable components, and interact with live application state through desktop, CLI, or custom frontends.**
+> **Build operational workbenches for complex .NET systems without building the workbench by hand. Annotate the domain model and interact with live application state through TUI, CLI, or custom frontends.**
 
 ---
 
@@ -1771,12 +1738,11 @@ The architecture should preserve multimodal interaction, cyclic runtime object g
 
 However, implementation effort should concentrate on a small number of polished capabilities:
 
-- one strong desktop reference frontend;
-- one minimal CLI reference frontend;
+- one strong TUI product frontend;
+- one minimal CLI framework frontend;
 - robust identity and binding semantics;
 - safe action invocation;
-- persistent user layouts;
-- constrained batch operations.
+- persistent user layouts after the product MVP;
+- constrained batch operations after the product MVP.
 
 The framework should resist pressure to become a full scripting environment, general application builder, or remote object runtime before the core interaction model is proven.
-

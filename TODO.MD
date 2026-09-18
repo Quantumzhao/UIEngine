@@ -1,82 +1,74 @@
-# Manifest of Complete features
+# UIEngine Progress
 
-Completed and developing features. 
+See [REBOOT_PLAN.md](REBOOT_PLAN.md) for rationale, dependencies, risks, and exit criteria.
 
-> - [ ] **Unchecked:** Not intended to be developed in the near future
-> - [x] **Checked:** Implemented, but not not fully completed
-> - [x] **~~Deleted:~~** Completely finished
-> - [ ] **==Unchecked==:** Developing
+## Reboot Decisions and Cleanup
 
-## Object Node
+- [x] Define the target architecture and MVP.
+- [x] Audit the legacy implementation against the design.
+- [x] Keep the UIEngine name and choose a clean API break.
+- [x] Use UIEngine as the final package and namespace prefix.
+- [x] Choose .NET 8 and a CLI-first vertical slice.
+- [x] Define the framework MVP as Core + CLI and the product MVP as TUI.
+- [x] Remove the credential-bearing NuGet configuration and packaging behavior.
+- [x] Remove obsolete Docker, container-tool, and VS Code configuration.
+- [x] Retarget the legacy solution to .NET 8.
+- [ ] Revoke the removed package credential through its provider.
+- [ ] Add characterization tests for legacy behavior worth preserving.
+- [ ] Enable nullable analysis and analyzers.
+- [ ] Add CI and clean-checkout verification.
 
-- [x] ~~Two-way data binding~~
+## Framework MVP — Core and CLI
 
-- [x] ~~Display binded value~~
+- [ ] Create the Core, Attributes, Reflection, CLI, and test projects.
+- [ ] Implement host-scoped roots and opt-in descriptor discovery.
+- [ ] Implement runtime identity and cycle-safe traversal.
+- [ ] Implement structured interaction results.
+- [ ] Implement CLI navigation, inspection, get, set, and call commands.
+- [ ] Prove the vertical slice with shared-reference and cyclic fixtures.
+- [ ] Add programmatic exposure and stable domain identity providers.
+- [ ] Add logical paths, binding states, and binding recovery.
+- [ ] Add validation and dispatcher-mediated reads, writes, and calls.
+- [ ] Add normalized state and collection observation.
+- [ ] Add collection snapshots, paging, and virtualization contracts.
+- [ ] Add async actions, progress, and cancellation.
+- [ ] Pass the framework MVP acceptance tests through the CLI.
 
-- [x] ~~Display instance method~~
+## Product MVP — TUI
 
-- [x] ~~Modify and assign value~~
-	
-- [x] ~~Type inference~~
-  
-- [x] template instantiation
-  
-- [ ] ==preview==
-  
-- [ ] ==unsafe accessing==
-  
-    > Continue display descendant template object nodes without the object is not loaded
+- [ ] Select a TUI toolkit without coupling it to the core.
+- [ ] Build an object browser with navigation history or breadcrumbs.
+- [ ] Build generated value editors and action forms.
+- [ ] Add collection browsing.
+- [ ] Add async progress, cancellation, and structured error presentation.
+- [ ] Show unavailable, missing, and mismatched targets explicitly.
+- [ ] Prove the TUI against the same cyclic fixture as the CLI.
 
-## Method Node
+## Product MVP Release and Legacy Retirement
 
-- [ ] ==Display parameters with==
-    - [ ] ==descriptions==
-    - [ ] previews
-    - [ ] complete list of candidate arguments
-    - [ ] correct list of candidate arguments
-- [x] Modify parameters
-    - [ ] Object node assignment (drag and drop)
-- [ ] Do verification (type inference) when modifying parameters
-- [x] ~~Return value~~
-- [x] Type inference on return value
+- [ ] Pass core, CLI, and TUI acceptance tests.
+- [ ] Replace useful legacy samples with maintained fixtures.
+- [ ] Remove the legacy UIEngine, Dataset, and CLITest projects.
+- [ ] Define licensing, versioning, packaging, and release policy.
 
-## Collection Node
+## Post-MVP Layouts
 
-- [x] Two way collection binding
-- [ ] ==Collection node assignment==
+- [ ] Add component creation, deletion, movement, containment, and rebinding.
+- [ ] Add versioned portable layouts and broken-binding visualization.
+- [ ] Add layout migrations and repair workflows.
 
-## Extension Function Node
+## Post-MVP Batch Operations
 
-- [ ] ==Filter==
-    - [ ] ==composite expression==
-- [ ] Sort
-    - [ ] composite expression
-- [ ] Map
-    - [ ] multiple expressions, and combine them to a single table (collection)
-- [ ] Foreach
+- [ ] Add target snapshots and predefined member filters.
+- [ ] Add per-target compatibility analysis.
+- [ ] Add preview-first value assignment and action invocation.
+- [ ] Add sequential execution, cancellation, and per-item results.
+- [ ] Cover partial failure and non-transactional behavior.
 
-## Automation
+## Post-MVP
 
-- [ ] Serialize/Deserialize chain of `ObjectNode` to code, which grammar is suggested below: 
-
-    ``` 
-    Expr ::= ObjectNodeName
-           | Expr.Expr
-           | Expr[Val]
-           | MethodName(ExprList)
-           | CollectionNodeName
-           | CollectionNodeName.ExtensionFunctionNode
-    Val ::= Int
-    	  | String
-    ExprList ::= Expr
-    		  | Expr, ExprList
-    BoolExpr ::= BoolExpr AND BoolExpr
-    		  | BoolExpr OR BoolExpr
-    		  | NOT BoolExpr
-    ExtensionFunctionNode ::= Filter(TemplatedObjectNode, BoolExpr)
-    					  | Sort(TemplatedObjectNode, IComparable)
-    					  | Map(TemplatedObjectNode, Expr)
-    					  | Foreach(TemplatedObjectNode, Expr.MethodNodeName(ExprList))
-    ```
-
-    
+- [ ] Add source generation and AOT support.
+- [ ] Add search and indexing.
+- [ ] Add tables, charts, and safe derived values.
+- [ ] Design an authenticated remote protocol.
+- [ ] Add additional frontends when justified.
