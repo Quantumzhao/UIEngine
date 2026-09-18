@@ -20,6 +20,8 @@ See [REBOOT_PLAN.md](REBOOT_PLAN.md) for rationale, dependencies, risks, and exi
 
 ## Framework MVP — Core and CLI
 
+Detailed first milestone: [Architecture Runway and CLI Walking Skeleton](docs/milestones/0001-architecture-runway-cli-walking-skeleton.md).
+
 - [ ] Create the Core, Attributes, Reflection, CLI, and test projects.
 - [ ] Implement host-scoped roots and opt-in descriptor discovery.
 - [ ] Implement runtime identity and cycle-safe traversal.

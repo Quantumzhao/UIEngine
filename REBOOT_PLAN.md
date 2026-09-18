@@ -207,6 +207,8 @@ Exit criteria:
 
 ### Phase 1 — Runtime core and CLI vertical slice
 
+The first bounded implementation outline, including its remaining Phase 0 prerequisites, is [Milestone 01 — Architecture Runway and CLI Walking Skeleton](docs/milestones/01-architecture-runway-cli-walking-skeleton.md).
+
 Create projects for the runtime core, exposure attributes, reflection discovery, CLI, tests, and representative samples. Keep dependency direction from frontends toward semantic contracts; the core must not reference TUI or CLI presentation types.
 
 Implement the minimum end-to-end model:

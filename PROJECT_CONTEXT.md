@@ -17,6 +17,7 @@ UIEngine is intended primarily for simulations, engines, services, research syst
 - `REBOOT_PLAN.md` records the legacy audit, migration strategy, risks, roadmap, and acceptance criteria.
 - `TODO.MD` is the concise progress tracker derived from the reboot plan.
 - `README.MD` is the public repository entry point and current-state summary.
+- `docs/milestones/` contains bounded execution plans derived from the context, design, and reboot roadmap. An outline does not override those documents or authorize work until it is explicitly selected for implementation.
 
 These documents must agree; their different roles do not create a precedence order. If a conflict is found, stop before relying on either statement, report the exact conflicting claims, resolve the intent with the product owner, and update every affected document together. Do not silently choose one document over another.
 
