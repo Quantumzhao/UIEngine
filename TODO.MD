@@ -32,7 +32,7 @@ Detailed milestones:
 - [x] Implement CLI navigation, inspection, get, set, and call commands.
 - [x] Prove the vertical slice with shared-reference and cyclic fixtures.
 - [x] Confirm Milestone 01 acceptance in GitHub Actions after publishing the local commits.
-- [ ] Reconcile the post-acceptance repository baseline and restore acceptance-equivalent CLI behavior coverage.
+- [x] Reconcile the post-acceptance repository baseline and restore acceptance-equivalent CLI behavior coverage.
 - [ ] Add programmatic exposure and stable domain identity providers.
 - [ ] Add logical paths, binding states, and binding recovery.
 - [ ] Distinguish successful null and empty values from missing and unavailable targets.
@@ -62,7 +62,7 @@ Detailed milestones:
 
 - [ ] Pass core, CLI, and TUI acceptance tests.
 - [ ] Replace useful legacy samples with maintained fixtures.
-- [ ] Remove the legacy UIEngine, Dataset, and CLITest projects.
+- [ ] Remove the remaining legacy UIEngine project.
 - [ ] Define licensing, versioning, packaging, and release policy.
 - [ ] Define supported platforms and public API compatibility and support policy.
 

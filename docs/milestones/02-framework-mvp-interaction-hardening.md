@@ -1,6 +1,6 @@
 # Milestone 02 — Framework MVP Interaction Hardening
 
-**Status:** Draft
+**Status:** In progress — step 1 complete
 
 **Acceptance:** Not run
 
@@ -30,13 +30,14 @@ The current implementation provides:
 - a deterministic cyclic fixture; and
 - framework, CLI, dependency, and legacy-characterization test projects.
 
-Before Phase 2 implementation begins, reconcile the current tree with the Milestone 01 acceptance record:
+The Phase 2 entry gate was reconciled on 2026-09-19:
 
-- the acceptance record says that 29 tests passed, while the current tree runs 24 because behavior-level CLI integration tests were removed and only the CLI entry-point test remains;
-- `PROJECT_CONTEXT.md`, `REBOOT_PLAN.md`, and `TODO.MD` say that `Dataset` and `CLITestProject` remain until Product MVP retirement, while those projects are absent from the current tree; and
-- the accepted Milestone 01 behavior must remain covered even if the removed files and projects are intentionally not restored.
+- the post-acceptance removal of `Dataset` and `CLITestProject` is accepted as intentional cleanup because their useful fixture role is retained by `Examples/CyclicDomain`;
+- the five behavior-level CLI integration tests were restored against the reorganized project paths and namespaces;
+- current-state documents now describe the remaining legacy project consistently; and
+- `dotnet build UIEngine.sln` completed with zero warnings and errors, and `dotnet test UIEngine.sln --no-build` passed all 29 tests (18 framework, 6 CLI, and 5 legacy-characterization tests).
 
-This entry gate does not prescribe whether to restore those files or formally accept the later removals. It requires one explicit decision, consistent document updates, and acceptance-equivalent CLI coverage before new Phase 2 behavior is layered on top. Do not rewrite the historical Milestone 01 acceptance record; record any new baseline separately.
+This is the Phase 2 starting baseline. The historical Milestone 01 acceptance record remains unchanged.
 
 ## Architecture and Project Boundaries
 
@@ -247,10 +248,10 @@ Keep the repository buildable after every step. Add the smallest relevant tests 
 
 ### 1. Reconcile and lock the starting baseline
 
-1. Decide whether the post-acceptance removal of CLI behavior tests, `Dataset`, and `CLITestProject` is intentional.
-2. Update the current-state documents consistently without changing the historical Milestone 01 acceptance record.
-3. Re-establish acceptance-equivalent tests for the retained Milestone 01 CLI commands and cyclic workflow.
-4. Run the current solution build and test suite and record the new Phase 2 starting baseline.
+1. [x] Decide whether the post-acceptance removal of CLI behavior tests, `Dataset`, and `CLITestProject` is intentional.
+2. [x] Update the current-state documents consistently without changing the historical Milestone 01 acceptance record.
+3. [x] Re-establish acceptance-equivalent tests for the retained Milestone 01 CLI commands and cyclic workflow.
+4. [x] Run the current solution build and test suite and record the new Phase 2 starting baseline.
 
 Stop here if the intended repository state cannot be resolved.
 

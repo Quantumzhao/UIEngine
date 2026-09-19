@@ -27,7 +27,5 @@ The CLI is an architectural proving frontend rather than the product TUI. Use `l
 - `Examples/CyclicDomain/` — deterministic reboot fixture.
 - `Tests/` — reboot and legacy-characterization test projects.
 - `UIEngine/` — legacy reflection and node prototype.
-- `CLITestProject/` — legacy CLI and cyclic demographic sample.
-- `Dataset/` — additional legacy sample types; it is not a test project.
 
 The project is not ready for package publication. Packaging and release metadata will be introduced only after the new APIs, tests, licensing, and release policy are established.

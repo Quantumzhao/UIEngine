@@ -25,17 +25,15 @@ This document is the consolidated target architecture and implementation plan. I
 | Area | Purpose | Current condition |
 |---|---|---|
 | `UIEngine/` | Legacy reflection and node library | Builds on .NET 10; retained as a characterized baseline |
-| `CLITestProject/` | CLI plus a cyclic demographic model | Useful fixture source; CLI is incomplete |
-| `Dataset/` | Additional annotated sample model | Despite its name, it contains no tests |
 | `Core/` | Reboot runtime contracts, attributes, host, and reflection provider | Milestone 01 implementation complete |
 | `Frontend/Cli/` | Descriptor-driven proving frontend | Milestone 01 implementation complete |
 | `Examples/CyclicDomain/` | Deterministic reboot fixture | Covers cyclic and shared-reference traversal |
-| `Tests/` | Framework, CLI, and legacy-characterization tests | 29 tests pass in clean-checkout acceptance |
+| `Tests/` | Framework, CLI, dependency, and legacy-characterization tests | 29 tests pass in the Phase 2 starting baseline |
 | `REBOOT_PLAN.md` | Target architecture, legacy audit, migration plan, risks, and acceptance criteria | Consolidated authoritative design and execution plan |
 | `README.MD` | Repository entry point | Describes current status without presenting planned APIs as shipped |
 | `TODO.MD` | Progress tracker | Concise checklist derived from this plan |
 
-The cleanup baseline intentionally had no package-generation configuration, private package feed, Docker profile, or repository-owned editor launch configuration. Its three existing projects originally targeted `net8.0`; the repository later advanced all projects together to `net10.0` as routine LTS maintenance. There was no automated test project at the cleanup baseline.
+The cleanup baseline intentionally had no package-generation configuration, private package feed, Docker profile, or repository-owned editor launch configuration. Its three existing projects originally targeted `net8.0`; the repository later advanced all projects together to `net10.0` as routine LTS maintenance. There was no automated test project at the cleanup baseline. After Milestone 01 acceptance, the obsolete `CLITestProject` and `Dataset` sample projects were intentionally removed; the maintained cyclic example and CLI integration tests retain their useful coverage.
 
 The removed package credential was revoked through its provider but remains present in pre-cleanup Git history. Rewriting published history is intentionally outside the scope of this cleanup.
 
@@ -68,7 +66,7 @@ Status meanings:
 | Validation and error model | Absent | Expected failures generally surface as raw exceptions or warnings. |
 | Threading and dispatch | Absent | Reflection reads, writes, and calls run directly on the caller's thread. |
 | Diagnostics and logging | Absent | Warning events are not a structured diagnostic or audit system. |
-| Automated verification | Absent | Neither `Dataset` nor `CLITestProject` is a test project. |
+| Automated verification | Absent | The former `Dataset` and `CLITestProject` projects were samples rather than automated tests. |
 
 ## 4. Correctness and Maintenance Risks
 
@@ -164,14 +162,14 @@ The unfinished LINQ-like node system is not a scripting foundation. Initial batc
 
 ## 7. Migration Strategy
 
-The new implementation will be built beside the legacy projects so that its vertical slices remain executable throughout development.
+The new implementation will be built beside the remaining legacy library so that its vertical slices remain executable throughout development.
 
 Carry forward the following ideas and fixtures:
 
 - opt-in annotations and reflection fallback;
 - the distinction between values, methods, and collections;
 - `INotifyPropertyChanged` and `INotifyCollectionChanged` as supported observation adapters;
-- the demographic model as a cyclic/shared-reference test fixture after it is made deterministic;
+- the cyclic/shared-reference behavior demonstrated by the former demographic model, now represented by the deterministic `Examples/CyclicDomain` fixture;
 - a CLI as an architectural pressure test;
 - a UI-toolkit-free core.
 
@@ -186,7 +184,7 @@ Replace rather than refactor:
 - the ad hoc CLI parser and cache IDs;
 - warning events as the error/diagnostic model.
 
-Before removing legacy projects, extract maintained fixtures and add characterization tests only for behavior that informs the new system. The clean-break decision means tests should not freeze accidental legacy API behavior.
+Before removing the remaining legacy project, extract maintained fixtures and add characterization tests only for behavior that informs the new system. The clean-break decision means tests should not freeze accidental legacy API behavior.
 
 ## 8. Phased Roadmap
 
@@ -286,7 +284,7 @@ Exit criteria:
 - async progress, cancellation, collection browsing, and structured failures are usable in the TUI;
 - core, CLI, and TUI acceptance tests pass;
 - useful legacy samples have deterministic replacements;
-- UIEngine, Dataset, and CLITest legacy projects can be removed without losing product coverage;
+- the remaining legacy UIEngine project can be removed without losing product coverage;
 - licensing, versioning, package names, supported platforms, and release policy are defined before any package is published.
 
 ### Phase 4 — Post-MVP layouts and advanced binding
@@ -394,7 +392,7 @@ Maintain deterministic fixtures for:
 | Generalizing batch operations into a scripting language | Start with closed operation/filter descriptor sets and serializable plans. |
 | Leaking frontend concepts into the core | Enforce project dependency direction and validate the API through both CLI and TUI. |
 | Publishing an unstable API | Keep packaging disabled until the product MVP release gate defines compatibility and release policy. |
-| Losing useful prototype knowledge during the clean break | Add narrow characterization tests and migrate deterministic fixtures before removing legacy projects. |
+| Losing useful prototype knowledge during the clean break | Add narrow characterization tests and migrate deterministic fixtures before removing the remaining legacy project. |
 
 ## 11. Deferred Decisions
 
