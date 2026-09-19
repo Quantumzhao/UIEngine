@@ -10,6 +10,15 @@ namespace UIEngine.Frontend.Cli.Tests;
 public sealed class CliSessionTests
 {
     [Fact]
+    public void InteractivePromptLeavesMostOfTheTerminalAvailableForCommandOutput()
+    {
+        var configuration = CliPromptRunner.CreateConfiguration();
+
+        Assert.Equal(3, configuration.MaxCompletionItemsCount);
+        Assert.Equal(0.25, configuration.ProportionOfWindowHeightForCompletionPane);
+    }
+
+    [Fact]
     public void TokenizerPreservesQuotedValuesAndRejectsUnterminatedQuotes()
     {
         var valid = CliTokenizer.Tokenize("call Rename name=\"New York\"");
