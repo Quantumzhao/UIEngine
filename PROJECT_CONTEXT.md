@@ -26,12 +26,13 @@ Code and tests are authoritative for current implemented behavior. The context a
 ## Current State
 
 - The repository builds on .NET 10.
-- The implementation is the legacy UIEngine v0.2.3 proof of concept.
-- It demonstrates opt-in reflection discovery, basic value access, synchronous invocation, simple collection wrapping, partial change observation, and a small CLI.
-- It uses a tree-oriented `Dashboard`/`Node` architecture that conflicts with the target graph and descriptor model.
-- There is no automated test project, production frontend, layout system, batch engine, or supported package.
+- The first reboot milestone is implemented beside the legacy UIEngine v0.2.3 proof of concept. Its clean-checkout restore, build, 29-test suite, secret scan, and no-package check pass locally and in GitHub Actions.
+- The reboot now has a host-scoped descriptor runtime, explicit reflection discovery, stable runtime identity, cycle-safe graph traversal, live scalar operations, synchronous actions, finite collection snapshots, structured failures, and a deterministic cyclic sample.
+- The new CLI navigates and operates on those frontend-neutral contracts and uses PrettyPrompt for interactive editing, process-local history, and descriptor-aware completion.
+- The legacy tree-oriented `Dashboard`/`Node` implementation remains only as reference material and a characterized baseline while the reboot proceeds.
+- Automated framework, CLI, dependency, and legacy-characterization test projects are present. There is not yet a product TUI, layout system, batch engine, or supported package.
 - Packaging is disabled. Package metadata and release automation must not be reintroduced before the product MVP release gate defines licensing, versioning, compatibility, and support policy.
-- A removed package credential remains in pre-cleanup Git history and must be revoked through its provider. Rewriting history is outside the current cleanup scope.
+- The removed package credential was revoked through its provider but remains in pre-cleanup Git history. Rewriting history is outside the current cleanup scope.
 
 The legacy implementation is reference material and a source of candidate fixtures. It is not the public API foundation for the reboot.
 
@@ -116,11 +117,11 @@ Build the new implementation beside the legacy projects. Extract deterministic f
 
 ## Near-Term Priorities
 
-1. Revoke the removed package credential through its provider.
-2. Add characterization tests for legacy behavior worth carrying forward.
-3. Enable nullable analysis and analyzers deliberately, fixing rather than suppressing findings.
-4. Add CI for clean restore, build, tests, checks, and secret scanning.
-5. Start the Framework/CLI vertical slice defined in `REBOOT_PLAN.md`.
+1. Add programmatic exposure and stable domain identity providers.
+2. Add durable logical paths, binding states, and binding recovery.
+3. Add dispatcher-mediated validation, reads, writes, and calls.
+4. Add normalized state and collection observation.
+5. Continue the Framework MVP interaction-hardening work defined in `REBOOT_PLAN.md`.
 
 Use `dotnet build UIEngine.sln` as the minimum repository verification. Add the smallest relevant automated tests for every behavior change once a test project exists.
 

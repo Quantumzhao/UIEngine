@@ -1,41 +1,43 @@
 # UIEngine
 
-UIEngine is a proposed .NET framework for exposing live domain objects as a navigable, mutable, and invocable object space with pluggable frontends.
+UIEngine is a .NET framework under active development for exposing live domain objects as a navigable, mutable, and invocable object space with pluggable frontends.
 
-> **Reboot status:** the current implementation is the legacy UIEngine v0.2.3 prototype. The reboot keeps the UIEngine name while replacing its architecture; that new architecture has not been implemented yet.
+> **Reboot status:** the first runtime-and-CLI milestone is implemented beside the legacy UIEngine v0.2.3 prototype. Clean-checkout and GitHub Actions acceptance have passed.
 
 ## What Works Today
 
-The legacy prototype demonstrates a small part of the intended interaction model:
+The reboot implementation currently provides:
 
-- opt-in property and method exposure through attributes;
-- reflection-based discovery of exposed members;
-- basic property reads and writes;
-- synchronous method invocation with parameters and return values;
-- eager wrapping of simple generic collections;
-- partial `INotifyPropertyChanged` and `INotifyCollectionChanged` integration;
-- a minimal command-line demonstration.
+- host-scoped root registration, runtime identity, and cycle-safe graph traversal;
+- opt-in reflection discovery with cached type metadata and semantic descriptors;
+- live scalar reads and writes with conversion, validation, and structured failures;
+- explicitly requested finite collection snapshots;
+- named-parameter synchronous action invocation through asynchronous-shaped contracts;
+- a deterministic cyclic sample and a CLI with navigation, inspection, mutation, invocation, history, and completion; and
+- automated framework, CLI, dependency, and legacy-characterization tests.
 
-These capabilities are experimental. The repository has no automated tests, and several collection, notification, method, and graph-navigation paths are incomplete or unsafe.
+The legacy prototype remains as characterized reference material while the clean-break replacement is developed.
 
 ## What Is Not Implemented
 
-The current code does not provide the descriptor API, cyclic graph identity, durable bindings, async action model, validation, layout persistence, safe batch operations, production CLI, or product TUI described by the design.
+The current code does not yet provide programmatic exposure, stable domain identity, durable binding recovery, dispatcher-mediated access, normalized observation, paging or virtualization, asynchronous actions and progress, layout persistence, safe batch operations, or the product TUI described by the design.
 
-The old tree-oriented `Dashboard`/`Node` API will not be preserved as a compatibility layer. New development will happen behind a clean UIEngine API while the prototype remains available only as a reference and fixture source.
+The old tree-oriented `Dashboard`/`Node` API will not be preserved as a compatibility layer. New development continues behind a clean UIEngine API while the prototype remains available only as a reference and fixture source.
 
 The framework MVP is the new core plus a minimal CLI. The product MVP adds a TUI over that same frontend-independent core.
 
-## Build and Run the Legacy Prototype
+## Build, Test, and Run the CLI
 
 The solution targets .NET 10.
 
 ```sh
+dotnet restore UIEngine.sln
 dotnet build UIEngine.sln
-dotnet run --project CLITestProject/CLITestProject.csproj
+dotnet test UIEngine.sln
+dotnet run --project Framework/UIEngine.Frontend.Cli/UIEngine.Frontend.Cli.csproj
 ```
 
-The CLI is a rough demonstration rather than a supported user interface. Enter `show` to list exposed roots and `exit` to quit.
+The CLI is an architectural proving frontend rather than the product TUI. Use `ls` to list roots or members, `cd` to navigate, and `exit` to quit.
 
 ## Repository Guide
 
@@ -43,6 +45,10 @@ The CLI is a rough demonstration rather than a supported user interface. Enter `
 - [Project context](PROJECT_CONTEXT.md) — concise source of settled intent and constraints.
 - [Reboot audit and plan](REBOOT_PLAN.md) — detailed assessment, decisions, risks, and phased implementation plan.
 - [Progress tracker](TODO.MD) — concise checklist derived from the reboot plan.
+- `Framework/UIEngine.Framework/` — reboot runtime contracts, host, and reflection provider.
+- `Framework/UIEngine.Frontend.Cli/` — descriptor-driven CLI proving frontend.
+- `Samples/UIEngine.Samples.CyclicDomain/` — deterministic reboot fixture.
+- `Tests/` — reboot and legacy-characterization test projects.
 - `UIEngine/` — legacy reflection and node prototype.
 - `CLITestProject/` — legacy CLI and cyclic demographic sample.
 - `Dataset/` — additional legacy sample types; it is not a test project.

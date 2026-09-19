@@ -1,6 +1,7 @@
 # UIEngine Reboot Audit and Plan
 
-**Status:** approved direction; runtime implementation has not started  
+**Status:** architecture runway and CLI walking skeleton complete; Framework MVP hardening next
+
 **Legacy baseline:** UIEngine v0.2.3  
 **Target framework:** .NET 10
 **Primary design:** [runtime-domain-workbench-design.md](runtime-domain-workbench-design.md)
@@ -19,16 +20,20 @@ This document records what exists, what does not, known correctness risks, settl
 
 | Area | Purpose | Current condition |
 |---|---|---|
-| `UIEngine/` | Legacy reflection and node library | Builds on .NET 10; experimental and untested |
+| `UIEngine/` | Legacy reflection and node library | Builds on .NET 10; retained as a characterized baseline |
 | `CLITestProject/` | CLI plus a cyclic demographic model | Useful fixture source; CLI is incomplete |
 | `Dataset/` | Additional annotated sample model | Despite its name, it contains no tests |
+| `Framework/UIEngine.Framework/` | Reboot runtime contracts, host, and reflection provider | Milestone 01 implementation complete |
+| `Framework/UIEngine.Frontend.Cli/` | Descriptor-driven proving frontend | Milestone 01 implementation complete |
+| `Samples/UIEngine.Samples.CyclicDomain/` | Deterministic reboot fixture | Covers cyclic and shared-reference traversal |
+| `Tests/` | Framework, CLI, and legacy-characterization tests | 29 tests pass in clean-checkout acceptance |
 | `runtime-domain-workbench-design.md` | Target architecture and product specification | Authoritative design input |
 | `README.MD` | Repository entry point | Describes current status without presenting planned APIs as shipped |
 | `TODO.MD` | Progress tracker | Concise checklist derived from this plan |
 
 The cleanup baseline intentionally had no package-generation configuration, private package feed, Docker profile, or repository-owned editor launch configuration. Its three existing projects originally targeted `net8.0`; the repository later advanced all projects together to `net10.0` as routine LTS maintenance. There was no automated test project at the cleanup baseline.
 
-The removed package credential remains present in pre-cleanup Git history. It must be revoked outside this repository. Rewriting published history is intentionally outside the scope of this cleanup.
+The removed package credential was revoked through its provider but remains present in pre-cleanup Git history. Rewriting published history is intentionally outside the scope of this cleanup.
 
 ## 3. Capability Audit
 
@@ -183,6 +188,8 @@ Before removing legacy projects, extract maintained fixtures and add characteriz
 
 ### Phase 0 — Baseline and safety
 
+Status: implemented and verified by GitHub Actions.
+
 Goals:
 
 - remove credential-bearing and obsolete configuration;
@@ -190,7 +197,7 @@ Goals:
 - establish a verified build and smoke-test baseline;
 - introduce tests and automated checks before runtime redesign.
 
-Remaining work after the repository cleanup:
+The phase established:
 
 - revoke the removed package credential through its provider;
 - add characterization tests for useful exposure, value, action, collection, and notification behavior;
@@ -206,6 +213,8 @@ Exit criteria:
 - CI enforces the baseline.
 
 ### Phase 1 — Runtime core and CLI vertical slice
+
+Status: implementation and acceptance complete.
 
 The first bounded implementation outline, including its remaining Phase 0 prerequisites, is [Milestone 01 — Architecture Runway and CLI Walking Skeleton](docs/milestones/01-architecture-runway-cli-walking-skeleton.md).
 

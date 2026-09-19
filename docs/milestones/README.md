@@ -27,4 +27,4 @@ Use `NN-short-descriptive-name.md`, with two-digit chronological numbers allocat
 
 | Milestone | Status | Summary |
 |---|---|---|
-| [01 — Architecture Runway and CLI Walking Skeleton](01-architecture-runway-cli-walking-skeleton.md) | Planned | Establish the safety baseline and prove a minimal graph-aware runtime through the CLI. |
+| [01 — Architecture Runway and CLI Walking Skeleton](01-architecture-runway-cli-walking-skeleton.md) | Complete | Establish the safety baseline and prove a minimal graph-aware runtime through the CLI. |

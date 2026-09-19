@@ -20,7 +20,7 @@ See [REBOOT_PLAN.md](REBOOT_PLAN.md) for rationale, dependencies, risks, and exi
 
 ## Framework MVP — Core and CLI
 
-Detailed first milestone: [Architecture Runway and CLI Walking Skeleton](docs/milestones/0001-architecture-runway-cli-walking-skeleton.md).
+Detailed first milestone: [Architecture Runway and CLI Walking Skeleton](docs/milestones/01-architecture-runway-cli-walking-skeleton.md).
 
 - [x] Create the Framework, CLI, sample, and test projects with logical areas organized by namespace.
 - [x] Implement host-scoped roots and opt-in descriptor discovery.
@@ -28,6 +28,7 @@ Detailed first milestone: [Architecture Runway and CLI Walking Skeleton](docs/mi
 - [x] Implement structured interaction results.
 - [x] Implement CLI navigation, inspection, get, set, and call commands.
 - [x] Prove the vertical slice with shared-reference and cyclic fixtures.
+- [x] Confirm Milestone 01 acceptance in GitHub Actions after publishing the local commits.
 - [ ] Add programmatic exposure and stable domain identity providers.
 - [ ] Add logical paths, binding states, and binding recovery.
 - [ ] Add validation and dispatcher-mediated reads, writes, and calls.

@@ -1,6 +1,9 @@
-# Milestone 0001 — Architecture Runway and CLI Walking Skeleton
+# Milestone 01 — Architecture Runway and CLI Walking Skeleton
 
-**Status:** Planned  
+**Status:** Complete
+
+**Acceptance:** Local and GitHub Actions acceptance passed
+
 **Prerequisite:** The removed package credential has been revoked through its provider.  
 **Governing documents:** [Project context](../../PROJECT_CONTEXT.md), [target design](../../runtime-domain-workbench-design.md), and [reboot plan](../../REBOOT_PLAN.md)
 
@@ -118,6 +121,18 @@ Do not encode known broken collection mutation, global-state behavior, node iden
 - CI restores, builds, tests, and scans the current tree successfully.
 - No package is generated, and no TUI or post-MVP subsystem has been started.
 - Only genuinely completed items are checked in [TODO.MD](../../TODO.MD).
+
+## Acceptance Record
+
+Local acceptance passed on 2026-09-19 from a clean archive of commit `6837c72`:
+
+- a no-cache restore completed successfully;
+- the Release solution build completed with zero warnings and errors;
+- all 29 framework, CLI, dependency, repository, and legacy-characterization tests passed;
+- Gitleaks 8.30.1 reported no secrets in the current tree; and
+- the clean build produced no `.nupkg` files.
+
+GitHub Actions run [#1](https://github.com/Quantumzhao/UIEngine/actions/runs/35424138427) completed successfully for commit `6837c72`, confirming the configured restore, build, test, secret-scan, and package checks. The ignored legacy package artifact in the developer working copy predates this acceptance run, is not tracked, and was not reproduced by the clean build.
 
 ## Implementation Steps
 
