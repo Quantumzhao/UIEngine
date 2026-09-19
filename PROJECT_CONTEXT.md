@@ -36,9 +36,9 @@ Consistency rules:
 - **Reboot:** Milestone 01 is implemented beside legacy UIEngine v0.2.3.
 - **Accepted:** clean restore, build, 29 tests, secret scan, and no-package check pass locally and in GitHub Actions.
 - **Phase 2 baseline:** the later removal of `Dataset` and `CLITestProject` is accepted as intentional cleanup; their useful cyclic-fixture role is covered by `Examples/CyclicDomain`, and the current build passes with 29 tests after restoring CLI behavior coverage.
-- **Runtime:** immutable host service configuration, host-scoped programmatic value and summary registration, deterministic programmatic/custom/reflection provider tiers, inline dispatch, explicit disposal, structured diagnostic IDs and logging, host-scoped descriptors, opt-in reflection discovery, reference-based runtime identity, normalized interface/attribute/callback domain identity, lazy encountered-object identity indexing, replaceable roots, cycle-safe graph traversal, live scalar operations, synchronous actions, finite collection snapshots, structured failures, and a deterministic cyclic sample.
-- **CLI:** descriptor-based navigation and operations; PrettyPrompt editing, process-local history, and descriptor-aware completion.
-- **Tests:** framework, CLI, dependency, and legacy-characterization projects exist; the current suite passes 55 tests.
+- **Runtime:** immutable host service configuration, host-scoped programmatic value and summary registration, deterministic programmatic/custom/reflection provider tiers, inline dispatch, explicit disposal, structured diagnostic IDs and logging, host-scoped descriptors, opt-in reflection discovery, reference-based runtime identity, normalized interface/attribute/callback domain identity, lazy encountered-object identity indexing, replaceable roots, canonical logical paths with index/key/domain-identity selectors, replacement-safe data-only bindings, cycle-safe graph traversal, live scalar operations, synchronous actions, finite collection snapshots, structured failures, and a deterministic cyclic sample.
+- **CLI:** Core-resolved canonical and replacement-safe navigation plus descriptor-based operations; PrettyPrompt editing, process-local history, and descriptor-aware completion.
+- **Tests:** framework, CLI, dependency, and legacy-characterization projects exist; the current suite passes 76 tests.
 - **Legacy:** the remaining tree-based `Dashboard`/`Node` code is characterized reference material, not the new API foundation.
 - **Missing:** product TUI, layouts, batch engine, and supported package.
 - **Packaging:** disabled until the Product MVP release gate defines APIs, tests, licensing, versioning, compatibility, and support.
@@ -54,6 +54,7 @@ Consistency rules:
 - **Framework MVP:** new core plus minimal CLI.
 - **Product MVP:** TUI over the Framework MVP. Avalonia is not the reference frontend.
 - **Identity:** stable runtime identity is required. Optional domain identity comes from an interface, attribute, or registry callback through one provider.
+- **Logical paths:** durable paths are absolute and case-sensitive, use percent-escaped semantic identifiers, and attach canonical `index`, `key`, or `identity` selectors to collection members.
 - **Layouts:** persist versioned component configuration and bindings, not domain state. Geometry is frontend-owned.
 - **Batch:** serializable descriptors, predefined filters, compatibility preview, and sequential execution by default.
 - **Transactions:** no automatic rollback for arbitrary side effects. Report partial success.
@@ -137,7 +138,7 @@ Not in either MVP: persistent layouts, batch operations, arbitrary scripting, au
 ## Near-Term Priorities
 
 1. Complete the remaining programmatic exposure roles and metadata validation.
-2. Durable logical paths, binding states, and recovery.
+2. Complete availability and validation semantics.
 3. Dispatcher-mediated validation, reads, writes, and calls.
 4. Normalized state and collection observation.
 5. Remaining Framework MVP hardening in `REBOOT_PLAN.md`.
@@ -147,7 +148,7 @@ Not in either MVP: persistent layouts, batch operations, arbitrary scripting, au
 Do not invent before the relevant roadmap phase:
 
 - final public signatures beyond established descriptor roles and invariants;
-- complete logical path grammar;
+- logical-path grammar extensions beyond the frozen Framework MVP forms;
 - package versioning and long-term support;
 - source-generator design and AOT matrix;
 - TUI toolkit and terminal composition model;

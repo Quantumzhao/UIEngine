@@ -35,7 +35,7 @@ Detailed milestones:
 - [x] Reconcile the post-acceptance repository baseline and restore acceptance-equivalent CLI behavior coverage.
 - [ ] Complete programmatic exposure roles and metadata validation.
 - [x] Add stable domain identity providers, lazy identity indexing, and root replacement.
-- [ ] Add logical paths, binding states, and binding recovery.
+- [x] Add logical paths, binding states, and binding recovery.
 - [ ] Distinguish successful null and empty values from missing and unavailable targets.
 - [ ] Complete finite-selection, parameter, validation, and action execution metadata.
 - [ ] Add validation and dispatcher-mediated reads, writes, and calls.

@@ -59,6 +59,14 @@ public interface ICollectionDescriptor : IMemberDescriptor
         CancellationToken cancellationToken = default);
 }
 
+/// <summary>Lets a collection provider implement stable keyed logical-path selection.</summary>
+public interface ICollectionPathSelector
+{
+    ValueTask<InteractionResult<IReadOnlyList<ObjectHandle>>> SelectByKeyAsync(
+        string key,
+        CancellationToken cancellationToken = default);
+}
+
 public interface IActionDescriptor : IMemberDescriptor
 {
     IReadOnlyList<IParameterDescriptor> Parameters { get; }

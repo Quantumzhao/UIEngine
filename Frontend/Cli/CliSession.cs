@@ -19,7 +19,7 @@ internal sealed class CliSession
 
     private readonly UIEngineHost _Host;
     private readonly TextWriter _Output;
-    private List<_Location> _Locations = [];
+    private List<LogicalPathLocation> _Locations = [];
 
     public CliSession(UIEngineHost host, TextWriter output)
     {
@@ -31,7 +31,7 @@ internal sealed class CliSession
 
     internal ObjectHandle? CurrentHandle => _Locations.Count == 0 ? null : _Locations[^1].Handle;
 
-    internal string CurrentPath => _Locations.Count == 0 ? "/" : _Locations[^1].Path;
+    internal string CurrentPath => _Locations.Count == 0 ? "/" : _Locations[^1].Path.ToString();
 
     internal async ValueTask<bool> ExecuteAsync(
         string line,
@@ -193,15 +193,22 @@ internal sealed class CliSession
             return;
         }
 
-        var resolution = await _ResolveAbsolutePathAsync(tokens[1], cancellationToken)
-            .ConfigureAwait(false);
-        if (!resolution.IsSuccess)
+        var resolution = await _Host.Paths.ResolveAsync(tokens[1], cancellationToken).ConfigureAwait(false);
+        if (!resolution.IsResolved)
         {
             _WriteFailure(resolution.Error);
             return;
         }
 
-        _Locations = resolution.Value.ToList();
+        if (resolution.Target is not null && resolution.Target.Kind != DescriptorKind.INSTANCE)
+        {
+            _WriteFailure(
+                InteractionErrorCode.INVALID_PATH,
+                "The path identifies a member rather than a navigable object.");
+            return;
+        }
+
+        _Locations = resolution.Locations.ToList();
         _Output.WriteLine(CurrentPath);
     }
 
@@ -396,7 +403,7 @@ internal sealed class CliSession
 
         foreach (var root in _Host.Roots)
         {
-            completions.Add($"/{root.Identifier}");
+            completions.Add(LogicalPath.Root.Append(root.Identifier).ToString());
         }
 
         if (CurrentHandle is not null)
@@ -407,7 +414,8 @@ internal sealed class CliSession
             {
                 foreach (var reference in descriptorResult.Value.References)
                 {
-                    completions.Add($"{CurrentPath.TrimEnd('/')}/{reference.Id}");
+                    var current = LogicalPath.Parse(CurrentPath).Value;
+                    completions.Add(current.Append(reference.Id).ToString());
                 }
             }
         }
@@ -470,126 +478,34 @@ internal sealed class CliSession
             .ToArray();
     }
 
-    private ValueTask<InteractionResult<IObjectDescriptor>> _GetCurrentDescriptorAsync(
+    private async ValueTask<InteractionResult<IObjectDescriptor>> _GetCurrentDescriptorAsync(
         CancellationToken cancellationToken)
     {
-        if (CurrentHandle is not { } handle)
+        if (_Locations.Count == 0)
         {
-            return ValueTask.FromResult(InteractionResult.Failure<IObjectDescriptor>(
+            return InteractionResult.Failure<IObjectDescriptor>(
                 InteractionErrorCode.TARGET_UNAVAILABLE,
-                "No object is selected. Use 'cd /<root>' first."));
+                "No object is selected. Use 'cd /<root>' first.");
         }
 
-        return _Host.DescribeAsync(handle, cancellationToken);
-    }
-
-    private async ValueTask<InteractionResult<IReadOnlyList<_Location>>> _ResolveAbsolutePathAsync(
-        string path,
-        CancellationToken cancellationToken)
-    {
-        if (path == "/")
+        var resolution = await _Host.Paths.ResolveAsync(_Locations[^1].Path, cancellationToken)
+            .ConfigureAwait(false);
+        if (!resolution.IsResolved)
         {
-            return InteractionResult.Success<IReadOnlyList<_Location>>(Array.Empty<_Location>());
+            return InteractionResult.Failure<IObjectDescriptor>(
+                resolution.Error!.Code,
+                resolution.Error.Message);
         }
 
-        if (!path.StartsWith('/'))
+        if (resolution.Target is not { Kind: DescriptorKind.INSTANCE } target)
         {
-            return InteractionResult.Failure<IReadOnlyList<_Location>>(
-                InteractionErrorCode.INVALID_INPUT,
-                "The path must be absolute or '..'.");
+            return InteractionResult.Failure<IObjectDescriptor>(
+                InteractionErrorCode.INVALID_PATH,
+                "The current path no longer identifies a navigable object.");
         }
 
-        var segments = path[1..].Split('/', StringSplitOptions.None);
-        if (segments.Length == 0 || segments.Any(static segment => segment.Length == 0))
-        {
-            return InteractionResult.Failure<IReadOnlyList<_Location>>(
-                InteractionErrorCode.INVALID_INPUT,
-                $"Path '{path}' is malformed.");
-        }
-
-        var root = _Host.Roots.FirstOrDefault(candidate =>
-            string.Equals(candidate.Identifier, segments[0], StringComparison.Ordinal));
-        if (root is null)
-        {
-            return InteractionResult.Failure<IReadOnlyList<_Location>>(
-                InteractionErrorCode.TARGET_UNAVAILABLE,
-                $"Root '{segments[0]}' was not found.");
-        }
-
-        var locations = new List<_Location>
-        {
-            new(root.Handle, $"/{root.Identifier}"),
-        };
-        var currentHandle = root.Handle;
-        var currentPath = $"/{root.Identifier}";
-
-        for (var segmentIndex = 1; segmentIndex < segments.Length; segmentIndex++)
-        {
-            var descriptorResult = await _Host.DescribeAsync(currentHandle, cancellationToken)
-                .ConfigureAwait(false);
-            if (!descriptorResult.IsSuccess)
-            {
-                return _CopyFailure<IObjectDescriptor, IReadOnlyList<_Location>>(descriptorResult);
-            }
-
-            var memberIdentifier = segments[segmentIndex];
-            var descriptor = descriptorResult.Value;
-            var reference = descriptor.References.FirstOrDefault(member =>
-                string.Equals(member.Id, memberIdentifier, StringComparison.Ordinal));
-            if (reference is not null)
-            {
-                var referenceResult = await reference.ReadAsync(cancellationToken).ConfigureAwait(false);
-                if (!referenceResult.IsSuccess)
-                {
-                    return _CopyFailure<ObjectHandle, IReadOnlyList<_Location>>(referenceResult);
-                }
-
-                currentHandle = referenceResult.Value;
-                currentPath = $"{currentPath}/{memberIdentifier}";
-                locations.Add(new _Location(currentHandle, currentPath));
-                continue;
-            }
-
-            var collection = descriptor.Collections.FirstOrDefault(member =>
-                string.Equals(member.Id, memberIdentifier, StringComparison.Ordinal));
-            if (collection is null)
-            {
-                return InteractionResult.Failure<IReadOnlyList<_Location>>(
-                    InteractionErrorCode.TARGET_UNAVAILABLE,
-                    $"Navigable member '{memberIdentifier}' was not found at '{currentPath}'.");
-            }
-
-            if (++segmentIndex >= segments.Length ||
-                !int.TryParse(
-                    segments[segmentIndex],
-                    NumberStyles.None,
-                    CultureInfo.InvariantCulture,
-                    out var collectionIndex))
-            {
-                return InteractionResult.Failure<IReadOnlyList<_Location>>(
-                    InteractionErrorCode.INVALID_INPUT,
-                    $"Collection '{memberIdentifier}' requires a numeric index.");
-            }
-
-            var snapshotResult = await collection.SnapshotAsync(cancellationToken).ConfigureAwait(false);
-            if (!snapshotResult.IsSuccess)
-            {
-                return _CopyFailure<IReadOnlyList<ObjectHandle>, IReadOnlyList<_Location>>(snapshotResult);
-            }
-
-            if ((uint)collectionIndex >= (uint)snapshotResult.Value.Count)
-            {
-                return InteractionResult.Failure<IReadOnlyList<_Location>>(
-                    InteractionErrorCode.TARGET_UNAVAILABLE,
-                    $"Collection index {collectionIndex} is outside '{memberIdentifier}'.");
-            }
-
-            currentHandle = snapshotResult.Value[collectionIndex];
-            currentPath = $"{currentPath}/{memberIdentifier}/{collectionIndex}";
-            locations.Add(new _Location(currentHandle, currentPath));
-        }
-
-        return InteractionResult.Success<IReadOnlyList<_Location>>(locations);
+        _Locations = resolution.Locations.ToList();
+        return InteractionResult.Success(target.OwnerDescriptor);
     }
 
     private bool _HasArity(IReadOnlyList<string> tokens, int expected, string usage)
@@ -624,15 +540,4 @@ internal sealed class CliSession
         _ => value.ToString() ?? string.Empty,
     };
 
-    private static InteractionResult<TTarget> _CopyFailure<TSource, TTarget>(
-        InteractionResult<TSource> result)
-    {
-        var error = result.Error ?? new InteractionError(
-            InteractionErrorCode.INVOCATION_FAILED,
-            "An unspecified error occurred.");
-        return InteractionResult.Failure<TTarget>(error.Code, error.Message);
-    }
-
-    /// <summary>Records one navigable object and its logical path within the session.</summary>
-    private sealed record _Location(ObjectHandle Handle, string Path);
 }

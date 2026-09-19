@@ -1,6 +1,6 @@
 # Milestone 02 — Framework MVP Interaction Hardening
 
-**Status:** In progress — step 4 complete; remaining step 3 metadata roles are still open
+**Status:** In progress — step 5 complete; remaining step 3 metadata roles are still open
 
 **Acceptance:** Not run
 
@@ -284,10 +284,12 @@ Step 4 completed on 2026-09-19. Explicit exposure-registry identity callbacks ta
 
 ### 5. Implement logical paths and binding resolution
 
-1. Freeze the initial grammar, escaping, selector forms, and canonical formatting in contract tests.
-2. Implement semantic parsing and asynchronous resolution for roots, members, references, and supported collection selectors.
-3. Add data-only binding references, fallback policies, kind/type guards, and all resolution states.
-4. Prove recovery and refusal cases for root, reference, and collection-element replacement.
+1. [x] Freeze the initial grammar, escaping, selector forms, and canonical formatting in contract tests.
+2. [x] Implement semantic parsing and asynchronous resolution for roots, members, references, and supported collection selectors.
+3. [x] Add data-only binding references, fallback policies, kind/type guards, and all resolution states.
+4. [x] Prove recovery and refusal cases for root, reference, and collection-element replacement.
+
+Step 5 completed on 2026-09-19. Core now owns case-sensitive absolute logical paths with percent-escaped components, canonical attached index/key/domain-identity selectors, semantic asynchronous traversal, and legacy numeric-index input normalization. Data-only binding references support identity-only, path-only, and identity-then-path policies; all seven resolution states, kind/type guards, moved-path suggestions, compatible root/reference/collection-element recovery, and stale-path refusal are covered. The CLI now uses Core resolution and re-resolves its current canonical path before live operations. `dotnet build UIEngine.sln` completed with zero warnings and errors, and `dotnet test UIEngine.sln --no-build --no-restore` passed all 76 tests (63 framework, 8 CLI, and 5 legacy-characterization tests).
 
 ### 6. Complete availability and validation semantics
 

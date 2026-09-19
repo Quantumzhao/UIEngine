@@ -43,12 +43,30 @@ public sealed class CliSessionTests
         await session.ExecuteAsync("CD /world/Nations/0/Capital/OwnerNation");
 
         Assert.Equal(nationHandle, session.CurrentHandle);
-        Assert.Equal("/world/Nations/0/Capital/OwnerNation", session.CurrentPath);
+        Assert.Equal("/world/Nations[index=0]/Capital/OwnerNation", session.CurrentPath);
 
         await session.ExecuteAsync("cd ..");
 
-        Assert.Equal("/world/Nations/0/Capital", session.CurrentPath);
+        Assert.Equal("/world/Nations[index=0]/Capital", session.CurrentPath);
         Assert.NotEqual(nationHandle, session.CurrentHandle);
+    }
+
+    [Fact]
+    public async Task NavigationUsesCanonicalCorePathsAndRecoversRootReplacement()
+    {
+        var output = new StringWriter(CultureInfo.InvariantCulture);
+        using var host = new UIEngineHost([new ReflectionObjectDescriptorProvider()]);
+        host.RegisterRoot("world", CyclicWorldFactory.Create());
+        var session = new CliSession(host, output);
+
+        await session.ExecuteAsync("cd /world/Nations/0");
+        Assert.Equal("/world/Nations[index=0]", session.CurrentPath);
+
+        await session.ExecuteAsync("cd /world");
+        host.ReplaceRoot("world", new World("Mars"));
+        await session.ExecuteAsync("get Name");
+
+        Assert.Contains("Name = Mars", output.ToString(), StringComparison.Ordinal);
     }
 
     [Fact]

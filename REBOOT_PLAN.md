@@ -593,13 +593,13 @@ Cycle-safe tree projections maintain visited runtime identities and render repea
 
 ### 16.2 Logical paths
 
-Paths refer to exposed semantics, not raw CLR reflection chains. The eventual grammar must support named members, root aliases, keyed collection lookup, explicitly permitted index lookup, identity references, and later optional predicates. For example:
+Paths refer to exposed semantics, not raw CLR reflection chains. Framework MVP paths are absolute and case-sensitive. Slash-delimited root/member identifiers and selector values use UTF-8 percent escaping, and collection selectors attach to their member as `[index=…]`, `[key=…]`, or `[identity=…]`. Formatting emits this single canonical form; the CLI also accepts its Milestone 01 `/Collection/0` index form and normalizes it. For example:
 
 ```text
 /World/Nations[key=USSR]/Cities[key=Moscow]/Population
 ```
 
-The exact grammar remains deferred, but path parsing/formatting, resolution, and ambiguity are structured operations.
+Predicates and arbitrary queries remain deferred. Path parsing/formatting, resolution, and ambiguity are structured operations.
 
 ### 16.3 Persistent binding records and states
 

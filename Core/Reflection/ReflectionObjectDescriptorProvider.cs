@@ -348,7 +348,10 @@ internal sealed class ReflectionReferenceDescriptor : ReflectionMemberDescriptor
 }
 
 /// <summary>Produces explicitly requested finite handle snapshots of an exposed collection.</summary>
-internal sealed class ReflectionCollectionDescriptor : ReflectionMemberDescriptor, ICollectionDescriptor
+internal sealed class ReflectionCollectionDescriptor :
+    ReflectionMemberDescriptor,
+    ICollectionDescriptor,
+    ICollectionPathSelector
 {
     private readonly UIEngineHost _Host;
 
@@ -433,6 +436,80 @@ internal sealed class ReflectionCollectionDescriptor : ReflectionMemberDescripto
             }
 
             return InteractionResult.Success<IReadOnlyList<ObjectHandle>>(handles.ToArray());
+        }
+        catch (TargetInvocationException exception)
+        {
+            return InteractionResult.Failure<IReadOnlyList<ObjectHandle>>(
+                InteractionErrorCode.INVOCATION_FAILED,
+                exception.InnerException?.Message ?? exception.Message);
+        }
+        catch (InvalidOperationException exception)
+        {
+            return InteractionResult.Failure<IReadOnlyList<ObjectHandle>>(
+                InteractionErrorCode.INVOCATION_FAILED,
+                exception.Message);
+        }
+    }
+
+    public async ValueTask<InteractionResult<IReadOnlyList<ObjectHandle>>> SelectByKeyAsync(
+        string key,
+        CancellationToken cancellationToken = default)
+    {
+        if (IsHostDisposed)
+        {
+            return _DisposedFailure<IReadOnlyList<ObjectHandle>>();
+        }
+
+        if (cancellationToken.IsCancellationRequested)
+        {
+            return InteractionResult.Failure<IReadOnlyList<ObjectHandle>>(
+                InteractionErrorCode.CANCELLED,
+                "Collection selection was cancelled.");
+        }
+
+        if (!TryGetTarget(out var target) || target is null)
+        {
+            return InteractionResult.Failure<IReadOnlyList<ObjectHandle>>(
+                InteractionErrorCode.TARGET_UNAVAILABLE,
+                "The containing object is no longer available.");
+        }
+
+        try
+        {
+            if (ReflectionMemberAccess.Read(Metadata.Member, target) is not IDictionary dictionary)
+            {
+                return InteractionResult.Failure<IReadOnlyList<ObjectHandle>>(
+                    InteractionErrorCode.TARGET_MISSING,
+                    $"Collection '{Id}' does not support string-keyed selection.");
+            }
+
+            var matchingValues = dictionary.Keys
+                .Cast<object?>()
+                .Where(candidate => candidate is string text && StringComparer.Ordinal.Equals(text, key))
+                .Select(candidate => dictionary[candidate!])
+                .ToArray();
+            var handles = new List<ObjectHandle>(matchingValues.Length);
+            foreach (var value in matchingValues)
+            {
+                if (value is null || value.GetType().IsValueType)
+                {
+                    return InteractionResult.Failure<IReadOnlyList<ObjectHandle>>(
+                        InteractionErrorCode.TYPE_MISMATCH,
+                        $"Collection '{Id}' key '{key}' does not identify a reference object.");
+                }
+
+                var encountered = await _Host.EncounterAsync(value, cancellationToken).ConfigureAwait(false);
+                if (!encountered.IsSuccess)
+                {
+                    return InteractionResult.Failure<IReadOnlyList<ObjectHandle>>(
+                        encountered.Error!.Code,
+                        encountered.Error.Message);
+                }
+
+                handles.Add(encountered.Value);
+            }
+
+            return InteractionResult.Success<IReadOnlyList<ObjectHandle>>(handles);
         }
         catch (TargetInvocationException exception)
         {

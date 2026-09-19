@@ -35,6 +35,7 @@ public sealed class UIEngineHost : IDisposable, IAsyncDisposable
     private readonly Dictionary<ObjectIdentity, WeakReference<object>> _Objects = [];
     private readonly Dictionary<ObjectIdentity, DomainIdentity?> _DomainIdentities = [];
     private readonly Dictionary<DomainIdentity, HashSet<ObjectIdentity>> _DomainIdentityIndex = [];
+    private readonly Dictionary<ObjectIdentity, LogicalPath> _CanonicalPaths = [];
     private readonly Dictionary<string, _RootEntry> _Roots = new(StringComparer.Ordinal);
     private readonly ILogger _Logger;
     private readonly ProgrammaticExposureDescriptorProvider _ProgrammaticExposureProvider;
@@ -56,6 +57,8 @@ public sealed class UIEngineHost : IDisposable, IAsyncDisposable
         _ProgrammaticExposureProvider = new ProgrammaticExposureDescriptorProvider(
             Configuration.Exposure,
             Configuration.ReflectionProvider);
+        Paths = new LogicalPathResolver(this);
+        Bindings = new BindingResolver(this, Paths);
         _Logger = Configuration.LoggerFactory.CreateLogger<UIEngineHost>();
         _HOST_CREATED(_Logger, Configuration.DescriptorProviders.Count, null);
     }
@@ -63,6 +66,10 @@ public sealed class UIEngineHost : IDisposable, IAsyncDisposable
     public UIEngineHostConfiguration Configuration { get; }
 
     public IReadOnlyList<IObjectDescriptorProvider> Providers => Configuration.DescriptorProviders;
+
+    public LogicalPathResolver Paths { get; }
+
+    public BindingResolver Bindings { get; }
 
     public bool IsDisposed => Volatile.Read(ref _IsDisposed) != 0;
 
@@ -117,6 +124,7 @@ public sealed class UIEngineHost : IDisposable, IAsyncDisposable
             var handle = _GetOrCreateHandleCore(instance);
             var registration = new RegisteredRoot(identifier, handle, instance.GetType());
             _Roots.Add(identifier, new _RootEntry(registration, instance));
+            _CanonicalPaths[handle.Identity] = LogicalPath.Root.Append(identifier);
             return InteractionResult.Success(handle);
         }
     }
@@ -161,6 +169,7 @@ public sealed class UIEngineHost : IDisposable, IAsyncDisposable
             var handle = _GetOrCreateHandleCore(instance);
             var registration = new RegisteredRoot(identifier, handle, instance.GetType());
             _Roots[identifier] = new _RootEntry(registration, instance);
+            _CanonicalPaths[handle.Identity] = LogicalPath.Root.Append(identifier);
             return InteractionResult.Success(handle);
         }
     }
@@ -444,6 +453,7 @@ public sealed class UIEngineHost : IDisposable, IAsyncDisposable
             _Objects.Clear();
             _DomainIdentities.Clear();
             _DomainIdentityIndex.Clear();
+            _CanonicalPaths.Clear();
             _Identities.Clear();
         }
 
@@ -475,6 +485,25 @@ public sealed class UIEngineHost : IDisposable, IAsyncDisposable
             _Objects.Remove(handle.Identity);
             instance = null;
             return false;
+        }
+    }
+
+    internal void RecordCanonicalPath(ObjectHandle handle, LogicalPath path)
+    {
+        lock (_Gate)
+        {
+            if (!IsDisposed)
+            {
+                _CanonicalPaths[handle.Identity] = path;
+            }
+        }
+    }
+
+    internal bool TryGetCanonicalPath(ObjectHandle handle, out LogicalPath? path)
+    {
+        lock (_Gate)
+        {
+            return _CanonicalPaths.TryGetValue(handle.Identity, out path);
         }
     }
 
