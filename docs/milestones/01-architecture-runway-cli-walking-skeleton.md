@@ -18,7 +18,7 @@ This milestone excludes asynchronous invocation, observation, paging and virtual
 
 ## Baseline and Repository Structure
 
-- Add a `global.json` that selects a supported .NET 8 SDK feature band without advancing the target framework.
+- Add a `global.json` that selects the supported .NET 10 SDK feature band used by the repository.
 - Apply nullable analysis, implicit usings, and analyzers strictly to new projects. Keep any necessary legacy exemptions explicit and local rather than suppressing findings repository-wide.
 - Use xUnit for characterization, unit, and integration tests.
 - Add GitHub Actions checks for clean restore, build, and test, plus a current-working-tree secret scan. Historical secret scanning and Git-history rewriting remain outside this milestone.
@@ -138,7 +138,7 @@ Stop here if revocation cannot be confirmed.
 
 ### 3. Establish the build runway
 
-1. Add `global.json` for the selected .NET 8 SDK feature band.
+1. Add `global.json` for the selected .NET 10 SDK feature band.
 2. Enable nullable analysis, implicit usings, and analyzers for new projects while keeping any legacy exceptions local.
 3. Add restore, build, test, and current-working-tree secret-scan checks to GitHub Actions.
 4. Verify that packaging remains disabled and a normal build produces no `.nupkg` files.

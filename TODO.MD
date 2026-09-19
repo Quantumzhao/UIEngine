@@ -8,12 +8,12 @@ See [REBOOT_PLAN.md](REBOOT_PLAN.md) for rationale, dependencies, risks, and exi
 - [x] Audit the legacy implementation against the design.
 - [x] Keep the UIEngine name and choose a clean API break.
 - [x] Use UIEngine as the final package and namespace prefix.
-- [x] Choose .NET 8 and a CLI-first vertical slice.
+- [x] Choose .NET 10 and a CLI-first vertical slice.
 - [x] Define the framework MVP as Core + CLI and the product MVP as TUI.
 - [x] Remove the credential-bearing NuGet configuration and packaging behavior.
 - [x] Remove obsolete Docker, container-tool, and VS Code configuration.
-- [x] Retarget the legacy solution to .NET 8.
-- [ ] Revoke the removed package credential through its provider.
+- [x] Retarget the legacy solution to .NET 10.
+- [x] Revoke the removed package credential through its provider.
 - [x] Add characterization tests for legacy behavior worth preserving.
 - [x] Enable nullable analysis and analyzers.
 - [x] Add CI and clean-checkout verification.
@@ -26,8 +26,8 @@ Detailed first milestone: [Architecture Runway and CLI Walking Skeleton](docs/mi
 - [x] Implement host-scoped roots and opt-in descriptor discovery.
 - [x] Implement runtime identity and cycle-safe traversal.
 - [x] Implement structured interaction results.
-- [ ] Implement CLI navigation, inspection, get, set, and call commands.
-- [ ] Prove the vertical slice with shared-reference and cyclic fixtures.
+- [x] Implement CLI navigation, inspection, get, set, and call commands.
+- [x] Prove the vertical slice with shared-reference and cyclic fixtures.
 - [ ] Add programmatic exposure and stable domain identity providers.
 - [ ] Add logical paths, binding states, and binding recovery.
 - [ ] Add validation and dispatcher-mediated reads, writes, and calls.

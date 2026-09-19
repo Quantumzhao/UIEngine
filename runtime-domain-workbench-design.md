@@ -1157,7 +1157,7 @@ If the core can express these interactions without GUI-specific leakage, the sep
 Recommended implementation stack:
 
 - C#;
-- .NET 8 target;
+- .NET 10 target;
 - nullable reference types enabled;
 - analyzers enabled;
 - source generator project for compile-time metadata;
@@ -1174,7 +1174,7 @@ The product MVP frontend is a terminal user interface.
 
 The concrete TUI toolkit remains an implementation-phase decision. Selection SHOULD favor:
 
-- active .NET 8 support;
+- active .NET 10 support;
 - cross-platform terminal behavior;
 - keyboard-first navigation;
 - composable views and modal forms;

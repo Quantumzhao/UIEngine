@@ -2,7 +2,7 @@
 
 **Status:** approved direction; runtime implementation has not started  
 **Legacy baseline:** UIEngine v0.2.3  
-**Target framework:** .NET 8  
+**Target framework:** .NET 10
 **Primary design:** [runtime-domain-workbench-design.md](runtime-domain-workbench-design.md)
 
 ## 1. Executive Assessment
@@ -19,14 +19,14 @@ This document records what exists, what does not, known correctness risks, settl
 
 | Area | Purpose | Current condition |
 |---|---|---|
-| `UIEngine/` | Legacy reflection and node library | Builds on .NET 8; experimental and untested |
+| `UIEngine/` | Legacy reflection and node library | Builds on .NET 10; experimental and untested |
 | `CLITestProject/` | CLI plus a cyclic demographic model | Useful fixture source; CLI is incomplete |
 | `Dataset/` | Additional annotated sample model | Despite its name, it contains no tests |
 | `runtime-domain-workbench-design.md` | Target architecture and product specification | Authoritative design input |
 | `README.MD` | Repository entry point | Describes current status without presenting planned APIs as shipped |
 | `TODO.MD` | Progress tracker | Concise checklist derived from this plan |
 
-The cleanup baseline intentionally has no package-generation configuration, private package feed, Docker profile, or repository-owned editor launch configuration. All three existing projects target `net8.0`. There is still no automated test project.
+The cleanup baseline intentionally had no package-generation configuration, private package feed, Docker profile, or repository-owned editor launch configuration. Its three existing projects originally targeted `net8.0`; the repository later advanced all projects together to `net10.0` as routine LTS maintenance. There was no automated test project at the cleanup baseline.
 
 The removed package credential remains present in pre-cleanup Git history. It must be revoked outside this repository. Rewriting published history is intentionally outside the scope of this cleanup.
 
@@ -141,7 +141,7 @@ The unfinished LINQ-like node system is not a scripting foundation. Initial batc
 
 1. **Product name and prefix:** the rebooted product remains UIEngine, and `UIEngine` is the final package and namespace prefix. Version 0.2.3 and its `Dashboard`/`Node` API are the legacy implementation of that product.
 2. **Compatibility:** the new public API is a clean break. No `Dashboard`/`Node` compatibility adapter will be built.
-3. **Framework baseline:** new and retained projects use .NET 8. A later LTS upgrade is routine maintenance, not an MVP dependency.
+3. **Framework baseline:** new and retained projects use .NET 10. The upgrade from .NET 8 was routine LTS maintenance rather than an MVP dependency.
 4. **Framework MVP:** the new core and a minimal CLI validate the complete baseline interaction model.
 5. **Product MVP:** a TUI is the reference product frontend. Avalonia is not part of the plan.
 6. **Exposure default:** exposure is opt-in. Properties are preferred; fields may be supported through the normalized exposure model.
@@ -186,7 +186,7 @@ Before removing legacy projects, extract maintained fixtures and add characteriz
 Goals:
 
 - remove credential-bearing and obsolete configuration;
-- target .NET 8 without producing packages;
+- target .NET 10 without producing packages;
 - establish a verified build and smoke-test baseline;
 - introduce tests and automated checks before runtime redesign.
 
@@ -200,7 +200,7 @@ Remaining work after the repository cleanup:
 
 Exit criteria:
 
-- a fresh checkout restores and builds with the documented .NET 8 SDK family;
+- a fresh checkout restores and builds with the documented .NET 10 SDK family;
 - the removed credential is revoked, and no credential, EOL target, implicit package generation, or machine-specific configuration remains in the tracked working tree;
 - retained legacy behavior is covered by focused tests;
 - CI enforces the baseline.

@@ -25,7 +25,7 @@ Code and tests are authoritative for current implemented behavior. The context a
 
 ## Current State
 
-- The repository builds on .NET 8.
+- The repository builds on .NET 10.
 - The implementation is the legacy UIEngine v0.2.3 proof of concept.
 - It demonstrates opt-in reflection discovery, basic value access, synchronous invocation, simple collection wrapping, partial change observation, and a small CLI.
 - It uses a tree-oriented `Dashboard`/`Node` architecture that conflicts with the target graph and descriptor model.
@@ -39,7 +39,7 @@ The legacy implementation is reference material and a source of candidate fixtur
 
 - **Name and prefix:** UIEngine is the final product name and package/namespace prefix.
 - **Compatibility:** make a clean public API break; do not build a `Dashboard`/`Node` compatibility adapter.
-- **Framework:** target .NET 8 for the reboot. A later LTS upgrade is maintenance, not an MVP requirement.
+- **Framework:** target .NET 10 for the reboot. The repository moved from .NET 8 as routine LTS maintenance before that runtime reached end of support.
 - **Exposure:** require explicit opt-in exposure. Prefer properties while allowing fields through the normalized exposure model.
 - **Trust boundary:** begin as an in-process trusted developer tool. Remote access is a later, separate protocol.
 - **Framework MVP:** deliver the new core and a minimal CLI that validates the interaction model.

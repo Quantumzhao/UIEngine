@@ -28,7 +28,7 @@ The framework MVP is the new core plus a minimal CLI. The product MVP adds a TUI
 
 ## Build and Run the Legacy Prototype
 
-The solution targets .NET 8.
+The solution targets .NET 10.
 
 ```sh
 dotnet build UIEngine.sln
