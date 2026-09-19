@@ -80,6 +80,7 @@ public interface IObjectDescriptorProvider
     bool CanDescribe(Type objectType);
 
     ValueTask<InteractionResult<IObjectDescriptor>> DescribeAsync(
+        UIEngineHost host,
         object instance,
         ObjectHandle handle,
         CancellationToken cancellationToken = default);

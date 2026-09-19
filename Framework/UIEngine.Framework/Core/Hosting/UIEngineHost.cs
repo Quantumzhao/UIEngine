@@ -78,6 +78,35 @@ public sealed class UIEngineHost
         }
     }
 
+    public ValueTask<InteractionResult<IObjectDescriptor>> DescribeAsync(
+        ObjectHandle handle,
+        CancellationToken cancellationToken = default)
+    {
+        if (cancellationToken.IsCancellationRequested)
+        {
+            return ValueTask.FromResult(InteractionResult.Failure<IObjectDescriptor>(
+                InteractionErrorCode.CANCELLED,
+                "Descriptor discovery was cancelled."));
+        }
+
+        if (!TryResolve(handle, out var instance) || instance is null)
+        {
+            return ValueTask.FromResult(InteractionResult.Failure<IObjectDescriptor>(
+                InteractionErrorCode.TARGET_UNAVAILABLE,
+                "The target object is no longer available."));
+        }
+
+        var provider = Providers.FirstOrDefault(candidate => candidate.CanDescribe(instance.GetType()));
+        if (provider is null)
+        {
+            return ValueTask.FromResult(InteractionResult.Failure<IObjectDescriptor>(
+                InteractionErrorCode.DESCRIPTOR_UNAVAILABLE,
+                $"No descriptor provider supports '{instance.GetType().FullName}'."));
+        }
+
+        return provider.DescribeAsync(this, instance, handle, cancellationToken);
+    }
+
     internal bool TryResolve(ObjectHandle handle, out object? instance)
     {
         lock (_Gate)

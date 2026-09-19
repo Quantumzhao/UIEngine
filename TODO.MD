@@ -23,8 +23,8 @@ See [REBOOT_PLAN.md](REBOOT_PLAN.md) for rationale, dependencies, risks, and exi
 Detailed first milestone: [Architecture Runway and CLI Walking Skeleton](docs/milestones/0001-architecture-runway-cli-walking-skeleton.md).
 
 - [x] Create the Framework, CLI, sample, and test projects with logical areas organized by namespace.
-- [ ] Implement host-scoped roots and opt-in descriptor discovery.
-- [ ] Implement runtime identity and cycle-safe traversal.
+- [x] Implement host-scoped roots and opt-in descriptor discovery.
+- [x] Implement runtime identity and cycle-safe traversal.
 - [x] Implement structured interaction results.
 - [ ] Implement CLI navigation, inspection, get, set, and call commands.
 - [ ] Prove the vertical slice with shared-reference and cyclic fixtures.
