@@ -7,7 +7,8 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "UIEngine", "UIEngine\UIEngi
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{1AA45197-8FBB-4B47-B4C9-47FD07E9765B}"
 	ProjectSection(SolutionItems) = preProject
-		docs\milestones\01-architecture-runway-cli-walking-skeleton.md = docs\milestones\0001-architecture-runway-cli-walking-skeleton.md
+		docs\milestones\01-architecture-runway-cli-walking-skeleton.md = docs\milestones\01-architecture-runway-cli-walking-skeleton.md
+		docs\milestones\02-framework-mvp-interaction-hardening.md = docs\milestones\02-framework-mvp-interaction-hardening.md
 		docs\milestones\README.md = docs\milestones\README.md
 		PROJECT_CONTEXT.md = PROJECT_CONTEXT.md
 		README.MD = README.MD

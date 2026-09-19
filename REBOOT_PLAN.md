@@ -245,6 +245,8 @@ Exit criteria:
 
 ### Phase 2 — Framework MVP interaction hardening
 
+The bounded implementation outline for this phase is [Milestone 02 — Framework MVP Interaction Hardening](docs/milestones/02-framework-mvp-interaction-hardening.md).
+
 Add:
 
 - programmatic exposure for third-party and runtime-dependent types;
