@@ -16,6 +16,10 @@ public sealed class UIEngineHostOptions
 
     public IInteractionDispatcher Dispatcher { get; init; } = InlineInteractionDispatcher.Instance;
 
+    /// <summary>
+    /// Gets providers checked in order after an exposure-registry callback and before built-in
+    /// interface and attributed-member discovery.
+    /// </summary>
     public IEnumerable<IDomainIdentityProvider> DomainIdentityProviders { get; init; } = [];
 
     public IEnumerable<IObservationAdapter> ObservationAdapters { get; init; } = [];

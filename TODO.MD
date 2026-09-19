@@ -33,7 +33,8 @@ Detailed milestones:
 - [x] Prove the vertical slice with shared-reference and cyclic fixtures.
 - [x] Confirm Milestone 01 acceptance in GitHub Actions after publishing the local commits.
 - [x] Reconcile the post-acceptance repository baseline and restore acceptance-equivalent CLI behavior coverage.
-- [ ] Add programmatic exposure and stable domain identity providers.
+- [ ] Complete programmatic exposure roles and metadata validation.
+- [x] Add stable domain identity providers, lazy identity indexing, and root replacement.
 - [ ] Add logical paths, binding states, and binding recovery.
 - [ ] Distinguish successful null and empty values from missing and unavailable targets.
 - [ ] Complete finite-selection, parameter, validation, and action execution metadata.

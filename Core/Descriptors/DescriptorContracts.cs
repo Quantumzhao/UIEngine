@@ -11,6 +11,8 @@ public interface IObjectDescriptor
 {
     ObjectIdentity Identity { get; }
 
+    DomainIdentity? DomainIdentity => null;
+
     string TypeName { get; }
 
     string DisplayName { get; }

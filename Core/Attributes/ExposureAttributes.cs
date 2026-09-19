@@ -16,3 +16,6 @@ public sealed class ChildrenAttribute : Attribute;
     AttributeTargets.Property | AttributeTargets.Field | AttributeTargets.Method,
     Inherited = true)]
 public sealed class SummaryAttribute : Attribute;
+
+[AttributeUsage(AttributeTargets.Property | AttributeTargets.Field, Inherited = true)]
+public sealed class DomainIdentitySourceAttribute : Attribute;

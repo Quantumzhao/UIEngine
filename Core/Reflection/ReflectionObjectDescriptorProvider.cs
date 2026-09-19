@@ -291,26 +291,26 @@ internal sealed class ReflectionReferenceDescriptor : ReflectionMemberDescriptor
 
     public Type ReferenceType => Metadata.MemberType;
 
-    public ValueTask<InteractionResult<ObjectHandle>> ReadAsync(
+    public async ValueTask<InteractionResult<ObjectHandle>> ReadAsync(
         CancellationToken cancellationToken = default)
     {
         if (IsHostDisposed)
         {
-            return ValueTask.FromResult(_DisposedFailure<ObjectHandle>());
+            return _DisposedFailure<ObjectHandle>();
         }
 
         if (cancellationToken.IsCancellationRequested)
         {
-            return ValueTask.FromResult(InteractionResult.Failure<ObjectHandle>(
+            return InteractionResult.Failure<ObjectHandle>(
                 InteractionErrorCode.CANCELLED,
-                "Reference resolution was cancelled."));
+                "Reference resolution was cancelled.");
         }
 
         if (!TryGetTarget(out var target) || target is null)
         {
-            return ValueTask.FromResult(InteractionResult.Failure<ObjectHandle>(
+            return InteractionResult.Failure<ObjectHandle>(
                 InteractionErrorCode.TARGET_UNAVAILABLE,
-                "The containing object is no longer available."));
+                "The containing object is no longer available.");
         }
 
         try
@@ -318,32 +318,31 @@ internal sealed class ReflectionReferenceDescriptor : ReflectionMemberDescriptor
             var referencedObject = ReflectionMemberAccess.Read(Metadata.Member, target);
             if (referencedObject is null)
             {
-                return ValueTask.FromResult(InteractionResult.Failure<ObjectHandle>(
+                return InteractionResult.Failure<ObjectHandle>(
                     InteractionErrorCode.TARGET_UNAVAILABLE,
-                    $"Reference '{Id}' is null."));
+                    $"Reference '{Id}' is null.");
             }
 
             if (referencedObject.GetType().IsValueType)
             {
-                return ValueTask.FromResult(InteractionResult.Failure<ObjectHandle>(
+                return InteractionResult.Failure<ObjectHandle>(
                     InteractionErrorCode.UNSUPPORTED_TARGET_TYPE,
-                    $"Reference '{Id}' produced a value type."));
+                    $"Reference '{Id}' produced a value type.");
             }
 
-            return ValueTask.FromResult(InteractionResult.Success(
-                _Host.GetOrCreateHandle(referencedObject)));
+            return await _Host.EncounterAsync(referencedObject, cancellationToken).ConfigureAwait(false);
         }
         catch (TargetInvocationException exception)
         {
-            return ValueTask.FromResult(InteractionResult.Failure<ObjectHandle>(
+            return InteractionResult.Failure<ObjectHandle>(
                 InteractionErrorCode.INVOCATION_FAILED,
-                exception.InnerException?.Message ?? exception.Message));
+                exception.InnerException?.Message ?? exception.Message);
         }
         catch (InvalidOperationException exception)
         {
-            return ValueTask.FromResult(InteractionResult.Failure<ObjectHandle>(
+            return InteractionResult.Failure<ObjectHandle>(
                 InteractionErrorCode.DESCRIPTOR_UNAVAILABLE,
-                exception.Message));
+                exception.Message);
         }
     }
 }
@@ -365,35 +364,35 @@ internal sealed class ReflectionCollectionDescriptor : ReflectionMemberDescripto
 
     public Type ElementType { get; }
 
-    public ValueTask<InteractionResult<IReadOnlyList<ObjectHandle>>> SnapshotAsync(
+    public async ValueTask<InteractionResult<IReadOnlyList<ObjectHandle>>> SnapshotAsync(
         CancellationToken cancellationToken = default)
     {
         if (IsHostDisposed)
         {
-            return ValueTask.FromResult(_DisposedFailure<IReadOnlyList<ObjectHandle>>());
+            return _DisposedFailure<IReadOnlyList<ObjectHandle>>();
         }
 
         if (cancellationToken.IsCancellationRequested)
         {
-            return ValueTask.FromResult(InteractionResult.Failure<IReadOnlyList<ObjectHandle>>(
+            return InteractionResult.Failure<IReadOnlyList<ObjectHandle>>(
                 InteractionErrorCode.CANCELLED,
-                "Collection enumeration was cancelled."));
+                "Collection enumeration was cancelled.");
         }
 
         if (!TryGetTarget(out var target) || target is null)
         {
-            return ValueTask.FromResult(InteractionResult.Failure<IReadOnlyList<ObjectHandle>>(
+            return InteractionResult.Failure<IReadOnlyList<ObjectHandle>>(
                 InteractionErrorCode.TARGET_UNAVAILABLE,
-                "The containing object is no longer available."));
+                "The containing object is no longer available.");
         }
 
         try
         {
             if (ReflectionMemberAccess.Read(Metadata.Member, target) is not IEnumerable collection)
             {
-                return ValueTask.FromResult(InteractionResult.Failure<IReadOnlyList<ObjectHandle>>(
+                return InteractionResult.Failure<IReadOnlyList<ObjectHandle>>(
                     InteractionErrorCode.TARGET_UNAVAILABLE,
-                    $"Collection '{Id}' is null or unavailable."));
+                    $"Collection '{Id}' is null or unavailable.");
             }
 
             var handles = new List<ObjectHandle>();
@@ -402,43 +401,50 @@ internal sealed class ReflectionCollectionDescriptor : ReflectionMemberDescripto
             {
                 if (cancellationToken.IsCancellationRequested)
                 {
-                    return ValueTask.FromResult(InteractionResult.Failure<IReadOnlyList<ObjectHandle>>(
+                    return InteractionResult.Failure<IReadOnlyList<ObjectHandle>>(
                         InteractionErrorCode.CANCELLED,
-                        "Collection enumeration was cancelled."));
+                        "Collection enumeration was cancelled.");
                 }
 
                 if (item is null)
                 {
-                    return ValueTask.FromResult(InteractionResult.Failure<IReadOnlyList<ObjectHandle>>(
+                    return InteractionResult.Failure<IReadOnlyList<ObjectHandle>>(
                         InteractionErrorCode.TARGET_UNAVAILABLE,
-                        $"Collection '{Id}' contains a null element at index {index}."));
+                        $"Collection '{Id}' contains a null element at index {index}.");
                 }
 
                 if (item.GetType().IsValueType)
                 {
-                    return ValueTask.FromResult(InteractionResult.Failure<IReadOnlyList<ObjectHandle>>(
+                    return InteractionResult.Failure<IReadOnlyList<ObjectHandle>>(
                         InteractionErrorCode.UNSUPPORTED_TARGET_TYPE,
-                        $"Collection '{Id}' contains a value-type element at index {index}."));
+                        $"Collection '{Id}' contains a value-type element at index {index}.");
                 }
 
-                handles.Add(_Host.GetOrCreateHandle(item));
+                var encountered = await _Host.EncounterAsync(item, cancellationToken).ConfigureAwait(false);
+                if (!encountered.IsSuccess)
+                {
+                    return InteractionResult.Failure<IReadOnlyList<ObjectHandle>>(
+                        encountered.Error!.Code,
+                        encountered.Error.Message);
+                }
+
+                handles.Add(encountered.Value);
                 index++;
             }
 
-            return ValueTask.FromResult(InteractionResult.Success<IReadOnlyList<ObjectHandle>>(
-                handles.ToArray()));
+            return InteractionResult.Success<IReadOnlyList<ObjectHandle>>(handles.ToArray());
         }
         catch (TargetInvocationException exception)
         {
-            return ValueTask.FromResult(InteractionResult.Failure<IReadOnlyList<ObjectHandle>>(
+            return InteractionResult.Failure<IReadOnlyList<ObjectHandle>>(
                 InteractionErrorCode.INVOCATION_FAILED,
-                exception.InnerException?.Message ?? exception.Message));
+                exception.InnerException?.Message ?? exception.Message);
         }
         catch (InvalidOperationException exception)
         {
-            return ValueTask.FromResult(InteractionResult.Failure<IReadOnlyList<ObjectHandle>>(
+            return InteractionResult.Failure<IReadOnlyList<ObjectHandle>>(
                 InteractionErrorCode.INVOCATION_FAILED,
-                exception.Message));
+                exception.Message);
         }
     }
 }

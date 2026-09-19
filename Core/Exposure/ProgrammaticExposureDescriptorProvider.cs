@@ -17,7 +17,8 @@ internal sealed class ProgrammaticExposureDescriptorProvider
         _ReflectionFallback = reflectionFallback;
     }
 
-    public bool CanDescribe(Type objectType) => _Registry.TryGet(objectType, out _);
+    public bool CanDescribe(Type objectType) =>
+        _Registry.TryGet(objectType, out var registration) && registration?.HasDescriptorExposure == true;
 
     public async ValueTask<InteractionResult<IObjectDescriptor>> DescribeAsync(
         UIEngineHost host,
@@ -25,7 +26,8 @@ internal sealed class ProgrammaticExposureDescriptorProvider
         ObjectHandle handle,
         CancellationToken cancellationToken)
     {
-        if (!_Registry.TryGet(instance.GetType(), out var registration) || registration is null)
+        if (!_Registry.TryGet(instance.GetType(), out var registration) ||
+            registration?.HasDescriptorExposure != true)
         {
             return InteractionResult.Failure<IObjectDescriptor>(
                 InteractionErrorCode.DESCRIPTOR_UNAVAILABLE,

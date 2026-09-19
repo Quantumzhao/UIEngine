@@ -1,6 +1,6 @@
 # Milestone 02 — Framework MVP Interaction Hardening
 
-**Status:** In progress — step 3 registration/composition slice complete
+**Status:** In progress — step 4 complete; remaining step 3 metadata roles are still open
 
 **Acceptance:** Not run
 
@@ -25,7 +25,7 @@ This milestone excludes the product TUI, frontend capability negotiation, layout
 
 The current implementation provides:
 
-- a single `Core` assembly with host-scoped roots, reference-based runtime identity, reflection discovery, semantic descriptor interfaces, structured results, scalar conversion, finite collection snapshots, and synchronous actions;
+- a single `Core` assembly with host-scoped replaceable roots, reference-based runtime identity, lazy domain-identity indexing, reflection discovery, semantic descriptor interfaces, structured results, scalar conversion, finite collection snapshots, and synchronous actions;
 - a separate CLI with descriptor-aware completion and `ls`, `cd`, `inspect`, `get`, `set`, `call`, and `exit`;
 - a deterministic cyclic fixture; and
 - framework, CLI, dependency, and legacy-characterization test projects.
@@ -271,14 +271,16 @@ Step 2 completed on 2026-09-19. `dotnet build UIEngine.sln` completed with zero 
 3. Separate immutable type metadata from host-, context-, instance-, and live-state evaluation.
 4. Validate definitions and provider selection before executing live operations.
 
-Step 3 began on 2026-09-19 with exact-type value and summary registration, per-host immutable snapshots, and fixed programmatic/custom/reflection precedence. Programmatic members supplement reflection and override same-identifier reflected members. The remaining registration roles and metadata validation above are not yet complete. `dotnet build UIEngine.sln` completed with zero warnings and errors, and `dotnet test UIEngine.sln --no-build` passed all 45 tests (34 framework, 6 CLI, and 5 legacy-characterization tests).
+Step 3 began on 2026-09-19 with exact-type value and summary registration, per-host immutable snapshots, and fixed programmatic/custom/reflection precedence. Programmatic members supplement reflection and override same-identifier reflected members. Identity callbacks were subsequently completed in step 4; the other registration roles and metadata validation above are not yet complete. `dotnet build UIEngine.sln` completed with zero warnings and errors, and `dotnet test UIEngine.sln --no-build` passed all 45 tests (34 framework, 6 CLI, and 5 legacy-characterization tests).
 
 ### 4. Normalize domain identity and replacement
 
-1. Add normalized interface, attribute, and callback identity sources with documented precedence.
-2. Track encountered domain identities without eagerly walking the graph.
-3. Add structured duplicate/ambiguous identity handling.
-4. Add root replacement/unregistration and tests proving new runtime identity, stable domain identity, and release of old registrations.
+1. [x] Add normalized interface, attribute, and callback identity sources with documented precedence.
+2. [x] Track encountered domain identities without eagerly walking the graph.
+3. [x] Add structured duplicate/ambiguous identity handling.
+4. [x] Add root replacement/unregistration and tests proving new runtime identity, stable domain identity, and release of old registrations.
+
+Step 4 completed on 2026-09-19. Explicit exposure-registry identity callbacks take precedence, followed by the first configured provider; otherwise interface and attributed-member sources are reconciled and conflicting values fail discovery. Only described or explicitly traversed objects enter the host-scoped identity index. Duplicate live keys resolve as ambiguous, and root replacement/unregistration releases the old registration without conflating runtime and domain identity. `dotnet build UIEngine.sln` completed with zero warnings and errors, and `dotnet test UIEngine.sln --no-build` passed all 55 tests (43 framework, 7 CLI, and 5 legacy-characterization tests).
 
 ### 5. Implement logical paths and binding resolution
 

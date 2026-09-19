@@ -34,7 +34,22 @@ public sealed class ExposureTypeBuilder<T> : IExposureTypeBuilder
     where T : class
 {
     private readonly List<ValueExposureDefinition> _Values = [];
+    private Func<object, string?>? _DomainIdentity;
     private Func<object, string?>? _Summary;
+
+    /// <summary>Sets the stable domain identity cached when an instance is encountered.</summary>
+    public ExposureTypeBuilder<T> Identity(Func<T, string?> identity)
+    {
+        ArgumentNullException.ThrowIfNull(identity);
+        if (_DomainIdentity is not null)
+        {
+            throw new InvalidOperationException(
+                $"A domain identity is already registered for '{typeof(T).FullName}'.");
+        }
+
+        _DomainIdentity = instance => identity((T)instance);
+        return this;
+    }
 
     /// <summary>Adds a live scalar value whose display name may depend on the current instance.</summary>
     public ExposureTypeBuilder<T> Value<TValue>(
@@ -85,7 +100,8 @@ public sealed class ExposureTypeBuilder<T> : IExposureTypeBuilder
         return new ExposureTypeRegistration(
             typeof(T),
             new ReadOnlyCollection<ValueExposureDefinition>(_Values.ToArray()),
-            _Summary);
+            _Summary,
+            _DomainIdentity);
     }
 }
 
@@ -104,7 +120,11 @@ internal sealed record ValueExposureDefinition(
 internal sealed record ExposureTypeRegistration(
     Type ObjectType,
     IReadOnlyList<ValueExposureDefinition> Values,
-    Func<object, string?>? GetSummary);
+    Func<object, string?>? GetSummary,
+    Func<object, string?>? GetDomainIdentity)
+{
+    public bool HasDescriptorExposure => Values.Count > 0 || GetSummary is not null;
+}
 
 internal sealed class ExposureRegistrySnapshot
 {
