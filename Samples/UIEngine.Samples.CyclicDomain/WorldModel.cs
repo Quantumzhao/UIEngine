@@ -34,16 +34,34 @@ public sealed class Nation
     public string Code { get; }
 
     [Expose]
+    public int Population { get; set; }
+
+    [Expose(ReadOnly = true)]
+    public int Turn => _Turn;
+
+    [Expose]
     public City? Capital { get; set; }
 
     [Children]
     public IList<City> Cities { get; } = new List<City>();
 
     [Summary]
-    public string Summary => Code;
+    public string Summary => $"{Code}: {Population} resident(s), turn {Turn}";
 
     [Action]
-    public void AdvanceTurn() => _Turn++;
+    public int AdvanceTurn(int populationDelta)
+    {
+        if (populationDelta < 0)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(populationDelta),
+                "Population delta cannot be negative.");
+        }
+
+        Population += populationDelta;
+        _Turn++;
+        return Population;
+    }
 
     public string HiddenState { get; } = "hidden";
 }

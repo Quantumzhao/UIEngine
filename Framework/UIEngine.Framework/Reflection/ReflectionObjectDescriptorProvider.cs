@@ -1,4 +1,7 @@
+using System.Collections;
 using System.Reflection;
+using System.Runtime.CompilerServices;
+using UIEngine.Attributes;
 using UIEngine.Core;
 
 namespace UIEngine.Reflection;
@@ -65,7 +68,7 @@ internal sealed class ReflectionObjectDescriptor : IObjectDescriptor
             .ToArray();
         Collections = metadata.DescriptorMembers
             .Where(static member => member.Kind == ReflectionMemberKind.COLLECTION)
-            .Select(member => (ICollectionDescriptor)new ReflectionCollectionDescriptor(instance, member))
+            .Select(member => (ICollectionDescriptor)new ReflectionCollectionDescriptor(host, instance, member))
             .ToArray();
         Actions = metadata.DescriptorMembers
             .Where(static member => member.Kind == ReflectionMemberKind.ACTION)
@@ -131,36 +134,122 @@ internal abstract class ReflectionMemberDescriptor : IMemberDescriptor
     protected bool TryGetTarget(out object? target) => _Target.TryGetTarget(out target);
 }
 
-/// <summary>Describes a scalar member whose live operations are supplied in Part 7.</summary>
+/// <summary>Reads and writes one exposed scalar member against current domain state.</summary>
 internal sealed class ReflectionValueDescriptor : ReflectionMemberDescriptor, IValueDescriptor
 {
     public ReflectionValueDescriptor(object target, ReflectionMemberMetadata metadata)
         : base(target, metadata)
     {
+        CanRead = ReflectionMemberAccess.CanRead(metadata.Member);
+        CanWrite = ReflectionMemberAccess.CanWrite(metadata.Member) &&
+            metadata.Member.GetCustomAttribute<ExposeAttribute>(inherit: true)?.ReadOnly != true;
     }
 
     public Type ValueType => Metadata.MemberType;
 
-    public bool CanRead => false;
+    public bool CanRead { get; }
 
-    public bool CanWrite => false;
+    public bool CanWrite { get; }
 
-    public ValueTask<InteractionResult<object?>> ReadAsync(CancellationToken cancellationToken = default) =>
-        ValueTask.FromResult(_Unavailable(cancellationToken));
+    public ValueTask<InteractionResult<object?>> ReadAsync(CancellationToken cancellationToken = default)
+    {
+        if (cancellationToken.IsCancellationRequested)
+        {
+            return ValueTask.FromResult(InteractionResult.Failure<object?>(
+                InteractionErrorCode.CANCELLED,
+                "The value read was cancelled."));
+        }
+
+        if (!CanRead)
+        {
+            return ValueTask.FromResult(InteractionResult.Failure<object?>(
+                InteractionErrorCode.DESCRIPTOR_UNAVAILABLE,
+                $"Value '{Id}' is not readable."));
+        }
+
+        if (!TryGetTarget(out var target) || target is null)
+        {
+            return ValueTask.FromResult(InteractionResult.Failure<object?>(
+                InteractionErrorCode.TARGET_UNAVAILABLE,
+                "The containing object is no longer available."));
+        }
+
+        try
+        {
+            return ValueTask.FromResult(InteractionResult.Success(
+                ReflectionMemberAccess.Read(Metadata.Member, target)));
+        }
+        catch (TargetInvocationException exception)
+        {
+            return ValueTask.FromResult(InteractionResult.Failure<object?>(
+                InteractionErrorCode.INVOCATION_FAILED,
+                exception.InnerException?.Message ?? exception.Message));
+        }
+        catch (InvalidOperationException exception)
+        {
+            return ValueTask.FromResult(InteractionResult.Failure<object?>(
+                InteractionErrorCode.DESCRIPTOR_UNAVAILABLE,
+                exception.Message));
+        }
+    }
 
     public ValueTask<InteractionResult<object?>> WriteAsync(
         object? value,
-        CancellationToken cancellationToken = default) =>
-        ValueTask.FromResult(_Unavailable(cancellationToken));
-
-    private static InteractionResult<object?> _Unavailable(CancellationToken cancellationToken) =>
-        cancellationToken.IsCancellationRequested
-            ? InteractionResult.Failure<object?>(
+        CancellationToken cancellationToken = default)
+    {
+        if (cancellationToken.IsCancellationRequested)
+        {
+            return ValueTask.FromResult(InteractionResult.Failure<object?>(
                 InteractionErrorCode.CANCELLED,
-                "The value operation was cancelled.")
-            : InteractionResult.Failure<object?>(
-                InteractionErrorCode.DESCRIPTOR_UNAVAILABLE,
-                "Live value operations are introduced in Part 7.");
+                "The value write was cancelled."));
+        }
+
+        if (!CanWrite)
+        {
+            return ValueTask.FromResult(InteractionResult.Failure<object?>(
+                InteractionErrorCode.VALIDATION_FAILED,
+                $"Value '{Id}' is read-only."));
+        }
+
+        if (!TryGetTarget(out var target) || target is null)
+        {
+            return ValueTask.FromResult(InteractionResult.Failure<object?>(
+                InteractionErrorCode.TARGET_UNAVAILABLE,
+                "The containing object is no longer available."));
+        }
+
+        var converted = ReflectionValueConverter.Convert(value, ValueType);
+        if (!converted.IsSuccess)
+        {
+            return ValueTask.FromResult(converted);
+        }
+
+        try
+        {
+            ReflectionMemberAccess.Write(Metadata.Member, target, converted.Value);
+            return ValueTask.FromResult(InteractionResult.Success(converted.Value));
+        }
+        catch (TargetInvocationException exception)
+        {
+            var cause = exception.InnerException ?? exception;
+            var code = cause is ArgumentException
+                ? InteractionErrorCode.VALIDATION_FAILED
+                : InteractionErrorCode.INVOCATION_FAILED;
+            return ValueTask.FromResult(InteractionResult.Failure<object?>(code, cause.Message));
+        }
+        catch (ArgumentException exception)
+        {
+            return ValueTask.FromResult(InteractionResult.Failure<object?>(
+                InteractionErrorCode.VALIDATION_FAILED,
+                exception.Message));
+        }
+        catch (InvalidOperationException exception)
+        {
+            return ValueTask.FromResult(InteractionResult.Failure<object?>(
+                InteractionErrorCode.VALIDATION_FAILED,
+                exception.Message));
+        }
+    }
 }
 
 /// <summary>Resolves an exposed object reference to a host-scoped handle on demand.</summary>
@@ -231,12 +320,18 @@ internal sealed class ReflectionReferenceDescriptor : ReflectionMemberDescriptor
     }
 }
 
-/// <summary>Describes an exposed collection without enumerating it during discovery.</summary>
+/// <summary>Produces explicitly requested finite handle snapshots of an exposed collection.</summary>
 internal sealed class ReflectionCollectionDescriptor : ReflectionMemberDescriptor, ICollectionDescriptor
 {
-    public ReflectionCollectionDescriptor(object target, ReflectionMemberMetadata metadata)
+    private readonly UIEngineHost _Host;
+
+    public ReflectionCollectionDescriptor(
+        UIEngineHost host,
+        object target,
+        ReflectionMemberMetadata metadata)
         : base(target, metadata)
     {
+        _Host = host;
         ElementType = ReflectionTypeClassifier.GetCollectionElementType(metadata.MemberType);
     }
 
@@ -245,24 +340,86 @@ internal sealed class ReflectionCollectionDescriptor : ReflectionMemberDescripto
     public ValueTask<InteractionResult<IReadOnlyList<ObjectHandle>>> SnapshotAsync(
         CancellationToken cancellationToken = default)
     {
-        var result = cancellationToken.IsCancellationRequested
-            ? InteractionResult.Failure<IReadOnlyList<ObjectHandle>>(
+        if (cancellationToken.IsCancellationRequested)
+        {
+            return ValueTask.FromResult(InteractionResult.Failure<IReadOnlyList<ObjectHandle>>(
                 InteractionErrorCode.CANCELLED,
-                "Collection enumeration was cancelled.")
-            : InteractionResult.Failure<IReadOnlyList<ObjectHandle>>(
-                InteractionErrorCode.DESCRIPTOR_UNAVAILABLE,
-                "Finite collection snapshots are introduced in Part 7.");
-        return ValueTask.FromResult(result);
+                "Collection enumeration was cancelled."));
+        }
+
+        if (!TryGetTarget(out var target) || target is null)
+        {
+            return ValueTask.FromResult(InteractionResult.Failure<IReadOnlyList<ObjectHandle>>(
+                InteractionErrorCode.TARGET_UNAVAILABLE,
+                "The containing object is no longer available."));
+        }
+
+        try
+        {
+            if (ReflectionMemberAccess.Read(Metadata.Member, target) is not IEnumerable collection)
+            {
+                return ValueTask.FromResult(InteractionResult.Failure<IReadOnlyList<ObjectHandle>>(
+                    InteractionErrorCode.TARGET_UNAVAILABLE,
+                    $"Collection '{Id}' is null or unavailable."));
+            }
+
+            var handles = new List<ObjectHandle>();
+            var index = 0;
+            foreach (var item in collection)
+            {
+                if (cancellationToken.IsCancellationRequested)
+                {
+                    return ValueTask.FromResult(InteractionResult.Failure<IReadOnlyList<ObjectHandle>>(
+                        InteractionErrorCode.CANCELLED,
+                        "Collection enumeration was cancelled."));
+                }
+
+                if (item is null)
+                {
+                    return ValueTask.FromResult(InteractionResult.Failure<IReadOnlyList<ObjectHandle>>(
+                        InteractionErrorCode.TARGET_UNAVAILABLE,
+                        $"Collection '{Id}' contains a null element at index {index}."));
+                }
+
+                if (item.GetType().IsValueType)
+                {
+                    return ValueTask.FromResult(InteractionResult.Failure<IReadOnlyList<ObjectHandle>>(
+                        InteractionErrorCode.UNSUPPORTED_TARGET_TYPE,
+                        $"Collection '{Id}' contains a value-type element at index {index}."));
+                }
+
+                handles.Add(_Host.GetOrCreateHandle(item));
+                index++;
+            }
+
+            return ValueTask.FromResult(InteractionResult.Success<IReadOnlyList<ObjectHandle>>(
+                handles.ToArray()));
+        }
+        catch (TargetInvocationException exception)
+        {
+            return ValueTask.FromResult(InteractionResult.Failure<IReadOnlyList<ObjectHandle>>(
+                InteractionErrorCode.INVOCATION_FAILED,
+                exception.InnerException?.Message ?? exception.Message));
+        }
+        catch (InvalidOperationException exception)
+        {
+            return ValueTask.FromResult(InteractionResult.Failure<IReadOnlyList<ObjectHandle>>(
+                InteractionErrorCode.INVOCATION_FAILED,
+                exception.Message));
+        }
     }
 }
 
-/// <summary>Describes an exposed action whose invocation is supplied in Part 7.</summary>
+/// <summary>Binds named arguments and invokes one exposed synchronous action.</summary>
 internal sealed class ReflectionActionDescriptor : ReflectionMemberDescriptor, IActionDescriptor
 {
+    private readonly MethodInfo _Method;
+
     public ReflectionActionDescriptor(object target, ReflectionMemberMetadata metadata)
         : base(target, metadata)
     {
-        Parameters = ((MethodInfo)metadata.Member)
+        _Method = (MethodInfo)metadata.Member;
+        Parameters = _Method
             .GetParameters()
             .Select(static parameter => (IParameterDescriptor)new ReflectionParameterDescriptor(parameter))
             .ToArray();
@@ -275,14 +432,96 @@ internal sealed class ReflectionActionDescriptor : ReflectionMemberDescriptor, I
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(arguments);
-        var result = cancellationToken.IsCancellationRequested
-            ? InteractionResult.Failure<object?>(
+        if (cancellationToken.IsCancellationRequested)
+        {
+            return ValueTask.FromResult(InteractionResult.Failure<object?>(
                 InteractionErrorCode.CANCELLED,
-                "Action invocation was cancelled.")
-            : InteractionResult.Failure<object?>(
+                "Action invocation was cancelled."));
+        }
+
+        if (_Method.ContainsGenericParameters ||
+            _Method.GetParameters().Any(static parameter => parameter.ParameterType.IsByRef) ||
+            typeof(Task).IsAssignableFrom(_Method.ReturnType) ||
+            _Method.ReturnType == typeof(ValueTask) ||
+            _Method.ReturnType.IsGenericType &&
+            _Method.ReturnType.GetGenericTypeDefinition() == typeof(ValueTask<>))
+        {
+            return ValueTask.FromResult(InteractionResult.Failure<object?>(
                 InteractionErrorCode.DESCRIPTOR_UNAVAILABLE,
-                "Action invocation is introduced in Part 7.");
-        return ValueTask.FromResult(result);
+                $"Action '{Id}' is not a supported synchronous method."));
+        }
+
+        if (!TryGetTarget(out var target) || target is null)
+        {
+            return ValueTask.FromResult(InteractionResult.Failure<object?>(
+                InteractionErrorCode.TARGET_UNAVAILABLE,
+                "The containing object is no longer available."));
+        }
+
+        var methodParameters = _Method.GetParameters();
+        var unknownArgument = arguments.Keys.FirstOrDefault(argumentName =>
+            !methodParameters.Any(parameter =>
+                string.Equals(parameter.Name, argumentName, StringComparison.Ordinal)));
+        if (unknownArgument is not null)
+        {
+            return ValueTask.FromResult(InteractionResult.Failure<object?>(
+                InteractionErrorCode.INVALID_INPUT,
+                $"Action '{Id}' has no parameter named '{unknownArgument}'."));
+        }
+
+        var boundArguments = new object?[methodParameters.Length];
+        for (var index = 0; index < methodParameters.Length; index++)
+        {
+            var parameter = methodParameters[index];
+            var suppliedArgument = arguments.FirstOrDefault(argument =>
+                string.Equals(argument.Key, parameter.Name, StringComparison.Ordinal));
+            var wasSupplied = suppliedArgument.Key is not null;
+            if (!wasSupplied)
+            {
+                if (!parameter.IsOptional)
+                {
+                    return ValueTask.FromResult(InteractionResult.Failure<object?>(
+                        InteractionErrorCode.INVALID_INPUT,
+                        $"Required parameter '{parameter.Name}' was not supplied."));
+                }
+
+                boundArguments[index] = parameter.DefaultValue;
+                continue;
+            }
+
+            var converted = ReflectionValueConverter.Convert(
+                suppliedArgument.Value,
+                parameter.ParameterType);
+            if (!converted.IsSuccess)
+            {
+                var error = converted.Error ?? new InteractionError(
+                    InteractionErrorCode.CONVERSION_FAILED,
+                    "The argument could not be converted.");
+                return ValueTask.FromResult(InteractionResult.Failure<object?>(
+                    error.Code,
+                    $"Parameter '{parameter.Name}': {error.Message}"));
+            }
+
+            boundArguments[index] = converted.Value;
+        }
+
+        try
+        {
+            return ValueTask.FromResult(InteractionResult.Success(
+                _Method.Invoke(target, boundArguments)));
+        }
+        catch (TargetInvocationException exception)
+        {
+            return ValueTask.FromResult(InteractionResult.Failure<object?>(
+                InteractionErrorCode.INVOCATION_FAILED,
+                exception.InnerException?.Message ?? exception.Message));
+        }
+        catch (ArgumentException exception)
+        {
+            return ValueTask.FromResult(InteractionResult.Failure<object?>(
+                InteractionErrorCode.INVALID_INPUT,
+                exception.Message));
+        }
     }
 }
 
@@ -312,6 +551,25 @@ internal sealed class ReflectionParameterDescriptor : IParameterDescriptor
 /// <summary>Reads reflected properties, fields, and parameterless summary methods.</summary>
 internal static class ReflectionMemberAccess
 {
+    public static bool CanRead(MemberInfo member) => member switch
+    {
+        PropertyInfo property => property.GetMethod?.IsPublic == true &&
+            property.GetIndexParameters().Length == 0,
+        FieldInfo => true,
+        _ => false,
+    };
+
+    public static bool CanWrite(MemberInfo member) => member switch
+    {
+        PropertyInfo property => property.SetMethod?.IsPublic == true &&
+            property.GetIndexParameters().Length == 0 &&
+            !property.SetMethod.ReturnParameter
+                .GetRequiredCustomModifiers()
+                .Contains(typeof(IsExternalInit)),
+        FieldInfo field => !field.IsInitOnly && !field.IsLiteral,
+        _ => false,
+    };
+
     public static object? Read(MemberInfo member, object instance) => member switch
     {
         PropertyInfo property when property.GetIndexParameters().Length == 0 => property.GetValue(instance),
@@ -319,6 +577,21 @@ internal static class ReflectionMemberAccess
         MethodInfo method when method.GetParameters().Length == 0 => method.Invoke(instance, null),
         _ => throw new InvalidOperationException($"Member '{member.Name}' cannot be read without arguments."),
     };
+
+    public static void Write(MemberInfo member, object instance, object? value)
+    {
+        switch (member)
+        {
+            case PropertyInfo property when CanWrite(property):
+                property.SetValue(instance, value);
+                break;
+            case FieldInfo field when CanWrite(field):
+                field.SetValue(instance, value);
+                break;
+            default:
+                throw new InvalidOperationException($"Member '{member.Name}' is read-only.");
+        }
+    }
 }
 
 /// <summary>Provides reflection type-shape helpers shared by descriptor implementations.</summary>

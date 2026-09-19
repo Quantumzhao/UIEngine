@@ -33,7 +33,7 @@ public sealed class ReflectionDescriptorTests
         var first = (await host.DescribeAsync(handle)).Value;
         var second = (await host.DescribeAsync(handle)).Value;
 
-        var value = Assert.Single(first.Values);
+        var value = Assert.Single(first.Values, descriptor => descriptor.Id == nameof(Nation.Code));
         var reference = Assert.Single(first.References);
         var collection = Assert.Single(first.Collections);
 
@@ -44,7 +44,7 @@ public sealed class ReflectionDescriptorTests
         Assert.Equal(nameof(Nation.Cities), collection.Id);
         Assert.Equal(typeof(City), collection.ElementType);
         Assert.Equal(nameof(Nation.AdvanceTurn), Assert.Single(first.Actions).Id);
-        Assert.Equal("N1", first.Summary);
+        Assert.Equal("N1: 0 resident(s), turn 0", first.Summary);
 
         var firstIdentifiers = _GetIdentifiers(first);
         Assert.Equal(firstIdentifiers.Length, firstIdentifiers.Distinct(StringComparer.Ordinal).Count());
