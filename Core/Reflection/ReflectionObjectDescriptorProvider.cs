@@ -59,7 +59,7 @@ internal sealed class ReflectionObjectDescriptor : IObjectDescriptor
 
         Values = metadata.DescriptorMembers
             .Where(static member => member.Kind == ReflectionMemberKind.VALUE)
-            .Select(member => (IValueDescriptor)new ReflectionValueDescriptor(instance, member))
+            .Select(member => (IValueDescriptor)new ReflectionValueDescriptor(host, instance, member))
             .ToArray();
         References = metadata.DescriptorMembers
             .Where(static member => member.Kind == ReflectionMemberKind.REFERENCE)
@@ -71,7 +71,7 @@ internal sealed class ReflectionObjectDescriptor : IObjectDescriptor
             .ToArray();
         Actions = metadata.DescriptorMembers
             .Where(static member => member.Kind == ReflectionMemberKind.ACTION)
-            .Select(member => (IActionDescriptor)new ReflectionActionDescriptor(instance, member))
+            .Select(member => (IActionDescriptor)new ReflectionActionDescriptor(host, instance, member))
             .ToArray();
     }
 
@@ -116,10 +116,15 @@ internal sealed class ReflectionObjectDescriptor : IObjectDescriptor
 /// <summary>Provides shared metadata and weak target access for reflected member descriptors.</summary>
 internal abstract class ReflectionMemberDescriptor : IMemberDescriptor
 {
+    private readonly UIEngineHost _Host;
     private readonly WeakReference<object> _Target;
 
-    protected ReflectionMemberDescriptor(object target, ReflectionMemberMetadata metadata)
+    protected ReflectionMemberDescriptor(
+        UIEngineHost host,
+        object target,
+        ReflectionMemberMetadata metadata)
     {
+        _Host = host;
         _Target = new WeakReference<object>(target);
         Metadata = metadata;
     }
@@ -130,14 +135,23 @@ internal abstract class ReflectionMemberDescriptor : IMemberDescriptor
 
     protected ReflectionMemberMetadata Metadata { get; }
 
+    protected bool IsHostDisposed => _Host.IsDisposed;
+
     protected bool TryGetTarget(out object? target) => _Target.TryGetTarget(out target);
+
+    protected static InteractionResult<T> _DisposedFailure<T>() => InteractionResult.Failure<T>(
+        InteractionErrorCode.HOST_DISPOSED,
+        "The UIEngine host has been disposed.");
 }
 
 /// <summary>Reads and writes one exposed scalar member against current domain state.</summary>
 internal sealed class ReflectionValueDescriptor : ReflectionMemberDescriptor, IValueDescriptor
 {
-    public ReflectionValueDescriptor(object target, ReflectionMemberMetadata metadata)
-        : base(target, metadata)
+    public ReflectionValueDescriptor(
+        UIEngineHost host,
+        object target,
+        ReflectionMemberMetadata metadata)
+        : base(host, target, metadata)
     {
         CanRead = ReflectionMemberAccess.CanRead(metadata.Member);
         CanWrite = ReflectionMemberAccess.CanWrite(metadata.Member) &&
@@ -152,6 +166,11 @@ internal sealed class ReflectionValueDescriptor : ReflectionMemberDescriptor, IV
 
     public ValueTask<InteractionResult<object?>> ReadAsync(CancellationToken cancellationToken = default)
     {
+        if (IsHostDisposed)
+        {
+            return ValueTask.FromResult(_DisposedFailure<object?>());
+        }
+
         if (cancellationToken.IsCancellationRequested)
         {
             return ValueTask.FromResult(InteractionResult.Failure<object?>(
@@ -196,6 +215,11 @@ internal sealed class ReflectionValueDescriptor : ReflectionMemberDescriptor, IV
         object? value,
         CancellationToken cancellationToken = default)
     {
+        if (IsHostDisposed)
+        {
+            return ValueTask.FromResult(_DisposedFailure<object?>());
+        }
+
         if (cancellationToken.IsCancellationRequested)
         {
             return ValueTask.FromResult(InteractionResult.Failure<object?>(
@@ -260,7 +284,7 @@ internal sealed class ReflectionReferenceDescriptor : ReflectionMemberDescriptor
         UIEngineHost host,
         object target,
         ReflectionMemberMetadata metadata)
-        : base(target, metadata)
+        : base(host, target, metadata)
     {
         _Host = host;
     }
@@ -270,6 +294,11 @@ internal sealed class ReflectionReferenceDescriptor : ReflectionMemberDescriptor
     public ValueTask<InteractionResult<ObjectHandle>> ReadAsync(
         CancellationToken cancellationToken = default)
     {
+        if (IsHostDisposed)
+        {
+            return ValueTask.FromResult(_DisposedFailure<ObjectHandle>());
+        }
+
         if (cancellationToken.IsCancellationRequested)
         {
             return ValueTask.FromResult(InteractionResult.Failure<ObjectHandle>(
@@ -328,7 +357,7 @@ internal sealed class ReflectionCollectionDescriptor : ReflectionMemberDescripto
         UIEngineHost host,
         object target,
         ReflectionMemberMetadata metadata)
-        : base(target, metadata)
+        : base(host, target, metadata)
     {
         _Host = host;
         ElementType = ReflectionTypeClassifier.GetCollectionElementType(metadata.MemberType);
@@ -339,6 +368,11 @@ internal sealed class ReflectionCollectionDescriptor : ReflectionMemberDescripto
     public ValueTask<InteractionResult<IReadOnlyList<ObjectHandle>>> SnapshotAsync(
         CancellationToken cancellationToken = default)
     {
+        if (IsHostDisposed)
+        {
+            return ValueTask.FromResult(_DisposedFailure<IReadOnlyList<ObjectHandle>>());
+        }
+
         if (cancellationToken.IsCancellationRequested)
         {
             return ValueTask.FromResult(InteractionResult.Failure<IReadOnlyList<ObjectHandle>>(
@@ -414,8 +448,11 @@ internal sealed class ReflectionActionDescriptor : ReflectionMemberDescriptor, I
 {
     private readonly MethodInfo _Method;
 
-    public ReflectionActionDescriptor(object target, ReflectionMemberMetadata metadata)
-        : base(target, metadata)
+    public ReflectionActionDescriptor(
+        UIEngineHost host,
+        object target,
+        ReflectionMemberMetadata metadata)
+        : base(host, target, metadata)
     {
         _Method = (MethodInfo)metadata.Member;
         Parameters = _Method
@@ -431,6 +468,11 @@ internal sealed class ReflectionActionDescriptor : ReflectionMemberDescriptor, I
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(arguments);
+        if (IsHostDisposed)
+        {
+            return ValueTask.FromResult(_DisposedFailure<object?>());
+        }
+
         if (cancellationToken.IsCancellationRequested)
         {
             return ValueTask.FromResult(InteractionResult.Failure<object?>(

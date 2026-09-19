@@ -1,22 +1,61 @@
-using System.Collections.ObjectModel;
 using System.Runtime.CompilerServices;
+using Microsoft.Extensions.Logging;
 
 namespace UIEngine.Core;
 
-public sealed class UIEngineHost
+public sealed class UIEngineHost : IDisposable, IAsyncDisposable
 {
+    private static readonly Action<ILogger, int, Exception?> _HOST_CREATED = LoggerMessage.Define<int>(
+        LogLevel.Debug,
+        UIEngineDiagnosticEventIds.HOST_CREATED,
+        "UIEngine host created with {DescriptorProviderCount} descriptor providers.");
+    private static readonly Action<ILogger, Exception?> _HOST_DISPOSED = LoggerMessage.Define(
+        LogLevel.Debug,
+        UIEngineDiagnosticEventIds.HOST_DISPOSED,
+        "UIEngine host disposed.");
+    private static readonly Action<ILogger, Guid, Exception?> _DISCOVERY_STARTED = LoggerMessage.Define<Guid>(
+        LogLevel.Debug,
+        UIEngineDiagnosticEventIds.DISCOVERY_STARTED,
+        "Descriptor discovery started for runtime object {RuntimeId}.");
+    private static readonly Action<ILogger, Guid, Exception?> _DISCOVERY_COMPLETED = LoggerMessage.Define<Guid>(
+        LogLevel.Debug,
+        UIEngineDiagnosticEventIds.DISCOVERY_COMPLETED,
+        "Descriptor discovery completed for runtime object {RuntimeId}.");
+    private static readonly Action<ILogger, Guid, InteractionErrorCode, Exception?> _DISCOVERY_FAILED =
+        LoggerMessage.Define<Guid, InteractionErrorCode>(
+            LogLevel.Warning,
+            UIEngineDiagnosticEventIds.DISCOVERY_FAILED,
+            "Descriptor discovery failed for runtime object {RuntimeId} with code {ErrorCode}.");
+
     private readonly object _Gate = new();
     private readonly ConditionalWeakTable<object, _IdentityHolder> _Identities = new();
     private readonly Dictionary<ObjectIdentity, WeakReference<object>> _Objects = [];
     private readonly Dictionary<string, _RootEntry> _Roots = new(StringComparer.Ordinal);
+    private readonly ILogger _Logger;
+    private int _IsDisposed;
 
-    public UIEngineHost(IEnumerable<IObjectDescriptorProvider>? providers = null)
+    public UIEngineHost()
+        : this(new UIEngineHostOptions())
     {
-        var providerList = (providers ?? []).ToArray();
-        Providers = new ReadOnlyCollection<IObjectDescriptorProvider>(providerList);
     }
 
-    public IReadOnlyList<IObjectDescriptorProvider> Providers { get; }
+    public UIEngineHost(IEnumerable<IObjectDescriptorProvider> providers)
+        : this(new UIEngineHostOptions { DescriptorProviders = providers })
+    {
+    }
+
+    public UIEngineHost(UIEngineHostOptions options)
+    {
+        Configuration = new UIEngineHostConfiguration(options);
+        _Logger = Configuration.LoggerFactory.CreateLogger<UIEngineHost>();
+        _HOST_CREATED(_Logger, Configuration.DescriptorProviders.Count, null);
+    }
+
+    public UIEngineHostConfiguration Configuration { get; }
+
+    public IReadOnlyList<IObjectDescriptorProvider> Providers => Configuration.DescriptorProviders;
+
+    public bool IsDisposed => Volatile.Read(ref _IsDisposed) != 0;
 
     public IReadOnlyList<RegisteredRoot> Roots
     {
@@ -31,6 +70,11 @@ public sealed class UIEngineHost
 
     public InteractionResult<ObjectHandle> RegisterRoot(string identifier, object instance)
     {
+        if (IsDisposed)
+        {
+            return _DisposedFailure<ObjectHandle>();
+        }
+
         if (string.IsNullOrWhiteSpace(identifier))
         {
             return InteractionResult.Failure<ObjectHandle>(
@@ -49,6 +93,11 @@ public sealed class UIEngineHost
 
         lock (_Gate)
         {
+            if (IsDisposed)
+            {
+                return _DisposedFailure<ObjectHandle>();
+            }
+
             if (_Roots.ContainsKey(identifier))
             {
                 return InteractionResult.Failure<ObjectHandle>(
@@ -65,6 +114,7 @@ public sealed class UIEngineHost
 
     public ObjectHandle GetOrCreateHandle(object instance)
     {
+        ObjectDisposedException.ThrowIf(IsDisposed, this);
         ArgumentNullException.ThrowIfNull(instance);
 
         if (instance.GetType().IsValueType)
@@ -74,41 +124,122 @@ public sealed class UIEngineHost
 
         lock (_Gate)
         {
+            ObjectDisposedException.ThrowIf(IsDisposed, this);
             return _GetOrCreateHandleCore(instance);
         }
     }
 
-    public ValueTask<InteractionResult<IObjectDescriptor>> DescribeAsync(
+    public async ValueTask<InteractionResult<IObjectDescriptor>> DescribeAsync(
         ObjectHandle handle,
         CancellationToken cancellationToken = default)
     {
+        if (IsDisposed)
+        {
+            return _DisposedFailure<IObjectDescriptor>();
+        }
+
         if (cancellationToken.IsCancellationRequested)
         {
-            return ValueTask.FromResult(InteractionResult.Failure<IObjectDescriptor>(
+            return InteractionResult.Failure<IObjectDescriptor>(
                 InteractionErrorCode.CANCELLED,
-                "Descriptor discovery was cancelled."));
+                "Descriptor discovery was cancelled.");
         }
 
         if (!TryResolve(handle, out var instance) || instance is null)
         {
-            return ValueTask.FromResult(InteractionResult.Failure<IObjectDescriptor>(
-                InteractionErrorCode.TARGET_UNAVAILABLE,
-                "The target object is no longer available."));
+            return IsDisposed
+                ? _DisposedFailure<IObjectDescriptor>()
+                : InteractionResult.Failure<IObjectDescriptor>(
+                    InteractionErrorCode.TARGET_UNAVAILABLE,
+                    "The target object is no longer available.");
         }
 
         var provider = Providers.FirstOrDefault(candidate => candidate.CanDescribe(instance.GetType()));
         if (provider is null)
         {
-            return ValueTask.FromResult(InteractionResult.Failure<IObjectDescriptor>(
+            var unavailable = InteractionResult.Failure<IObjectDescriptor>(
                 InteractionErrorCode.DESCRIPTOR_UNAVAILABLE,
-                $"No descriptor provider supports '{instance.GetType().FullName}'."));
+                $"No descriptor provider supports '{instance.GetType().FullName}'.");
+            _DISCOVERY_FAILED(_Logger, handle.Identity.RuntimeId, unavailable.Error!.Code, null);
+            return unavailable;
         }
 
-        return provider.DescribeAsync(this, instance, handle, cancellationToken);
+        _DISCOVERY_STARTED(_Logger, handle.Identity.RuntimeId, null);
+        try
+        {
+            var result = await provider
+                .DescribeAsync(this, instance, handle, cancellationToken)
+                .ConfigureAwait(false);
+            if (result.IsSuccess)
+            {
+                _DISCOVERY_COMPLETED(_Logger, handle.Identity.RuntimeId, null);
+            }
+            else
+            {
+                _DISCOVERY_FAILED(_Logger, handle.Identity.RuntimeId, result.Error!.Code, null);
+            }
+
+            return result;
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            var cancelled = InteractionResult.Failure<IObjectDescriptor>(
+                InteractionErrorCode.CANCELLED,
+                "Descriptor discovery was cancelled.");
+            _DISCOVERY_FAILED(_Logger, handle.Identity.RuntimeId, cancelled.Error!.Code, null);
+            return cancelled;
+        }
+        catch (ObjectDisposedException) when (IsDisposed)
+        {
+            var disposed = _DisposedFailure<IObjectDescriptor>();
+            _DISCOVERY_FAILED(_Logger, handle.Identity.RuntimeId, disposed.Error!.Code, null);
+            return disposed;
+        }
+        catch (Exception exception)
+        {
+            var failed = InteractionResult.Failure<IObjectDescriptor>(
+                InteractionErrorCode.DESCRIPTOR_UNAVAILABLE,
+                exception.Message);
+            _DISCOVERY_FAILED(
+                _Logger,
+                handle.Identity.RuntimeId,
+                failed.Error!.Code,
+                Configuration.IncludeSensitiveDiagnosticData ? exception : null);
+            return failed;
+        }
+    }
+
+    public void Dispose()
+    {
+        if (Interlocked.Exchange(ref _IsDisposed, 1) != 0)
+        {
+            return;
+        }
+
+        lock (_Gate)
+        {
+            _Roots.Clear();
+            _Objects.Clear();
+            _Identities.Clear();
+        }
+
+        _HOST_DISPOSED(_Logger, null);
+    }
+
+    public ValueTask DisposeAsync()
+    {
+        Dispose();
+        return ValueTask.CompletedTask;
     }
 
     internal bool TryResolve(ObjectHandle handle, out object? instance)
     {
+        if (IsDisposed)
+        {
+            instance = null;
+            return false;
+        }
+
         lock (_Gate)
         {
             if (_Objects.TryGetValue(handle.Identity, out var reference) &&
@@ -135,6 +266,10 @@ public sealed class UIEngineHost
         _Objects.Add(identity, new WeakReference<object>(instance));
         return new ObjectHandle(identity);
     }
+
+    private static InteractionResult<T> _DisposedFailure<T>() => InteractionResult.Failure<T>(
+        InteractionErrorCode.HOST_DISPOSED,
+        "The UIEngine host has been disposed.");
 
     private sealed record _IdentityHolder(ObjectIdentity Identity);
 

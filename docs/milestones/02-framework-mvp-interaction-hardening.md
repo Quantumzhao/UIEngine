@@ -1,6 +1,6 @@
 # Milestone 02 — Framework MVP Interaction Hardening
 
-**Status:** In progress — step 1 complete
+**Status:** In progress — step 2 complete
 
 **Acceptance:** Not run
 
@@ -257,10 +257,12 @@ Stop here if the intended repository state cannot be resolved.
 
 ### 2. Establish host services, lifetime, and diagnostics
 
-1. Add explicit host configuration for provider precedence, dispatcher, identity providers, observation adapters, collection limits, and logging.
-2. Add an inline dispatcher and a deterministic test dispatcher.
-3. Make the host disposable and define post-disposal outcomes.
-4. Add structured diagnostic event IDs and a recording-logger test harness, keeping value logging redacted by default.
+1. [x] Add explicit host configuration for provider precedence, dispatcher, identity providers, observation adapters, collection limits, and logging.
+2. [x] Add an inline dispatcher and a deterministic test dispatcher.
+3. [x] Make the host disposable and define post-disposal outcomes.
+4. [x] Add structured diagnostic event IDs and a recording-logger test harness, keeping value logging redacted by default.
+
+Step 2 completed on 2026-09-19. `dotnet build UIEngine.sln` completed with zero warnings and errors, and `dotnet test UIEngine.sln --no-build` passed all 39 tests (28 framework, 6 CLI, and 5 legacy-characterization tests).
 
 ### 3. Add programmatic exposure and complete metadata
 

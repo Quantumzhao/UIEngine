@@ -13,4 +13,5 @@ public enum InteractionErrorCode
     VALIDATION_FAILED = 8,
     INVOCATION_FAILED = 9,
     CANCELLED = 10,
+    HOST_DISPOSED = 11,
 }
