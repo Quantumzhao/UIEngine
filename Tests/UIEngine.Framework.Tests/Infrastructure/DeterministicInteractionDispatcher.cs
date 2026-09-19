@@ -6,10 +6,13 @@ namespace UIEngine.Framework.Tests;
 internal sealed class DeterministicInteractionDispatcher : IInteractionDispatcher
 {
     private readonly Queue<Action> _Pending = new();
+    private bool _HasAccess;
 
     public int InvocationCount { get; private set; }
 
     public int PendingCount => _Pending.Count;
+
+    public bool CheckAccess() => _HasAccess;
 
     public ValueTask<T> InvokeAsync<T>(
         Func<T> action,
@@ -31,6 +34,7 @@ internal sealed class DeterministicInteractionDispatcher : IInteractionDispatche
 
             try
             {
+                _HasAccess = true;
                 completion.SetResult(action());
             }
             catch (Exception exception)
@@ -39,6 +43,7 @@ internal sealed class DeterministicInteractionDispatcher : IInteractionDispatche
             }
             finally
             {
+                _HasAccess = false;
                 cancellationRegistration.Dispose();
             }
         });

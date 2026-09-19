@@ -457,7 +457,7 @@ internal sealed class ReflectionCollectionDescriptor :
                     $"Collection '{Id}' is null or unavailable.");
             }
 
-            var handles = new List<ObjectHandle>();
+            var items = new List<object>();
             var index = 0;
             foreach (var item in collection)
             {
@@ -482,6 +482,13 @@ internal sealed class ReflectionCollectionDescriptor :
                         $"Collection '{Id}' contains a value-type element at index {index}.");
                 }
 
+                items.Add(item);
+                index++;
+            }
+
+            var handles = new List<ObjectHandle>(items.Count);
+            foreach (var item in items)
+            {
                 var encountered = await _Host.EncounterAsync(item, cancellationToken).ConfigureAwait(false);
                 if (!encountered.IsSuccess)
                 {
@@ -491,7 +498,6 @@ internal sealed class ReflectionCollectionDescriptor :
                 }
 
                 handles.Add(encountered.Value);
-                index++;
             }
 
             return InteractionResult.Success<IReadOnlyList<ObjectHandle>>(handles.ToArray());

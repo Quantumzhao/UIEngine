@@ -38,7 +38,7 @@ Detailed milestones:
 - [x] Add logical paths, binding states, and binding recovery.
 - [x] Distinguish successful null and empty values from missing and unavailable targets.
 - [x] Complete finite-selection, parameter, validation, and action execution metadata.
-- [ ] Add validation and dispatcher-mediated reads, writes, and calls.
+- [x] Add validation and dispatcher-mediated reads, writes, and calls.
 - [ ] Make host lifetime explicit and dispose subscriptions and active invocations safely.
 - [ ] Add normalized state and collection observation.
 - [ ] Add collection snapshots, paging, and virtualization contracts.

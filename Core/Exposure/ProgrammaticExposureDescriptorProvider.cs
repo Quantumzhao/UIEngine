@@ -231,10 +231,21 @@ internal sealed class ProgrammaticValueDescriptor : IValueDescriptor
                 string? domainIssue;
                 try
                 {
-                    var pending = await _Host.Configuration.Dispatcher.InvokeAsync(
-                        () => validator(target!, converted.Value, cancellationToken),
+                    var pendingResult = await _Host.ExecuteInteractionAsync(
+                        InteractionDispatchOperation.VALUE_WRITE,
+                        canExecuteDirectly: false,
+                        () => InteractionResult.Success(
+                            validator(target!, converted.Value, cancellationToken).AsTask()),
                         cancellationToken).ConfigureAwait(false);
-                    domainIssue = await pending.ConfigureAwait(false);
+                    if (!pendingResult.IsSuccess)
+                    {
+                        return InteractionResult.Failure<object?>(
+                            pendingResult.Error!.Code,
+                            pendingResult.Error.Message,
+                            pendingResult.Error.Issues);
+                    }
+
+                    domainIssue = await pendingResult.Value.ConfigureAwait(false);
                 }
                 catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
                 {
@@ -268,19 +279,26 @@ internal sealed class ProgrammaticValueDescriptor : IValueDescriptor
                 issues);
         }
 
-        try
-        {
-            _Definition.Write(target!, converted.Value);
-            return InteractionResult.Success(converted.Value);
-        }
-        catch (TargetInvocationException exception)
-        {
-            return _WriteFailure(exception.InnerException ?? exception);
-        }
-        catch (Exception exception)
-        {
-            return _WriteFailure(exception);
-        }
+        return await _Host.ExecuteInteractionAsync(
+            InteractionDispatchOperation.VALUE_WRITE,
+            canExecuteDirectly: false,
+            () =>
+            {
+                try
+                {
+                    _Definition.Write(target!, converted.Value);
+                    return InteractionResult.Success(converted.Value);
+                }
+                catch (TargetInvocationException exception)
+                {
+                    return _WriteFailure(exception.InnerException ?? exception);
+                }
+                catch (Exception exception)
+                {
+                    return _WriteFailure(exception);
+                }
+            },
+            cancellationToken).ConfigureAwait(false);
     }
 
     private InteractionResult<object?>? _CheckAvailability(

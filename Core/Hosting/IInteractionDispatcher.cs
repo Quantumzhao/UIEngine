@@ -3,6 +3,9 @@ namespace UIEngine.Core;
 /// <summary>Runs domain interactions on the execution context selected by the host.</summary>
 public interface IInteractionDispatcher
 {
+    /// <summary>Returns whether the caller is already running on this dispatcher's context.</summary>
+    bool CheckAccess();
+
     ValueTask<T> InvokeAsync<T>(Func<T> action, CancellationToken cancellationToken = default);
 
     ValueTask InvokeAsync(Action action, CancellationToken cancellationToken = default);
@@ -16,6 +19,8 @@ public sealed class InlineInteractionDispatcher : IInteractionDispatcher
     }
 
     public static InlineInteractionDispatcher Instance { get; } = new();
+
+    public bool CheckAccess() => true;
 
     public ValueTask<T> InvokeAsync<T>(
         Func<T> action,

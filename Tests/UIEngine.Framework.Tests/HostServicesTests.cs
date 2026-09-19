@@ -160,15 +160,23 @@ public sealed class HostServicesTests
 
         var result = await host.DescribeAsync(handle);
 
-        Assert.Equal(InteractionErrorCode.DESCRIPTOR_UNAVAILABLE, result.Error?.Code);
+        Assert.Equal(InteractionErrorCode.DISPATCH_FAILED, result.Error?.Code);
         var failure = Assert.Single(
             loggerFactory.Entries,
             entry => entry.EventId == UIEngineDiagnosticEventIds.DISCOVERY_FAILED);
         Assert.Equal(nameof(UIEngineDiagnosticEventIds.DISCOVERY_FAILED), failure.EventId.Name);
         Assert.Equal(handle.Identity.RuntimeId, failure.Properties["RuntimeId"]);
-        Assert.Equal(InteractionErrorCode.DESCRIPTOR_UNAVAILABLE, failure.Properties["ErrorCode"]);
+        Assert.Equal(InteractionErrorCode.DISPATCH_FAILED, failure.Properties["ErrorCode"]);
         Assert.DoesNotContain(SECRET, failure.Message, StringComparison.Ordinal);
         Assert.Null(failure.Exception);
+        var dispatchFailure = Assert.Single(
+            loggerFactory.Entries,
+            entry => entry.EventId == UIEngineDiagnosticEventIds.DISPATCH_FAILED);
+        Assert.Equal(
+            InteractionDispatchOperation.DESCRIPTOR_DISCOVERY,
+            dispatchFailure.Properties["DispatchOperation"]);
+        Assert.DoesNotContain(SECRET, dispatchFailure.Message, StringComparison.Ordinal);
+        Assert.Null(dispatchFailure.Exception);
     }
 
     [Theory]

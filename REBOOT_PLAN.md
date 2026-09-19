@@ -764,12 +764,13 @@ The runtime never assumes arbitrary domain access is thread-safe. Hosts provide 
 ```csharp
 public interface IInteractionDispatcher
 {
+    bool CheckAccess();
     ValueTask<T> InvokeAsync<T>(Func<T> action, CancellationToken ct);
     ValueTask InvokeAsync(Action action, CancellationToken ct);
 }
 ```
 
-Reads, writes, validation, and calls use the dispatcher when required. A provider may explicitly mark safe operations that can bypass dispatch.
+Reads, writes, validation, and calls use the dispatcher when required. `CheckAccess` lets nested interactions recognize the configured context and execute without re-enqueueing or deadlocking. A provider may explicitly mark safe operations that can bypass dispatch.
 
 ### 21.2 State and collection observation
 

@@ -25,4 +25,5 @@ public enum InteractionErrorCode
     AMBIGUOUS_TARGET = 20,
     TYPE_MISMATCH = 21,
     PERMISSION_DENIED = 22,
+    DISPATCH_FAILED = 23,
 }

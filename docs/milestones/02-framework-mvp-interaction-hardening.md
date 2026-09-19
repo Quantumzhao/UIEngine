@@ -262,16 +262,12 @@ Stop here if the intended repository state cannot be resolved.
 3. [x] Make the host disposable and define post-disposal outcomes.
 4. [x] Add structured diagnostic event IDs and a recording-logger test harness, keeping value logging redacted by default.
 
-Step 2 completed on 2026-09-19. `dotnet build UIEngine.sln` completed with zero warnings and errors, and `dotnet test UIEngine.sln --no-build` passed all 39 tests (28 framework, 6 CLI, and 5 legacy-characterization tests).
-
 ### 3. Add programmatic exposure and complete metadata
 
 1. [x] Implement the host-scoped registration model and deterministic composition with reflection.
 2. Add value, selection, reference, collection, action, summary, validation, key, and identity registrations needed by the acceptance fixtures.
 3. Separate immutable type metadata from host-, context-, instance-, and live-state evaluation.
 4. Validate definitions and provider selection before executing live operations.
-
-Step 3 began on 2026-09-19 with exact-type value and summary registration, per-host immutable snapshots, and fixed programmatic/custom/reflection precedence. Programmatic members supplement reflection and override same-identifier reflected members. Identity callbacks were subsequently completed in step 4; the other registration roles and metadata validation above are not yet complete. `dotnet build UIEngine.sln` completed with zero warnings and errors, and `dotnet test UIEngine.sln --no-build` passed all 45 tests (34 framework, 6 CLI, and 5 legacy-characterization tests).
 
 ### 4. Normalize domain identity and replacement
 
@@ -280,16 +276,12 @@ Step 3 began on 2026-09-19 with exact-type value and summary registration, per-h
 3. [x] Add structured duplicate/ambiguous identity handling.
 4. [x] Add root replacement/unregistration and tests proving new runtime identity, stable domain identity, and release of old registrations.
 
-Step 4 completed on 2026-09-19. Explicit exposure-registry identity callbacks take precedence, followed by the first configured provider; otherwise interface and attributed-member sources are reconciled and conflicting values fail discovery. Only described or explicitly traversed objects enter the host-scoped identity index. Duplicate live keys resolve as ambiguous, and root replacement/unregistration releases the old registration without conflating runtime and domain identity. `dotnet build UIEngine.sln` completed with zero warnings and errors, and `dotnet test UIEngine.sln --no-build` passed all 55 tests (43 framework, 7 CLI, and 5 legacy-characterization tests).
-
 ### 5. Implement logical paths and binding resolution
 
 1. [x] Freeze the initial grammar, escaping, selector forms, and canonical formatting in contract tests.
 2. [x] Implement semantic parsing and asynchronous resolution for roots, members, references, and supported collection selectors.
 3. [x] Add data-only binding references, fallback policies, kind/type guards, and all resolution states.
 4. [x] Prove recovery and refusal cases for root, reference, and collection-element replacement.
-
-Step 5 completed on 2026-09-19. Core now owns case-sensitive absolute logical paths with percent-escaped components, canonical attached index/key/domain-identity selectors, semantic asynchronous traversal, and legacy numeric-index input normalization. Data-only binding references support identity-only, path-only, and identity-then-path policies; all seven resolution states, kind/type guards, moved-path suggestions, compatible root/reference/collection-element recovery, and stale-path refusal are covered. The CLI now uses Core resolution and re-resolves its current canonical path before live operations. `dotnet build UIEngine.sln` completed with zero warnings and errors, and `dotnet test UIEngine.sln --no-build --no-restore` passed all 76 tests (63 framework, 8 CLI, and 5 legacy-characterization tests).
 
 ### 6. Complete availability and validation semantics
 
@@ -298,14 +290,12 @@ Step 5 completed on 2026-09-19. Core now owns case-sensitive absolute logical pa
 3. [x] Apply conversion and validation in a consistent order for writes and action arguments.
 4. [x] Add structured, contextual issues for value, parameter, action, and permission-like rejection.
 
-Step 6 completed on 2026-09-19. Successful scalar nulls and empty references now remain successful payloads while missing members, unavailable containers, and failed access retain distinct structured outcomes. Value and parameter descriptors expose nullability, explicit default presence, finite options, ranges, units/tags, and normalized validation rules; action descriptors expose risk, confirmation, and precondition metadata. Reflection data annotations and host-scoped synchronous/asynchronous programmatic rules run after conversion and before setters or actions, with stable contextual issues for value, parameter, action, and permission-like rejection. The CLI now reports missing members accurately, prints validation issues, and includes the new metadata in `inspect`. `dotnet build UIEngine.sln` completed with zero warnings and errors, and `dotnet test UIEngine.sln --no-build --no-restore` passed all 82 tests (69 framework, 8 CLI, and 5 legacy-characterization tests).
-
 ### 7. Route live access through dispatch
 
-1. Move reflection summary, value, reference, collection, validation, mutation, and invocation access behind the configured dispatcher.
-2. Define provider opt-out, reentrancy, cancellation, and dispatch-failure behavior.
-3. Verify that no CLI or descriptor implementation bypasses dispatch for live domain access.
-4. Test queued cancellation and host disposal without a real UI thread.
+1. [x] Move reflection summary, value, reference, collection, validation, mutation, and invocation access behind the configured dispatcher.
+2. [x] Define provider opt-out, reentrancy, cancellation, and dispatch-failure behavior.
+3. [x] Verify that no CLI or descriptor implementation bypasses dispatch for live domain access.
+4. [x] Test queued cancellation and host disposal without a real UI thread.
 
 ### 8. Add normalized observation
 

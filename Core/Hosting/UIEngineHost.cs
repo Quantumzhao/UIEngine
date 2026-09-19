@@ -29,6 +29,11 @@ public sealed class UIEngineHost : IDisposable, IAsyncDisposable
             LogLevel.Warning,
             UIEngineDiagnosticEventIds.DISCOVERY_FAILED,
             "Descriptor discovery failed for runtime object {RuntimeId} with code {ErrorCode}.");
+    private static readonly Action<ILogger, InteractionDispatchOperation, Exception?> _DISPATCH_FAILED =
+        LoggerMessage.Define<InteractionDispatchOperation>(
+            LogLevel.Warning,
+            UIEngineDiagnosticEventIds.DISPATCH_FAILED,
+            "Interaction dispatch failed for operation {DispatchOperation}.");
 
     private readonly object _Gate = new();
     private readonly ConditionalWeakTable<object, _IdentityHolder> _Identities = new();
@@ -395,18 +400,35 @@ public sealed class UIEngineHost : IDisposable, IAsyncDisposable
         _DISCOVERY_STARTED(_Logger, handle.Identity.RuntimeId, null);
         try
         {
-            var result = hasProgrammaticExposure
-                ? await _ProgrammaticExposureProvider
-                    .DescribeAsync(this, instance, handle, cancellationToken)
-                    .ConfigureAwait(false)
-                : await provider!
-                    .DescribeAsync(this, instance, handle, cancellationToken)
-                    .ConfigureAwait(false);
+            var policy = provider as IInteractionDispatchPolicy;
+            var canDiscoverDirectly = policy?.CanExecuteDirectly(
+                InteractionDispatchOperation.DESCRIPTOR_DISCOVERY) == true;
+            var result = await ExecuteInteractionAsync(
+                InteractionDispatchOperation.DESCRIPTOR_DISCOVERY,
+                canDiscoverDirectly,
+                async () =>
+                {
+                    var discovered = hasProgrammaticExposure
+                        ? await _ProgrammaticExposureProvider
+                            .DescribeAsync(this, instance, handle, cancellationToken)
+                            .ConfigureAwait(false)
+                        : await provider!
+                            .DescribeAsync(this, instance, handle, cancellationToken)
+                            .ConfigureAwait(false);
+                    return discovered.IsSuccess
+                        ? await DispatchedObjectDescriptor.CreateAsync(
+                            this,
+                            discovered.Value,
+                            domainIdentity.Value,
+                            policy,
+                            cancellationToken).ConfigureAwait(false)
+                        : discovered;
+                },
+                cancellationToken).ConfigureAwait(false);
             if (result.IsSuccess)
             {
                 _DISCOVERY_COMPLETED(_Logger, handle.Identity.RuntimeId, null);
-                return InteractionResult.Success<IObjectDescriptor>(
-                    new _DomainIdentityObjectDescriptor(result.Value, domainIdentity.Value));
+                return result;
             }
 
             _DISCOVERY_FAILED(_Logger, handle.Identity.RuntimeId, result.Error!.Code, null);
@@ -540,6 +562,92 @@ public sealed class UIEngineHost : IDisposable, IAsyncDisposable
             : InteractionResult.Failure<ObjectHandle>(identity.Error!.Code, identity.Error.Message);
     }
 
+    internal ValueTask<InteractionResult<T>> ExecuteInteractionAsync<T>(
+        InteractionDispatchOperation operation,
+        bool canExecuteDirectly,
+        Func<InteractionResult<T>> action,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(action);
+        return ExecuteInteractionAsync(
+            operation,
+            canExecuteDirectly,
+            () => ValueTask.FromResult(action()),
+            cancellationToken);
+    }
+
+    internal async ValueTask<InteractionResult<T>> ExecuteInteractionAsync<T>(
+        InteractionDispatchOperation operation,
+        bool canExecuteDirectly,
+        Func<ValueTask<InteractionResult<T>>> action,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(action);
+        if (IsDisposed)
+        {
+            return _DisposedFailure<T>();
+        }
+
+        if (cancellationToken.IsCancellationRequested)
+        {
+            return InteractionResult.Failure<T>(
+                InteractionErrorCode.CANCELLED,
+                $"The {operation} interaction was cancelled.");
+        }
+
+        try
+        {
+            if (canExecuteDirectly || Configuration.Dispatcher.CheckAccess())
+            {
+                return await _ExecuteCheckedAsync(action, cancellationToken).ConfigureAwait(false);
+            }
+
+            var pending = await Configuration.Dispatcher.InvokeAsync(
+                () => _ExecuteCheckedAsync(action, cancellationToken),
+                cancellationToken).ConfigureAwait(false);
+            return await pending.ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            return InteractionResult.Failure<T>(
+                InteractionErrorCode.CANCELLED,
+                $"The {operation} interaction was cancelled.");
+        }
+        catch (ObjectDisposedException) when (IsDisposed)
+        {
+            return _DisposedFailure<T>();
+        }
+        catch (Exception exception)
+        {
+            _DISPATCH_FAILED(
+                _Logger,
+                operation,
+                Configuration.IncludeSensitiveDiagnosticData ? exception : null);
+            return InteractionResult.Failure<T>(
+                InteractionErrorCode.DISPATCH_FAILED,
+                $"The dispatcher failed while executing {operation}.");
+        }
+    }
+
+    private async ValueTask<InteractionResult<T>> _ExecuteCheckedAsync<T>(
+        Func<ValueTask<InteractionResult<T>>> action,
+        CancellationToken cancellationToken)
+    {
+        if (IsDisposed)
+        {
+            return _DisposedFailure<T>();
+        }
+
+        if (cancellationToken.IsCancellationRequested)
+        {
+            return InteractionResult.Failure<T>(
+                InteractionErrorCode.CANCELLED,
+                "The interaction was cancelled before it executed.");
+        }
+
+        return await action().ConfigureAwait(false);
+    }
+
     private async ValueTask<InteractionResult<DomainIdentity?>> _DiscoverDomainIdentityAsync(
         object instance,
         CancellationToken cancellationToken)
@@ -669,26 +777,4 @@ public sealed class UIEngineHost : IDisposable, IAsyncDisposable
 
     private sealed record _RootEntry(RegisteredRoot Registration, object Instance);
 
-    private sealed class _DomainIdentityObjectDescriptor(
-        IObjectDescriptor descriptor,
-        DomainIdentity? domainIdentity) : IObjectDescriptor
-    {
-        public ObjectIdentity Identity => descriptor.Identity;
-
-        public DomainIdentity? DomainIdentity => domainIdentity;
-
-        public string TypeName => descriptor.TypeName;
-
-        public string DisplayName => descriptor.DisplayName;
-
-        public string? Summary => descriptor.Summary;
-
-        public IReadOnlyList<IValueDescriptor> Values => descriptor.Values;
-
-        public IReadOnlyList<IReferenceDescriptor> References => descriptor.References;
-
-        public IReadOnlyList<ICollectionDescriptor> Collections => descriptor.Collections;
-
-        public IReadOnlyList<IActionDescriptor> Actions => descriptor.Actions;
-    }
 }
