@@ -1,6 +1,6 @@
 # Milestone 02 — Framework MVP Interaction Hardening
 
-**Status:** In progress — step 2 complete
+**Status:** In progress — step 3 registration/composition slice complete
 
 **Acceptance:** Not run
 
@@ -266,10 +266,12 @@ Step 2 completed on 2026-09-19. `dotnet build UIEngine.sln` completed with zero 
 
 ### 3. Add programmatic exposure and complete metadata
 
-1. Implement the host-scoped registration model and deterministic composition with reflection.
+1. [x] Implement the host-scoped registration model and deterministic composition with reflection.
 2. Add value, selection, reference, collection, action, summary, validation, key, and identity registrations needed by the acceptance fixtures.
 3. Separate immutable type metadata from host-, context-, instance-, and live-state evaluation.
 4. Validate definitions and provider selection before executing live operations.
+
+Step 3 began on 2026-09-19 with exact-type value and summary registration, per-host immutable snapshots, and fixed programmatic/custom/reflection precedence. Programmatic members supplement reflection and override same-identifier reflected members. The remaining registration roles and metadata validation above are not yet complete. `dotnet build UIEngine.sln` completed with zero warnings and errors, and `dotnet test UIEngine.sln --no-build` passed all 45 tests (34 framework, 6 CLI, and 5 legacy-characterization tests).
 
 ### 4. Normalize domain identity and replacement
 

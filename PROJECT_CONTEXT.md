@@ -36,9 +36,9 @@ Consistency rules:
 - **Reboot:** Milestone 01 is implemented beside legacy UIEngine v0.2.3.
 - **Accepted:** clean restore, build, 29 tests, secret scan, and no-package check pass locally and in GitHub Actions.
 - **Phase 2 baseline:** the later removal of `Dataset` and `CLITestProject` is accepted as intentional cleanup; their useful cyclic-fixture role is covered by `Examples/CyclicDomain`, and the current build passes with 29 tests after restoring CLI behavior coverage.
-- **Runtime:** immutable host service configuration, ordered provider precedence, inline dispatch, explicit disposal, structured diagnostic IDs and logging, host-scoped descriptors, opt-in reflection discovery, runtime identity, cycle-safe graph traversal, live scalar operations, synchronous actions, finite collection snapshots, structured failures, and a deterministic cyclic sample.
+- **Runtime:** immutable host service configuration, host-scoped programmatic value and summary registration, deterministic programmatic/custom/reflection provider tiers, inline dispatch, explicit disposal, structured diagnostic IDs and logging, host-scoped descriptors, opt-in reflection discovery, runtime identity, cycle-safe graph traversal, live scalar operations, synchronous actions, finite collection snapshots, structured failures, and a deterministic cyclic sample.
 - **CLI:** descriptor-based navigation and operations; PrettyPrompt editing, process-local history, and descriptor-aware completion.
-- **Tests:** framework, CLI, dependency, and legacy-characterization projects exist; the current suite passes 39 tests.
+- **Tests:** framework, CLI, dependency, and legacy-characterization projects exist; the current suite passes 45 tests.
 - **Legacy:** the remaining tree-based `Dashboard`/`Node` code is characterized reference material, not the new API foundation.
 - **Missing:** product TUI, layouts, batch engine, and supported package.
 - **Packaging:** disabled until the Product MVP release gate defines APIs, tests, licensing, versioning, compatibility, and support.

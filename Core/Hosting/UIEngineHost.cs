@@ -1,5 +1,6 @@
 using System.Runtime.CompilerServices;
 using Microsoft.Extensions.Logging;
+using UIEngine.Core.Exposure;
 
 namespace UIEngine.Core;
 
@@ -32,6 +33,7 @@ public sealed class UIEngineHost : IDisposable, IAsyncDisposable
     private readonly Dictionary<ObjectIdentity, WeakReference<object>> _Objects = [];
     private readonly Dictionary<string, _RootEntry> _Roots = new(StringComparer.Ordinal);
     private readonly ILogger _Logger;
+    private readonly ProgrammaticExposureDescriptorProvider _ProgrammaticExposureProvider;
     private int _IsDisposed;
 
     public UIEngineHost()
@@ -47,6 +49,9 @@ public sealed class UIEngineHost : IDisposable, IAsyncDisposable
     public UIEngineHost(UIEngineHostOptions options)
     {
         Configuration = new UIEngineHostConfiguration(options);
+        _ProgrammaticExposureProvider = new ProgrammaticExposureDescriptorProvider(
+            Configuration.Exposure,
+            Configuration.ReflectionProvider);
         _Logger = Configuration.LoggerFactory.CreateLogger<UIEngineHost>();
         _HOST_CREATED(_Logger, Configuration.DescriptorProviders.Count, null);
     }
@@ -154,8 +159,18 @@ public sealed class UIEngineHost : IDisposable, IAsyncDisposable
                     "The target object is no longer available.");
         }
 
-        var provider = Providers.FirstOrDefault(candidate => candidate.CanDescribe(instance.GetType()));
-        if (provider is null)
+        var hasProgrammaticExposure = _ProgrammaticExposureProvider.CanDescribe(instance.GetType());
+        var provider = hasProgrammaticExposure
+            ? null
+            : Configuration.CustomDescriptorProviders.FirstOrDefault(
+                candidate => candidate.CanDescribe(instance.GetType()));
+        provider ??= hasProgrammaticExposure
+            ? null
+            : Configuration.ReflectionProvider is not null &&
+                Configuration.ReflectionProvider.CanDescribe(instance.GetType())
+                    ? Configuration.ReflectionProvider
+                    : null;
+        if (!hasProgrammaticExposure && provider is null)
         {
             var unavailable = InteractionResult.Failure<IObjectDescriptor>(
                 InteractionErrorCode.DESCRIPTOR_UNAVAILABLE,
@@ -167,9 +182,13 @@ public sealed class UIEngineHost : IDisposable, IAsyncDisposable
         _DISCOVERY_STARTED(_Logger, handle.Identity.RuntimeId, null);
         try
         {
-            var result = await provider
-                .DescribeAsync(this, instance, handle, cancellationToken)
-                .ConfigureAwait(false);
+            var result = hasProgrammaticExposure
+                ? await _ProgrammaticExposureProvider
+                    .DescribeAsync(this, instance, handle, cancellationToken)
+                    .ConfigureAwait(false)
+                : await provider!
+                    .DescribeAsync(this, instance, handle, cancellationToken)
+                    .ConfigureAwait(false);
             if (result.IsSuccess)
             {
                 _DISCOVERY_COMPLETED(_Logger, handle.Identity.RuntimeId, null);
