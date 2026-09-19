@@ -1,140 +1,156 @@
 # UIEngine Project Context
 
-> **Status:** current shared project context. Update it whenever a product decision changes; unresolved items remain explicitly deferred.
+> **Status:** Current shared agent context. Update when settled decisions change. Keep unresolved choices explicitly deferred.
 
 ## Purpose
 
-UIEngine is a .NET framework for exposing a running application's live domain model as an interactive object space. It should let developers navigate exposed objects, inspect and mutate values, invoke operations, compose persistent workbench layouts, and run constrained batch operations without first building a bespoke application UI.
+- Expose a running .NET application's live domain model as an interactive object space.
+- Support navigation, inspection, mutation, invocation, persistent workbenches, and constrained batch operations without a bespoke UI.
+- Keep interaction semantics frontend-neutral. CLI, TUI, desktop, web, voice, and custom clients may present them differently.
+- Target simulations, engines, services, research systems, internal tools, and prototypes with an existing domain model.
+- **Framework MVP:** core runtime plus proving CLI.
+- **Product MVP:** reference TUI over the same contracts.
 
-The core interaction model is frontend-independent. CLI, TUI, desktop, web, voice, and domain-specific clients may present the same capabilities differently. The framework MVP will prove the core through a minimal CLI; the product MVP will add the reference TUI.
+## Document Roles
 
-UIEngine is intended primarily for simulations, engines, services, research systems, internal tools, and prototypes whose domain model exists before a polished operational interface.
+| Path | Role |
+|---|---|
+| `PROJECT_CONTEXT.md` | Settled intent, constraints, and decisions |
+| `REBOOT_PLAN.md` | Detailed architecture, legacy audit, migration plan, risks, roadmap, and acceptance criteria |
+| `TODO.MD` | Progress checklist derived from the reboot plan |
+| `README.MD` | Public entry point and current-state summary |
+| `docs/milestones/` | Bounded execution plans; not authorization to implement |
 
-## Document Roles and Consistency
+Consistency rules:
 
-- `PROJECT_CONTEXT.md` records settled product intent, constraints, and decisions.
-- `runtime-domain-workbench-design.md` contains the detailed target architecture and desired behavior.
-- `REBOOT_PLAN.md` records the legacy audit, migration strategy, risks, roadmap, and acceptance criteria.
-- `TODO.MD` is the concise progress tracker derived from the reboot plan.
-- `README.MD` is the public repository entry point and current-state summary.
-- `docs/milestones/` contains bounded execution plans derived from the context, design, and reboot roadmap. An outline does not override those documents or authorize work until it is explicitly selected for implementation.
-
-These documents must agree; their different roles do not create a precedence order. If a conflict is found, stop before relying on either statement, report the exact conflicting claims, resolve the intent with the product owner, and update every affected document together. Do not silently choose one document over another.
-
-Code and tests are authoritative for current implemented behavior. The context and design are authoritative for intended behavior. Any discrepancy between implementation and intended behavior must be recorded as unfinished work or an explicit design change, not hidden by changing only one side.
+- No document has automatic precedence.
+- On conflict: stop, quote both claims, ask the product owner, then update every affected document.
+- Do not silently choose one claim.
+- Code and tests define implemented behavior.
+- This file and `REBOOT_PLAN.md` define intended behavior.
+- Record discrepancies as unfinished work or explicit design changes.
 
 ## Current State
 
-- The repository builds on .NET 10.
-- The first reboot milestone is implemented beside the legacy UIEngine v0.2.3 proof of concept. Its clean-checkout restore, build, 29-test suite, secret scan, and no-package check pass locally and in GitHub Actions.
-- The reboot now has a host-scoped descriptor runtime, explicit reflection discovery, stable runtime identity, cycle-safe graph traversal, live scalar operations, synchronous actions, finite collection snapshots, structured failures, and a deterministic cyclic sample.
-- The new CLI navigates and operates on those frontend-neutral contracts and uses PrettyPrompt for interactive editing, process-local history, and descriptor-aware completion.
-- The legacy tree-oriented `Dashboard`/`Node` implementation remains only as reference material and a characterized baseline while the reboot proceeds.
-- Automated framework, CLI, dependency, and legacy-characterization test projects are present. There is not yet a product TUI, layout system, batch engine, or supported package.
-- Packaging is disabled. Package metadata and release automation must not be reintroduced before the product MVP release gate defines licensing, versioning, compatibility, and support policy.
-- The removed package credential was revoked through its provider but remains in pre-cleanup Git history. Rewriting history is outside the current cleanup scope.
+- **Platform:** .NET 10.
+- **Reboot:** Milestone 01 is implemented beside legacy UIEngine v0.2.3.
+- **Accepted:** clean restore, build, 29 tests, secret scan, and no-package check pass locally and in GitHub Actions.
+- **Runtime:** host-scoped descriptors, opt-in reflection discovery, runtime identity, cycle-safe graph traversal, live scalar operations, synchronous actions, finite collection snapshots, structured failures, and a deterministic cyclic sample.
+- **CLI:** descriptor-based navigation and operations; PrettyPrompt editing, process-local history, and descriptor-aware completion.
+- **Tests:** framework, CLI, dependency, and legacy-characterization projects exist.
+- **Legacy:** tree-based `Dashboard`/`Node` code is characterized reference material and a fixture source, not the new API foundation.
+- **Missing:** product TUI, layouts, batch engine, and supported package.
+- **Packaging:** disabled until the Product MVP release gate defines APIs, tests, licensing, versioning, compatibility, and support.
+- **Credential history:** the removed credential is revoked but remains in pre-cleanup Git history. History rewriting is out of scope.
 
-The legacy implementation is reference material and a source of candidate fixtures. It is not the public API foundation for the reboot.
+## Settled Decisions
 
-## Settled Product Decisions
-
-- **Name and prefix:** UIEngine is the final product name and package/namespace prefix.
-- **Compatibility:** make a clean public API break; do not build a `Dashboard`/`Node` compatibility adapter.
-- **Framework:** target .NET 10 for the reboot. The repository moved from .NET 8 as routine LTS maintenance before that runtime reached end of support.
-- **Exposure:** require explicit opt-in exposure. Prefer properties while allowing fields through the normalized exposure model.
-- **Trust boundary:** begin as an in-process trusted developer tool. Remote access is a later, separate protocol.
-- **Framework MVP:** deliver the new core and a minimal CLI that validates the interaction model.
-- **Product MVP:** deliver a TUI on top of the framework MVP. Do not build Avalonia as the reference frontend.
-- **Identity:** require stable runtime identity. Accept optional domain identity through a normalized provider backed by an interface, attribute, or registry callback.
-- **Layouts:** persist versioned component configuration and bindings, not domain state. Keep exact geometry frontend-owned.
-- **Batch operations:** use constrained serializable descriptors, predefined filters, compatibility preview, and sequential execution by default.
-- **Transactions:** do not promise rollback for arbitrary domain side effects; report partial success explicitly.
-- **Packaging:** publish nothing until APIs, tests, licensing, versioning, and release policy are ready.
-- **Project granularity:** begin with one `UIEngine.Framework` library containing the core, attributes, and reflection areas as directories and namespaces. Keep executable frontends separate, but do not create a project merely to mirror a namespace or architectural label. Add an assembly boundary only when dependency isolation, deployment, packaging, target-framework, or tooling requirements justify it.
+- **Name:** UIEngine is the final product, package, and namespace prefix.
+- **Compatibility:** clean public API break. No `Dashboard`/`Node` adapter.
+- **Framework:** .NET 10. The .NET 8 upgrade was routine LTS maintenance, not an MVP dependency.
+- **Exposure:** explicit opt-in. Prefer properties; allow fields through normalized exposure.
+- **Trust:** in-process trusted developer tool. Remote access requires a later protocol.
+- **Framework MVP:** new core plus minimal CLI.
+- **Product MVP:** TUI over the Framework MVP. Avalonia is not the reference frontend.
+- **Identity:** stable runtime identity is required. Optional domain identity comes from an interface, attribute, or registry callback through one provider.
+- **Layouts:** persist versioned component configuration and bindings, not domain state. Geometry is frontend-owned.
+- **Batch:** serializable descriptors, predefined filters, compatibility preview, and sequential execution by default.
+- **Transactions:** no automatic rollback for arbitrary side effects. Report partial success.
+- **Packaging:** publish only after APIs, tests, licensing, versioning, and release policy are ready.
+- **Projects:** use one `Core` library for runtime contracts, attributes, and reflection. Keep executables separate. Add assemblies only for real dependency, deployment, packaging, target-framework, or tooling boundaries.
 
 ## Architectural Invariants
 
-The reboot must preserve these boundaries:
-
-1. **The domain model remains authoritative.** UIEngine interacts with live objects or explicit adapters rather than requiring a duplicate UI model.
-2. **The runtime models an object graph, not a tree.** Cycles, shared references, object replacement, and disappearing targets are normal cases.
-3. **Identity and path are different concepts.** Runtime identity represents an object instance; optional domain identity survives replacement/restart; logical paths support navigation and fallback resolution.
-4. **Descriptors express semantics, not controls.** The core describes readable values, writable values, selections, references, collections, actions, progress, and related capabilities without naming widgets.
-5. **The runtime is host-scoped.** Avoid global registries so hosts can be isolated, disposed, configured, and tested independently.
-6. **Expected failures are structured results.** Validation, binding, compatibility, and execution failures should not require frontends to parse exception strings.
-7. **Thread affinity is explicit.** Reads, writes, and calls use a host-provided dispatcher when domain objects require one.
-8. **Collection semantics are explicit.** Distinguish live, snapshot, paged, and virtualized access; never require eager materialization for ordinary browsing.
-9. **Observation is adaptable and disposable.** Support common .NET notifications, polling, and custom providers through normalized change events and managed subscription lifetimes.
-10. **Frontend capabilities are negotiated.** No frontend is assumed to support every descriptor, layout feature, or interaction.
-11. **Batch mutation is preview-first.** Snapshot targets, classify compatibility, execute under an explicit policy, and record a terminal result for every target.
-12. **Remote operation is not transparent object serialization.** Any future remote layer uses explicit descriptor DTOs, commands, authentication, authorization, and audit behavior.
+1. **Live domain authority:** use live objects or explicit adapters; do not require a duplicate UI model.
+2. **Graph runtime:** cycles, shared references, replacement, and missing targets are normal.
+3. **Separate identity and path:** runtime identity identifies an instance; optional domain identity may survive replacement/restart; paths support navigation and fallback.
+4. **Semantic descriptors:** describe values, selections, references, collections, actions, and progress—not widgets.
+5. **Host scope:** no global registries. Hosts must be isolated, configurable, disposable, and testable.
+6. **Structured failures:** frontends must not parse exception strings for expected failures.
+7. **Explicit affinity:** dispatch reads, writes, and calls when the domain requires it.
+8. **Explicit collection modes:** distinguish live, snapshot, paged, and virtualized access. Ordinary browsing must not force eager materialization.
+9. **Managed observation:** normalize .NET notifications, polling, and custom providers; dispose subscriptions safely.
+10. **Capability negotiation:** never assume every frontend supports every interaction.
+11. **Preview-first batch mutation:** snapshot targets, classify compatibility, apply an explicit policy, and record one terminal result per target.
+12. **Explicit remote protocol:** use descriptor DTOs, commands, authentication, authorization, and audit behavior—not transparent object serialization.
 
 ## MVP Boundaries
 
 ### Framework MVP — Core + CLI
 
-The framework MVP is complete when one non-trivial cyclic domain model can be used through the CLI to:
+One non-trivial cyclic model must support:
 
-- discover explicitly exposed roots and members;
-- navigate cycles and shared references without recursion failure or identity loss;
-- inspect and mutate live values with validation;
-- invoke parameterized synchronous and asynchronous actions;
-- observe selected external state changes;
-- report progress, cancellation, and structured failures;
-- list and inspect collection elements without requiring eager materialization;
-- expose the same semantic contracts that a non-CLI frontend can consume.
+- explicit root/member discovery;
+- cycle- and shared-reference-safe navigation;
+- validated live reads and writes;
+- parameterized sync and async actions;
+- selected external-state observation;
+- progress, cancellation, and structured failures;
+- collection browsing without forced eager materialization; and
+- the same contracts for CLI and non-CLI frontends.
 
 ### Product MVP — TUI
 
-The product MVP is complete when a TUI consumes the framework MVP without frontend-specific behavior leaking into the core and provides:
+The TUI must use the Framework MVP without core leakage and provide:
 
-- an object browser with navigation history or breadcrumbs;
-- generated value editors and action parameter forms;
+- object browsing with history or breadcrumbs;
+- generated value editors and action forms;
 - collection browsing;
-- async progress, cancellation, and structured error presentation;
-- clear unavailable, missing, and mismatched target states;
-- an end-to-end workflow over the same cyclic fixture used by the CLI.
+- async progress, cancellation, and structured errors;
+- explicit unavailable, missing, and mismatched states; and
+- the CLI's cyclic-fixture workflow.
 
-Persistent user-composed layouts, batch operations, arbitrary scripting, automatic undo, remote access, source generation, advanced analytics, and additional frontends are not part of either MVP. Layouts and batch operations remain committed post-MVP capabilities.
+Not in either MVP: persistent layouts, batch operations, arbitrary scripting, automatic undo, remote access, source generation, advanced analytics, or extra frontends. Layouts and batch remain committed post-MVP work.
 
-## Implementation Direction
+## Implementation Rules
 
-New code should use the fewest project boundaries that preserve actual runtime and tooling separation. Namespace and directory structure expresses logical architecture; it does not imply one assembly per area.
+### Structure
 
-A short summary comment explaining the role of each class or struct is encouraged. Name private members with an underscore followed by PascalCase, such as `_Field`, `_Property`, and `_Method`; constructors and language- or runtime-mandated names such as `Main` retain their required spelling. Name every constant and static-readonly field in `UPPER_SNAKE_CASE`, using a leading underscore only for private fields (for example, `PUBLIC_FIELD` and `_PRIVATE_FIELD`). Enum members also use `UPPER_SNAKE_CASE`, such as `InteractionErrorCode.INVALID_ROOT_IDENTIFIER`. Analyzer rule CA1707 is disabled solution-wide because its underscore prohibition conflicts with these conventions.
+- Use the fewest assembly boundaries that preserve runtime and tooling separation.
+- Use directories and namespaces for logical areas; they do not imply assemblies.
+- `Core/Core.csproj`: `UIEngine.Core`, `UIEngine.Core.Attributes`, and `UIEngine.Core.Reflection`.
+- `Frontend/Cli/Cli.csproj`: separate executable using `UIEngine.Frontend.Cli`.
+- `Examples/CyclicDomain/CyclicDomain.csproj`: deterministic example using `UIEngine.Examples.CyclicDomain`.
+- Examples and tests get projects only when their execution/hosting boundary requires one.
+- Hosting, layouts, and batch start as logical areas unless a real boundary appears.
+- The Product TUI is a separate executable. Source generators may need a compiler-facing project.
+- Public type names and justified package/assembly boundaries may evolve. Frontend independence and dependency direction may not.
 
-The framework MVP starts with:
+### Code Style
 
-- `UIEngine.Framework` — one library containing the `UIEngine.Core`, `UIEngine.Attributes`, and `UIEngine.Reflection` namespaces and directories;
-- `UIEngine.Frontend.Cli` — a separate executable that depends on `UIEngine.Framework`;
-- dedicated sample and test projects where executable or test-host boundaries require them.
+- Add short type summaries when they clarify a class or struct's role.
+- Private members: underscore plus PascalCase, such as `_Field`.
+- Constants and static-readonly fields: `UPPER_SNAKE_CASE`; private ones keep the leading underscore.
+- Enum members: `UPPER_SNAKE_CASE`.
+- Keep required names such as constructors and `Main` unchanged.
+- CA1707 is disabled solution-wide because it conflicts with these conventions.
 
-Future hosting, layouts, batch, and similar capabilities begin as logical areas and namespaces unless a concrete dependency or deployment requirement justifies another project. The product TUI remains a separate frontend executable. Source generators may require their own tooling project because they have a distinct compiler-facing target and dependency model.
+### Migration and Verification
 
-Exact public type names and justified assembly or package boundaries may be refined during their roadmap phase, but frontend independence and dependency direction are not negotiable.
-
-Build the new implementation beside the legacy projects. Extract deterministic fixtures and narrow characterization tests before removing legacy code, but do not preserve accidental legacy API behavior merely for compatibility.
+- Build the reboot beside legacy projects.
+- Extract deterministic fixtures and narrow characterization tests before legacy removal.
+- Do not preserve accidental legacy API behavior.
+- Minimum repository check: `dotnet build UIEngine.sln`.
+- Add the smallest relevant automated tests for each behavior change.
 
 ## Near-Term Priorities
 
-1. Add programmatic exposure and stable domain identity providers.
-2. Add durable logical paths, binding states, and binding recovery.
-3. Add dispatcher-mediated validation, reads, writes, and calls.
-4. Add normalized state and collection observation.
-5. Continue the Framework MVP interaction-hardening work defined in `REBOOT_PLAN.md`.
+1. Programmatic exposure and stable domain identity providers.
+2. Durable logical paths, binding states, and recovery.
+3. Dispatcher-mediated validation, reads, writes, and calls.
+4. Normalized state and collection observation.
+5. Remaining Framework MVP hardening in `REBOOT_PLAN.md`.
 
-Use `dotnet build UIEngine.sln` as the minimum repository verification. Add the smallest relevant automated tests for every behavior change once a test project exists.
+## Deferred Decisions
 
-## Explicitly Deferred Decisions
+Do not invent before the relevant roadmap phase:
 
-Do not invent these prematurely:
-
-- final public type signatures beyond the descriptor roles and invariants above;
-- the complete logical path grammar;
-- package versioning and long-term support policy;
-- source-generator implementation and AOT matrix;
-- the TUI toolkit and detailed terminal composition/layout model;
-- remote transport, authentication, and authorization;
+- final public signatures beyond established descriptor roles and invariants;
+- complete logical path grammar;
+- package versioning and long-term support;
+- source-generator design and AOT matrix;
+- TUI toolkit and terminal composition model;
+- remote transport, authentication, and authorization; and
 - additional frontend commitments.
 
-Resolve each deferred decision in its roadmap phase with tests or a concrete product requirement, then update this document if the result becomes a stable project-wide constraint.
+Resolve each with tests or a concrete product requirement. Update this file when the result becomes a stable project-wide constraint.

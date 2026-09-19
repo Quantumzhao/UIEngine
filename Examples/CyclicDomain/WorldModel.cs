@@ -1,6 +1,6 @@
-using UIEngine.Attributes;
+using UIEngine.Core.Attributes;
 
-namespace UIEngine.Samples.CyclicDomain;
+namespace UIEngine.Examples.CyclicDomain;
 
 /// <summary>Creates the deterministic cyclic graph used by the CLI and integration tests.</summary>
 public static class CyclicWorldFactory

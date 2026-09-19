@@ -5,8 +5,7 @@ This directory contains bounded, implementation-ready plans for UIEngine milesto
 Milestone outlines are derived from the repository's governing documents:
 
 - [PROJECT_CONTEXT.md](../../PROJECT_CONTEXT.md) records settled product intent and architectural constraints.
-- [runtime-domain-workbench-design.md](../../runtime-domain-workbench-design.md) describes the target architecture and behavior.
-- [REBOOT_PLAN.md](../../REBOOT_PLAN.md) contains the overall migration roadmap.
+- [REBOOT_PLAN.md](../../REBOOT_PLAN.md) describes the target architecture and behavior and contains the overall migration roadmap.
 - [TODO.MD](../../TODO.MD) remains the concise progress tracker.
 
 An outline does not override those documents or authorize implementation by itself. If an outline conflicts with them, implementation must pause until the product owner resolves the conflict and every affected document is updated.

@@ -1,9 +1,10 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
+    <RootNamespace>UIEngine.Examples.CyclicDomain</RootNamespace>
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="../../Framework/UIEngine.Framework/UIEngine.Framework.csproj" />
+    <ProjectReference Include="../../Core/Core.csproj" />
   </ItemGroup>
 </Project>

@@ -1,9 +1,9 @@
 using System.Collections;
 using System.Collections.Concurrent;
 using System.Reflection;
-using UIEngine.Attributes;
+using UIEngine.Core.Attributes;
 
-namespace UIEngine.Reflection;
+namespace UIEngine.Core.Reflection;
 
 /// <summary>Identifies the semantic descriptor role assigned to a reflected member.</summary>
 internal enum ReflectionMemberKind

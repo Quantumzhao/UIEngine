@@ -1,4 +1,4 @@
-namespace UIEngine.Attributes;
+namespace UIEngine.Core.Attributes;
 
 [AttributeUsage(AttributeTargets.Property | AttributeTargets.Field, Inherited = true)]
 public sealed class ExposeAttribute : Attribute

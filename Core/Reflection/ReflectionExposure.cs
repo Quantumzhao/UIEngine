@@ -1,6 +1,6 @@
 using System.Reflection;
 
-namespace UIEngine.Reflection;
+namespace UIEngine.Core.Reflection;
 
 internal static class ReflectionExposure
 {

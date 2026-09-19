@@ -8,7 +8,7 @@ public sealed class CliProjectSkeletonTests
     [Fact]
     public void CliAssemblyHasAnEntryPoint()
     {
-        var assembly = Assembly.Load(new AssemblyName("UIEngine.Frontend.Cli"));
+        var assembly = Assembly.Load(new AssemblyName("Cli"));
 
         Assert.NotNull(assembly.EntryPoint);
     }

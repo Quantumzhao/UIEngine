@@ -2,6 +2,7 @@
   <PropertyGroup>
     <OutputType>Exe</OutputType>
     <TargetFramework>net10.0</TargetFramework>
+    <RootNamespace>UIEngine.Frontend.Cli</RootNamespace>
   </PropertyGroup>
 
   <ItemGroup>
@@ -9,7 +10,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="../UIEngine.Framework/UIEngine.Framework.csproj" />
-    <ProjectReference Include="../../Samples/UIEngine.Samples.CyclicDomain/UIEngine.Samples.CyclicDomain.csproj" />
+    <ProjectReference Include="../../Core/Core.csproj" />
+    <ProjectReference Include="../../Examples/CyclicDomain/CyclicDomain.csproj" />
   </ItemGroup>
 </Project>

@@ -1,10 +1,9 @@
 using System.Collections;
 using System.Reflection;
 using System.Runtime.CompilerServices;
-using UIEngine.Attributes;
-using UIEngine.Core;
+using UIEngine.Core.Attributes;
 
-namespace UIEngine.Reflection;
+namespace UIEngine.Core.Reflection;
 
 /// <summary>Creates semantic descriptors for explicitly annotated reference types.</summary>
 public sealed class ReflectionObjectDescriptorProvider : IObjectDescriptorProvider

@@ -1,7 +1,7 @@
 using System.Collections;
-using UIEngine.Attributes;
 using UIEngine.Core;
-using UIEngine.Reflection;
+using UIEngine.Core.Attributes;
+using UIEngine.Core.Reflection;
 using Xunit;
 
 namespace UIEngine.Framework.Tests;

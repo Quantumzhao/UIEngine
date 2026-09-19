@@ -1,7 +1,7 @@
-using UIEngine.Attributes;
 using UIEngine.Core;
-using UIEngine.Reflection;
-using UIEngine.Samples.CyclicDomain;
+using UIEngine.Core.Attributes;
+using UIEngine.Core.Reflection;
+using UIEngine.Examples.CyclicDomain;
 using Xunit;
 
 namespace UIEngine.Framework.Tests;

@@ -14,8 +14,8 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="../../Framework/UIEngine.Frontend.Cli/UIEngine.Frontend.Cli.csproj" />
-    <ProjectReference Include="../../Framework/UIEngine.Framework/UIEngine.Framework.csproj" />
-    <ProjectReference Include="../../Samples/UIEngine.Samples.CyclicDomain/UIEngine.Samples.CyclicDomain.csproj" />
+    <ProjectReference Include="../../Frontend/Cli/Cli.csproj" />
+    <ProjectReference Include="../../Core/Core.csproj" />
+    <ProjectReference Include="../../Examples/CyclicDomain/CyclicDomain.csproj" />
   </ItemGroup>
 </Project>

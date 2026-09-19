@@ -13,15 +13,15 @@ public sealed class ProjectReferenceGraphTests
         var repositoryRoot = _FindRepositoryRoot();
         var expectedReferences = new Dictionary<string, string[]>(StringComparer.Ordinal)
         {
-            ["Framework/UIEngine.Frontend.Cli/UIEngine.Frontend.Cli.csproj"] =
+            ["Frontend/Cli/Cli.csproj"] =
             [
-                "Framework/UIEngine.Framework/UIEngine.Framework.csproj",
-                "Samples/UIEngine.Samples.CyclicDomain/UIEngine.Samples.CyclicDomain.csproj",
+                "Core/Core.csproj",
+                "Examples/CyclicDomain/CyclicDomain.csproj",
             ],
-            ["Framework/UIEngine.Framework/UIEngine.Framework.csproj"] = Array.Empty<string>(),
-            ["Samples/UIEngine.Samples.CyclicDomain/UIEngine.Samples.CyclicDomain.csproj"] =
+            ["Core/Core.csproj"] = Array.Empty<string>(),
+            ["Examples/CyclicDomain/CyclicDomain.csproj"] =
             [
-                "Framework/UIEngine.Framework/UIEngine.Framework.csproj",
+                "Core/Core.csproj",
             ],
         };
 
@@ -29,8 +29,9 @@ public sealed class ProjectReferenceGraphTests
             .EnumerateFiles(repositoryRoot, "*.csproj", SearchOption.AllDirectories)
             .Select(path => _NormalizePath(Path.GetRelativePath(repositoryRoot, path)))
             .Where(path =>
-                path.StartsWith("Framework/", StringComparison.Ordinal) ||
-                path.StartsWith("Samples/", StringComparison.Ordinal))
+                path.StartsWith("Core/", StringComparison.Ordinal) ||
+                path.StartsWith("Examples/", StringComparison.Ordinal) ||
+                path.StartsWith("Frontend/", StringComparison.Ordinal))
             .OrderBy(static path => path, StringComparer.Ordinal)
             .ToArray();
 

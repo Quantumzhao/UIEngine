@@ -1,5 +1,5 @@
-using UIEngine.Attributes;
-using UIEngine.Reflection;
+using UIEngine.Core.Attributes;
+using UIEngine.Core.Reflection;
 using Xunit;
 
 namespace UIEngine.Framework.Tests;

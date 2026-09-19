@@ -1,6 +1,6 @@
 using UIEngine.Core;
-using UIEngine.Reflection;
-using UIEngine.Samples.CyclicDomain;
+using UIEngine.Core.Reflection;
+using UIEngine.Examples.CyclicDomain;
 
 namespace UIEngine.Frontend.Cli;
 

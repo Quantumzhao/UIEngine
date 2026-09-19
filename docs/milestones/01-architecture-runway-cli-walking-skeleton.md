@@ -5,7 +5,7 @@
 **Acceptance:** Local and GitHub Actions acceptance passed
 
 **Prerequisite:** The removed package credential has been revoked through its provider.  
-**Governing documents:** [Project context](../../PROJECT_CONTEXT.md), [target design](../../runtime-domain-workbench-design.md), and [reboot plan](../../REBOOT_PLAN.md)
+**Governing documents:** [Project context](../../PROJECT_CONTEXT.md) and [architecture and reboot plan](../../REBOOT_PLAN.md)
 
 This outline does not authorize implementation. Work begins only when the milestone is explicitly selected for implementation.
 
@@ -25,11 +25,11 @@ This milestone excludes asynchronous invocation, observation, paging and virtual
 - Apply nullable analysis, implicit usings, and analyzers strictly to new projects. Keep any necessary legacy exemptions explicit and local rather than suppressing findings repository-wide.
 - Use xUnit for characterization, unit, and integration tests.
 - Add GitHub Actions checks for clean restore, build, and test, plus a current-working-tree secret scan. Historical secret scanning and Git-history rewriting remain outside this milestone.
-- Organize the solution into `Legacy`, `Framework`, `Samples`, and `Tests` solution folders without moving the existing legacy files.
+- Organize the solution into `Legacy`, `Core`, `Frontend`, `Examples`, and `Tests` solution folders without moving the existing legacy files.
 - Add these new projects:
-  - `UIEngine.Framework`, with Core, Attributes, and Reflection organized as namespaces and directories
-  - `UIEngine.Frontend.Cli`
-  - a deterministic sample-domain project
+  - `Core`, with runtime contracts, Attributes, and Reflection organized as namespaces and directories
+  - `Cli`, using the `UIEngine.Frontend.Cli` namespace
+  - a deterministic `CyclicDomain` example project
   - a legacy characterization-test project
   - framework and CLI test projects
 - Prevent new implementation projects from referencing legacy assemblies. Only legacy characterization tests may reference the old `UIEngine` assembly.
@@ -160,8 +160,8 @@ Stop here if revocation cannot be confirmed.
 
 ### 4. Create the new project skeleton
 
-1. Add the `Framework`, `Samples`, and `Tests` solution folders while leaving the legacy files in place under `Legacy`.
-2. Add the Framework and CLI projects, organize Core, Attributes, and Reflection within the framework by namespace and directory, and add the deterministic sample-domain, framework-test, and CLI-test projects.
+1. Add the `Core`, `Frontend`, `Examples`, and `Tests` solution folders while leaving the legacy files in place under `Legacy`.
+2. Add the Core and Cli projects, organize runtime contracts, Attributes, and Reflection within Core by namespace and directory, and add the deterministic CyclicDomain example, framework-test, and CLI-test projects.
 3. Add only the intended one-way project references and a guard test or inspection check that rejects references from new implementation projects to legacy assemblies.
 4. Build the empty project graph before adding runtime behavior.
 

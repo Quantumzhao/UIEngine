@@ -1,7 +1,5 @@
 using System.Globalization;
-using UIEngine.Core;
-
-namespace UIEngine.Reflection;
+namespace UIEngine.Core.Reflection;
 
 /// <summary>Converts frontend values into the scalar types supported by reflection operations.</summary>
 internal static class ReflectionValueConverter
