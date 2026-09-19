@@ -29,6 +29,12 @@ public static class InteractionResult
     public static InteractionResult<T> Success<T>(T value) => new(value);
 
     public static InteractionResult<T> Failure<T>(InteractionErrorCode code, string message)
+        => Failure<T>(code, message, []);
+
+    public static InteractionResult<T> Failure<T>(
+        InteractionErrorCode code,
+        string message,
+        IReadOnlyList<InteractionIssue> issues)
     {
         if (code == InteractionErrorCode.NONE)
         {
@@ -36,6 +42,7 @@ public static class InteractionResult
         }
 
         ArgumentException.ThrowIfNullOrWhiteSpace(message);
-        return new InteractionResult<T>(new InteractionError(code, message));
+        ArgumentNullException.ThrowIfNull(issues);
+        return new InteractionResult<T>(new InteractionError(code, message, issues));
     }
 }

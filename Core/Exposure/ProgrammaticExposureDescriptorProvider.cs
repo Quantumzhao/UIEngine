@@ -140,6 +140,18 @@ internal sealed class ProgrammaticValueDescriptor : IValueDescriptor
 
     public bool CanWrite => _Definition.Write is not null;
 
+    public bool IsNullable => _Definition.IsNullable;
+
+    public IReadOnlyList<SelectionOption> Options => _Definition.Options;
+
+    public ValueRange? Range => _Definition.Range;
+
+    public IReadOnlyList<ValidationRuleDescriptor> ValidationRules => _Definition.ValidationRules;
+
+    public string? Unit => _Definition.Unit;
+
+    public IReadOnlyList<string> Tags => _Definition.Tags;
+
     public ValueTask<InteractionResult<object?>> ReadAsync(CancellationToken cancellationToken = default)
     {
         var unavailable = _CheckAvailability("read", cancellationToken);
@@ -163,42 +175,111 @@ internal sealed class ProgrammaticValueDescriptor : IValueDescriptor
         }
     }
 
-    public ValueTask<InteractionResult<object?>> WriteAsync(
+    public async ValueTask<InteractionResult<object?>> WriteAsync(
         object? value,
         CancellationToken cancellationToken = default)
     {
         var unavailable = _CheckAvailability("write", cancellationToken);
         if (unavailable is not null)
         {
-            return ValueTask.FromResult(unavailable);
+            return unavailable;
         }
 
         if (_Definition.Write is null)
         {
-            return ValueTask.FromResult(InteractionResult.Failure<object?>(
+            var message = $"Value '{Id}' is read-only.";
+            return InteractionResult.Failure<object?>(
                 InteractionErrorCode.VALIDATION_FAILED,
-                $"Value '{Id}' is read-only."));
+                message,
+                [new InteractionIssue(
+                    InteractionIssueCode.READ_ONLY,
+                    InteractionIssueTarget.VALUE,
+                    Id,
+                    message)]);
         }
 
         var converted = ReflectionValueConverter.Convert(value, ValueType);
         if (!converted.IsSuccess)
         {
-            return ValueTask.FromResult(converted);
+            var error = converted.Error!;
+            return InteractionResult.Failure<object?>(
+                error.Code,
+                error.Message,
+                [new InteractionIssue(
+                    error.Code == InteractionErrorCode.VALIDATION_FAILED
+                        ? InteractionIssueCode.NULL_NOT_ALLOWED
+                        : InteractionIssueCode.CONVERSION_FAILED,
+                    InteractionIssueTarget.VALUE,
+                    Id,
+                    error.Message)]);
         }
 
         _Target.TryGetTarget(out var target);
+        var issues = ValueValidation.Validate(
+            converted.Value,
+            IsNullable,
+            Options,
+            Range,
+            [],
+            target,
+            InteractionIssueTarget.VALUE,
+            Id).ToList();
+        if (issues.Count == 0)
+        {
+            foreach (var validator in _Definition.Validators)
+            {
+                string? domainIssue;
+                try
+                {
+                    var pending = await _Host.Configuration.Dispatcher.InvokeAsync(
+                        () => validator(target!, converted.Value, cancellationToken),
+                        cancellationToken).ConfigureAwait(false);
+                    domainIssue = await pending.ConfigureAwait(false);
+                }
+                catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+                {
+                    return InteractionResult.Failure<object?>(
+                        InteractionErrorCode.CANCELLED,
+                        "Value validation was cancelled.");
+                }
+                catch (Exception exception)
+                {
+                    return InteractionResult.Failure<object?>(
+                        InteractionErrorCode.INVOCATION_FAILED,
+                        $"Validation for value '{Id}' failed: {exception.Message}");
+                }
+
+                if (domainIssue is not null)
+                {
+                    issues.Add(new InteractionIssue(
+                        InteractionIssueCode.RULE_FAILED,
+                        InteractionIssueTarget.VALUE,
+                        Id,
+                        domainIssue));
+                }
+            }
+        }
+
+        if (issues.Count > 0)
+        {
+            return InteractionResult.Failure<object?>(
+                InteractionErrorCode.VALIDATION_FAILED,
+                $"Value '{Id}' failed validation.",
+                issues);
+        }
+
         try
         {
             _Definition.Write(target!, converted.Value);
-            return ValueTask.FromResult(InteractionResult.Success(converted.Value));
+            return InteractionResult.Success(converted.Value);
         }
         catch (TargetInvocationException exception)
         {
-            return ValueTask.FromResult(_WriteFailure(exception.InnerException ?? exception));
+            return _WriteFailure(exception.InnerException ?? exception);
         }
         catch (Exception exception)
         {
-            return ValueTask.FromResult(_WriteFailure(exception));
+            return _WriteFailure(exception);
         }
     }
 
@@ -233,10 +314,23 @@ internal sealed class ProgrammaticValueDescriptor : IValueDescriptor
     private static InteractionResult<object?> _InvocationFailure(Exception exception) =>
         InteractionResult.Failure<object?>(InteractionErrorCode.INVOCATION_FAILED, exception.Message);
 
-    private static InteractionResult<object?> _WriteFailure(Exception exception) =>
+    private InteractionResult<object?> _WriteFailure(Exception exception) =>
         InteractionResult.Failure<object?>(
-            exception is ArgumentException or InvalidOperationException
-                ? InteractionErrorCode.VALIDATION_FAILED
-                : InteractionErrorCode.INVOCATION_FAILED,
-            exception.Message);
+            exception is UnauthorizedAccessException
+                ? InteractionErrorCode.PERMISSION_DENIED
+                : exception is ArgumentException or InvalidOperationException
+                    ? InteractionErrorCode.VALIDATION_FAILED
+                    : InteractionErrorCode.INVOCATION_FAILED,
+            exception.Message,
+            [new InteractionIssue(
+                exception is UnauthorizedAccessException
+                    ? InteractionIssueCode.PERMISSION_DENIED
+                    : exception is ArgumentException or InvalidOperationException
+                        ? InteractionIssueCode.RULE_FAILED
+                        : InteractionIssueCode.ACTION_REJECTED,
+                exception is UnauthorizedAccessException
+                    ? InteractionIssueTarget.PERMISSION
+                    : InteractionIssueTarget.VALUE,
+                Id,
+                exception.Message)]);
 }

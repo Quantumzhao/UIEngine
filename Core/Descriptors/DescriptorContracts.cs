@@ -36,6 +36,18 @@ public interface IValueDescriptor : IMemberDescriptor
 
     bool CanWrite { get; }
 
+    bool IsNullable { get; }
+
+    IReadOnlyList<SelectionOption> Options { get; }
+
+    ValueRange? Range { get; }
+
+    IReadOnlyList<ValidationRuleDescriptor> ValidationRules { get; }
+
+    string? Unit { get; }
+
+    IReadOnlyList<string> Tags { get; }
+
     ValueTask<InteractionResult<object?>> ReadAsync(CancellationToken cancellationToken = default);
 
     ValueTask<InteractionResult<object?>> WriteAsync(
@@ -47,7 +59,7 @@ public interface IReferenceDescriptor : IMemberDescriptor
 {
     Type ReferenceType { get; }
 
-    ValueTask<InteractionResult<ObjectHandle>> ReadAsync(
+    ValueTask<InteractionResult<ObjectHandle?>> ReadAsync(
         CancellationToken cancellationToken = default);
 }
 
@@ -71,6 +83,10 @@ public interface IActionDescriptor : IMemberDescriptor
 {
     IReadOnlyList<IParameterDescriptor> Parameters { get; }
 
+    ActionRisk Risk { get; }
+
+    bool RequiresConfirmation { get; }
+
     ValueTask<InteractionResult<object?>> InvokeAsync(
         IReadOnlyDictionary<string, object?> arguments,
         CancellationToken cancellationToken = default);
@@ -82,7 +98,21 @@ public interface IParameterDescriptor : IMemberDescriptor
 
     bool IsRequired { get; }
 
+    bool IsNullable { get; }
+
+    bool HasDefaultValue { get; }
+
     object? DefaultValue { get; }
+
+    IReadOnlyList<SelectionOption> Options { get; }
+
+    ValueRange? Range { get; }
+
+    IReadOnlyList<ValidationRuleDescriptor> ValidationRules { get; }
+
+    string? Unit { get; }
+
+    IReadOnlyList<string> Tags { get; }
 }
 
 public interface IObjectDescriptorProvider

@@ -151,7 +151,18 @@ public sealed class LogicalPathResolver
                     return _FromFailure(read.Error!, path, locations);
                 }
 
-                currentHandle = read.Value;
+                if (read.Value is null)
+                {
+                    return _Failure(
+                        BindingResolutionState.TEMPORARILY_UNAVAILABLE,
+                        new InteractionError(
+                            InteractionErrorCode.TARGET_UNAVAILABLE,
+                            $"Reference '{reference.Id}' is empty."),
+                        path,
+                        locations);
+                }
+
+                currentHandle = read.Value.Value;
                 canonicalPath = canonicalPath.Append(segment.Identifier);
             }
             else

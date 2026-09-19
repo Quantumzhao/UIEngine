@@ -62,9 +62,9 @@ public sealed class ReflectionDescriptorTests
         var nationHandle = host.RegisterRoot("nation", nation).Value;
 
         var nationDescriptor = (await host.DescribeAsync(nationHandle)).Value;
-        var capitalHandle = (await Assert.Single(nationDescriptor.References).ReadAsync()).Value;
+        var capitalHandle = (await Assert.Single(nationDescriptor.References).ReadAsync()).Value!.Value;
         var capitalDescriptor = (await host.DescribeAsync(capitalHandle)).Value;
-        var ownerHandle = (await Assert.Single(capitalDescriptor.References).ReadAsync()).Value;
+        var ownerHandle = (await Assert.Single(capitalDescriptor.References).ReadAsync()).Value!.Value;
 
         Assert.Equal(nationHandle, ownerHandle);
         Assert.Equal(nationHandle.Identity, nationDescriptor.Identity);

@@ -164,6 +164,18 @@ internal sealed class ReflectionValueDescriptor : ReflectionMemberDescriptor, IV
 
     public bool CanWrite { get; }
 
+    public bool IsNullable => Metadata.IsNullable;
+
+    public IReadOnlyList<SelectionOption> Options => Metadata.Options;
+
+    public ValueRange? Range => Metadata.Range;
+
+    public IReadOnlyList<ValidationRuleDescriptor> ValidationRules => Metadata.ValidationRules;
+
+    public string? Unit => Metadata.Unit;
+
+    public IReadOnlyList<string> Tags => Metadata.Tags;
+
     public ValueTask<InteractionResult<object?>> ReadAsync(CancellationToken cancellationToken = default)
     {
         if (IsHostDisposed)
@@ -229,9 +241,15 @@ internal sealed class ReflectionValueDescriptor : ReflectionMemberDescriptor, IV
 
         if (!CanWrite)
         {
+            var message = $"Value '{Id}' is read-only.";
             return ValueTask.FromResult(InteractionResult.Failure<object?>(
                 InteractionErrorCode.VALIDATION_FAILED,
-                $"Value '{Id}' is read-only."));
+                message,
+                [new InteractionIssue(
+                    InteractionIssueCode.READ_ONLY,
+                    InteractionIssueTarget.VALUE,
+                    Id,
+                    message)]));
         }
 
         if (!TryGetTarget(out var target) || target is null)
@@ -244,7 +262,34 @@ internal sealed class ReflectionValueDescriptor : ReflectionMemberDescriptor, IV
         var converted = ReflectionValueConverter.Convert(value, ValueType);
         if (!converted.IsSuccess)
         {
-            return ValueTask.FromResult(converted);
+            var error = converted.Error!;
+            return ValueTask.FromResult(InteractionResult.Failure<object?>(
+                error.Code,
+                error.Message,
+                [new InteractionIssue(
+                    error.Code == InteractionErrorCode.VALIDATION_FAILED
+                        ? InteractionIssueCode.NULL_NOT_ALLOWED
+                        : InteractionIssueCode.CONVERSION_FAILED,
+                    InteractionIssueTarget.VALUE,
+                    Id,
+                    error.Message)]));
+        }
+
+        var issues = ValueValidation.Validate(
+            converted.Value,
+            IsNullable,
+            Options,
+            range: null,
+            Metadata.ValidationAttributes,
+            target,
+            InteractionIssueTarget.VALUE,
+            Id);
+        if (issues.Count > 0)
+        {
+            return ValueTask.FromResult(InteractionResult.Failure<object?>(
+                InteractionErrorCode.VALIDATION_FAILED,
+                $"Value '{Id}' failed validation.",
+                issues));
         }
 
         try
@@ -255,23 +300,33 @@ internal sealed class ReflectionValueDescriptor : ReflectionMemberDescriptor, IV
         catch (TargetInvocationException exception)
         {
             var cause = exception.InnerException ?? exception;
-            var code = cause is ArgumentException
-                ? InteractionErrorCode.VALIDATION_FAILED
-                : InteractionErrorCode.INVOCATION_FAILED;
-            return ValueTask.FromResult(InteractionResult.Failure<object?>(code, cause.Message));
+            return ValueTask.FromResult(_SetterFailure(cause));
         }
         catch (ArgumentException exception)
         {
-            return ValueTask.FromResult(InteractionResult.Failure<object?>(
-                InteractionErrorCode.VALIDATION_FAILED,
-                exception.Message));
+            return ValueTask.FromResult(_SetterFailure(exception));
         }
         catch (InvalidOperationException exception)
         {
-            return ValueTask.FromResult(InteractionResult.Failure<object?>(
-                InteractionErrorCode.VALIDATION_FAILED,
-                exception.Message));
+            return ValueTask.FromResult(_SetterFailure(exception));
         }
+        catch (UnauthorizedAccessException exception)
+        {
+            return ValueTask.FromResult(_SetterFailure(exception));
+        }
+    }
+
+    private InteractionResult<object?> _SetterFailure(Exception exception)
+    {
+        var denied = exception is UnauthorizedAccessException;
+        return InteractionResult.Failure<object?>(
+            denied ? InteractionErrorCode.PERMISSION_DENIED : InteractionErrorCode.VALIDATION_FAILED,
+            exception.Message,
+            [new InteractionIssue(
+                denied ? InteractionIssueCode.PERMISSION_DENIED : InteractionIssueCode.RULE_FAILED,
+                denied ? InteractionIssueTarget.PERMISSION : InteractionIssueTarget.VALUE,
+                Id,
+                exception.Message)]);
     }
 }
 
@@ -291,24 +346,24 @@ internal sealed class ReflectionReferenceDescriptor : ReflectionMemberDescriptor
 
     public Type ReferenceType => Metadata.MemberType;
 
-    public async ValueTask<InteractionResult<ObjectHandle>> ReadAsync(
+    public async ValueTask<InteractionResult<ObjectHandle?>> ReadAsync(
         CancellationToken cancellationToken = default)
     {
         if (IsHostDisposed)
         {
-            return _DisposedFailure<ObjectHandle>();
+            return _DisposedFailure<ObjectHandle?>();
         }
 
         if (cancellationToken.IsCancellationRequested)
         {
-            return InteractionResult.Failure<ObjectHandle>(
+            return InteractionResult.Failure<ObjectHandle?>(
                 InteractionErrorCode.CANCELLED,
                 "Reference resolution was cancelled.");
         }
 
         if (!TryGetTarget(out var target) || target is null)
         {
-            return InteractionResult.Failure<ObjectHandle>(
+            return InteractionResult.Failure<ObjectHandle?>(
                 InteractionErrorCode.TARGET_UNAVAILABLE,
                 "The containing object is no longer available.");
         }
@@ -318,29 +373,33 @@ internal sealed class ReflectionReferenceDescriptor : ReflectionMemberDescriptor
             var referencedObject = ReflectionMemberAccess.Read(Metadata.Member, target);
             if (referencedObject is null)
             {
-                return InteractionResult.Failure<ObjectHandle>(
-                    InteractionErrorCode.TARGET_UNAVAILABLE,
-                    $"Reference '{Id}' is null.");
+                return InteractionResult.Success<ObjectHandle?>(null);
             }
 
             if (referencedObject.GetType().IsValueType)
             {
-                return InteractionResult.Failure<ObjectHandle>(
+                return InteractionResult.Failure<ObjectHandle?>(
                     InteractionErrorCode.UNSUPPORTED_TARGET_TYPE,
                     $"Reference '{Id}' produced a value type.");
             }
 
-            return await _Host.EncounterAsync(referencedObject, cancellationToken).ConfigureAwait(false);
+            var encountered = await _Host.EncounterAsync(referencedObject, cancellationToken).ConfigureAwait(false);
+            return encountered.IsSuccess
+                ? InteractionResult.Success<ObjectHandle?>(encountered.Value)
+                : InteractionResult.Failure<ObjectHandle?>(
+                    encountered.Error!.Code,
+                    encountered.Error.Message,
+                    encountered.Error.Issues);
         }
         catch (TargetInvocationException exception)
         {
-            return InteractionResult.Failure<ObjectHandle>(
+            return InteractionResult.Failure<ObjectHandle?>(
                 InteractionErrorCode.INVOCATION_FAILED,
                 exception.InnerException?.Message ?? exception.Message);
         }
         catch (InvalidOperationException exception)
         {
-            return InteractionResult.Failure<ObjectHandle>(
+            return InteractionResult.Failure<ObjectHandle?>(
                 InteractionErrorCode.DESCRIPTOR_UNAVAILABLE,
                 exception.Message);
         }
@@ -529,7 +588,10 @@ internal sealed class ReflectionCollectionDescriptor :
 /// <summary>Binds named arguments and invokes one exposed synchronous action.</summary>
 internal sealed class ReflectionActionDescriptor : ReflectionMemberDescriptor, IActionDescriptor
 {
+    private readonly ActionAttribute _ActionMetadata;
+    private readonly bool _HasInvalidPrecondition;
     private readonly MethodInfo _Method;
+    private readonly MethodInfo? _Precondition;
 
     public ReflectionActionDescriptor(
         UIEngineHost host,
@@ -538,6 +600,9 @@ internal sealed class ReflectionActionDescriptor : ReflectionMemberDescriptor, I
         : base(host, target, metadata)
     {
         _Method = (MethodInfo)metadata.Member;
+        _ActionMetadata = _Method.GetCustomAttribute<ActionAttribute>(inherit: true) ?? new ActionAttribute();
+        _Precondition = _ResolvePrecondition(_Method, _ActionMetadata.Precondition);
+        _HasInvalidPrecondition = _ActionMetadata.Precondition is not null && _Precondition is null;
         Parameters = _Method
             .GetParameters()
             .Select(static parameter => (IParameterDescriptor)new ReflectionParameterDescriptor(parameter))
@@ -545,6 +610,10 @@ internal sealed class ReflectionActionDescriptor : ReflectionMemberDescriptor, I
     }
 
     public IReadOnlyList<IParameterDescriptor> Parameters { get; }
+
+    public ActionRisk Risk => _ActionMetadata.Risk;
+
+    public bool RequiresConfirmation => _ActionMetadata.RequiresConfirmation;
 
     public ValueTask<InteractionResult<object?>> InvokeAsync(
         IReadOnlyDictionary<string, object?> arguments,
@@ -575,6 +644,13 @@ internal sealed class ReflectionActionDescriptor : ReflectionMemberDescriptor, I
                 $"Action '{Id}' is not a supported synchronous method."));
         }
 
+        if (_HasInvalidPrecondition)
+        {
+            return ValueTask.FromResult(InteractionResult.Failure<object?>(
+                InteractionErrorCode.DESCRIPTOR_UNAVAILABLE,
+                $"Action '{Id}' has an invalid precondition declaration."));
+        }
+
         if (!TryGetTarget(out var target) || target is null)
         {
             return ValueTask.FromResult(InteractionResult.Failure<object?>(
@@ -588,9 +664,15 @@ internal sealed class ReflectionActionDescriptor : ReflectionMemberDescriptor, I
                 string.Equals(parameter.Name, argumentName, StringComparison.Ordinal)));
         if (unknownArgument is not null)
         {
+            var message = $"Action '{Id}' has no parameter named '{unknownArgument}'.";
             return ValueTask.FromResult(InteractionResult.Failure<object?>(
                 InteractionErrorCode.INVALID_INPUT,
-                $"Action '{Id}' has no parameter named '{unknownArgument}'."));
+                message,
+                [new InteractionIssue(
+                    InteractionIssueCode.ACTION_REJECTED,
+                    InteractionIssueTarget.PARAMETER,
+                    unknownArgument,
+                    message)]));
         }
 
         var boundArguments = new object?[methodParameters.Length];
@@ -604,9 +686,15 @@ internal sealed class ReflectionActionDescriptor : ReflectionMemberDescriptor, I
             {
                 if (!parameter.IsOptional)
                 {
+                    var message = $"Required parameter '{parameter.Name}' was not supplied.";
                     return ValueTask.FromResult(InteractionResult.Failure<object?>(
                         InteractionErrorCode.INVALID_INPUT,
-                        $"Required parameter '{parameter.Name}' was not supplied."));
+                        message,
+                        [new InteractionIssue(
+                            InteractionIssueCode.REQUIRED,
+                            InteractionIssueTarget.PARAMETER,
+                            parameter.Name ?? $"arg{parameter.Position}",
+                            message)]));
                 }
 
                 boundArguments[index] = parameter.DefaultValue;
@@ -623,10 +711,53 @@ internal sealed class ReflectionActionDescriptor : ReflectionMemberDescriptor, I
                     "The argument could not be converted.");
                 return ValueTask.FromResult(InteractionResult.Failure<object?>(
                     error.Code,
-                    $"Parameter '{parameter.Name}': {error.Message}"));
+                    $"Parameter '{parameter.Name}': {error.Message}",
+                    [new InteractionIssue(
+                        error.Code == InteractionErrorCode.VALIDATION_FAILED
+                            ? InteractionIssueCode.NULL_NOT_ALLOWED
+                            : InteractionIssueCode.CONVERSION_FAILED,
+                        InteractionIssueTarget.PARAMETER,
+                        parameter.Name ?? $"arg{parameter.Position}",
+                        error.Message)]));
             }
 
             boundArguments[index] = converted.Value;
+        }
+
+        for (var index = 0; index < Parameters.Count; index++)
+        {
+            var parameter = (ReflectionParameterDescriptor)Parameters[index];
+            var issues = parameter.Validate(boundArguments[index], target);
+            if (issues.Count > 0)
+            {
+                return ValueTask.FromResult(InteractionResult.Failure<object?>(
+                    InteractionErrorCode.VALIDATION_FAILED,
+                    $"Parameter '{parameter.Id}' failed validation.",
+                    issues));
+            }
+        }
+
+        if (_Precondition is not null)
+        {
+            try
+            {
+                if (_Precondition.Invoke(target, null) is not true)
+                {
+                    var message = $"Action '{Id}' is not currently available.";
+                    return ValueTask.FromResult(InteractionResult.Failure<object?>(
+                        InteractionErrorCode.VALIDATION_FAILED,
+                        message,
+                        [new InteractionIssue(
+                            InteractionIssueCode.ACTION_REJECTED,
+                            InteractionIssueTarget.ACTION,
+                            Id,
+                            message)]));
+                }
+            }
+            catch (TargetInvocationException exception)
+            {
+                return ValueTask.FromResult(_InvocationFailure(exception.InnerException ?? exception));
+            }
         }
 
         try
@@ -636,29 +767,91 @@ internal sealed class ReflectionActionDescriptor : ReflectionMemberDescriptor, I
         }
         catch (TargetInvocationException exception)
         {
-            return ValueTask.FromResult(InteractionResult.Failure<object?>(
-                InteractionErrorCode.INVOCATION_FAILED,
-                exception.InnerException?.Message ?? exception.Message));
+            return ValueTask.FromResult(_InvocationFailure(exception.InnerException ?? exception));
         }
         catch (ArgumentException exception)
         {
             return ValueTask.FromResult(InteractionResult.Failure<object?>(
                 InteractionErrorCode.INVALID_INPUT,
-                exception.Message));
+                exception.Message,
+                [new InteractionIssue(
+                    InteractionIssueCode.ACTION_REJECTED,
+                    InteractionIssueTarget.ACTION,
+                    Id,
+                    exception.Message)]));
         }
+    }
+
+    private InteractionResult<object?> _InvocationFailure(Exception exception)
+    {
+        if (exception is UnauthorizedAccessException)
+        {
+            return InteractionResult.Failure<object?>(
+                InteractionErrorCode.PERMISSION_DENIED,
+                exception.Message,
+                [new InteractionIssue(
+                    InteractionIssueCode.PERMISSION_DENIED,
+                    InteractionIssueTarget.PERMISSION,
+                    Id,
+                    exception.Message)]);
+        }
+
+        return InteractionResult.Failure<object?>(
+            InteractionErrorCode.INVOCATION_FAILED,
+            exception.Message,
+            [new InteractionIssue(
+                InteractionIssueCode.ACTION_REJECTED,
+                InteractionIssueTarget.ACTION,
+                Id,
+                exception.Message)]);
+    }
+
+    private static MethodInfo? _ResolvePrecondition(MethodInfo action, string? preconditionName)
+    {
+        if (preconditionName is null)
+        {
+            return null;
+        }
+
+        var precondition = action.DeclaringType?.GetMethod(
+            preconditionName,
+            BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic,
+            binder: null,
+            types: Type.EmptyTypes,
+            modifiers: null);
+        return precondition?.ReturnType == typeof(bool) ? precondition : null;
     }
 }
 
 /// <summary>Describes one reflected action parameter.</summary>
 internal sealed class ReflectionParameterDescriptor : IParameterDescriptor
 {
+    private readonly IReadOnlyList<System.ComponentModel.DataAnnotations.ValidationAttribute> _ValidationAttributes;
+
     public ReflectionParameterDescriptor(ParameterInfo parameter)
     {
         Id = parameter.Name ?? $"arg{parameter.Position}";
         DisplayName = Id;
         ParameterType = parameter.ParameterType;
         IsRequired = !parameter.IsOptional;
+        IsNullable = ReflectionValidationMetadata.IsNullable(parameter);
+        _ValidationAttributes = ReflectionValidationMetadata.GetAttributes(parameter);
+        if (_ValidationAttributes.Any(static attribute =>
+                attribute is System.ComponentModel.DataAnnotations.RequiredAttribute))
+        {
+            IsNullable = false;
+        }
+
+        HasDefaultValue = parameter.HasDefaultValue;
         DefaultValue = parameter.HasDefaultValue ? parameter.DefaultValue : null;
+        Options = ValueValidation.GetEnumOptions(ParameterType);
+        Range = ReflectionValidationMetadata.GetRange(_ValidationAttributes);
+        ValidationRules = ReflectionValidationMetadata.GetRules(
+            _ValidationAttributes,
+            Options.Count > 0);
+        var interactionMetadata = parameter.GetCustomAttribute<InteractionMetadataAttribute>(inherit: true);
+        Unit = interactionMetadata?.Unit;
+        Tags = interactionMetadata?.Tags.ToArray() ?? [];
     }
 
     public string Id { get; }
@@ -669,7 +862,32 @@ internal sealed class ReflectionParameterDescriptor : IParameterDescriptor
 
     public bool IsRequired { get; }
 
+    public bool IsNullable { get; }
+
+    public bool HasDefaultValue { get; }
+
     public object? DefaultValue { get; }
+
+    public IReadOnlyList<SelectionOption> Options { get; }
+
+    public ValueRange? Range { get; }
+
+    public IReadOnlyList<ValidationRuleDescriptor> ValidationRules { get; }
+
+    public string? Unit { get; }
+
+    public IReadOnlyList<string> Tags { get; }
+
+    internal IReadOnlyList<InteractionIssue> Validate(object? value, object target) =>
+        ValueValidation.Validate(
+            value,
+            IsNullable,
+            Options,
+            range: null,
+            _ValidationAttributes,
+            target,
+            InteractionIssueTarget.PARAMETER,
+            Id);
 }
 
 /// <summary>Reads reflected properties, fields, and parameterless summary methods.</summary>

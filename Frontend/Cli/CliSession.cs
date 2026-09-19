@@ -236,8 +236,15 @@ internal sealed class CliSession
 
         foreach (var value in descriptor.Values.OrderBy(static member => member.Id, StringComparer.Ordinal))
         {
+            var options = value.Options.Count == 0
+                ? "none"
+                : string.Join('|', value.Options.Select(option => _FormatValue(option.Value)));
+            var range = value.Range is null
+                ? "none"
+                : $"{_FormatValue(value.Range.Minimum)}..{_FormatValue(value.Range.Maximum)}";
             _Output.WriteLine(
-                $"value {value.Id} type={value.ValueType.Name} read={value.CanRead} write={value.CanWrite}");
+                $"value {value.Id} type={value.ValueType.Name} read={value.CanRead} write={value.CanWrite} " +
+                $"nullable={value.IsNullable} range={range} options={options}");
         }
 
         foreach (var reference in descriptor.References.OrderBy(static member => member.Id, StringComparer.Ordinal))
@@ -255,8 +262,13 @@ internal sealed class CliSession
             var parameters = string.Join(
                 ", ",
                 action.Parameters.Select(static parameter =>
-                    $"{parameter.Id}:{parameter.ParameterType.Name}"));
-            _Output.WriteLine($"action {action.Id}({parameters})");
+                    $"{parameter.Id}:{parameter.ParameterType.Name}" +
+                    $"?={parameter.IsNullable}" +
+                    (parameter.HasDefaultValue
+                        ? $" default={_FormatValue(parameter.DefaultValue)}"
+                        : string.Empty)));
+            _Output.WriteLine(
+                $"action {action.Id}({parameters}) risk={action.Risk} confirm={action.RequiresConfirmation}");
         }
     }
 
@@ -281,7 +293,7 @@ internal sealed class CliSession
         if (value is null)
         {
             _WriteFailure(
-                InteractionErrorCode.TARGET_UNAVAILABLE,
+                InteractionErrorCode.TARGET_MISSING,
                 $"Value '{tokens[1]}' was not found at '{CurrentPath}'.");
             return;
         }
@@ -317,7 +329,7 @@ internal sealed class CliSession
         if (value is null)
         {
             _WriteFailure(
-                InteractionErrorCode.TARGET_UNAVAILABLE,
+                InteractionErrorCode.TARGET_MISSING,
                 $"Value '{tokens[1]}' was not found at '{CurrentPath}'.");
             return;
         }
@@ -377,7 +389,7 @@ internal sealed class CliSession
         if (action is null)
         {
             _WriteFailure(
-                InteractionErrorCode.TARGET_UNAVAILABLE,
+                InteractionErrorCode.TARGET_MISSING,
                 $"Action '{tokens[1]}' was not found at '{CurrentPath}'.");
             return;
         }
@@ -528,6 +540,11 @@ internal sealed class CliSession
         }
 
         _WriteFailure(error.Code, error.Message);
+        foreach (var issue in error.Issues)
+        {
+            _Output.WriteLine(
+                $"issue {issue.Code} target={issue.Target} id={issue.TargetId}: {issue.Message}");
+        }
     }
 
     private void _WriteFailure(InteractionErrorCode code, string message) =>

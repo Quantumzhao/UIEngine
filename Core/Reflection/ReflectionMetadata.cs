@@ -1,5 +1,6 @@
 using System.Collections;
 using System.Collections.Concurrent;
+using System.ComponentModel.DataAnnotations;
 using System.Reflection;
 using UIEngine.Core.Attributes;
 
@@ -20,7 +21,14 @@ internal sealed record ReflectionMemberMetadata(
     string DisplayName,
     Type MemberType,
     ReflectionMemberKind Kind,
-    MemberInfo Member);
+    MemberInfo Member,
+    bool IsNullable,
+    IReadOnlyList<SelectionOption> Options,
+    ValueRange? Range,
+    IReadOnlyList<ValidationRuleDescriptor> ValidationRules,
+    IReadOnlyList<ValidationAttribute> ValidationAttributes,
+    string? Unit,
+    IReadOnlyList<string> Tags);
 
 /// <summary>Stores cached exposure and descriptor metadata for one reflected type.</summary>
 internal sealed record ReflectionTypeMetadata(
@@ -68,12 +76,24 @@ internal static class ReflectionTypeMetadataCache
                 suffix++;
             }
 
+            var validationAttributes = ReflectionValidationMetadata.GetAttributes(candidate.Member);
+            var options = ValueValidation.GetEnumOptions(candidate.MemberType);
+            var interactionMetadata = candidate.Member.GetCustomAttribute<InteractionMetadataAttribute>(
+                inherit: true);
             descriptorMembers.Add(new ReflectionMemberMetadata(
                 identifier,
                 candidate.Member.Name,
                 candidate.MemberType,
                 candidate.Kind,
-                candidate.Member));
+                candidate.Member,
+                ReflectionValidationMetadata.IsNullable(candidate.Member, candidate.MemberType) &&
+                    validationAttributes.All(static attribute => attribute is not RequiredAttribute),
+                options,
+                ReflectionValidationMetadata.GetRange(validationAttributes),
+                ReflectionValidationMetadata.GetRules(validationAttributes, options.Count > 0),
+                validationAttributes,
+                interactionMetadata?.Unit,
+                interactionMetadata?.Tags.ToArray() ?? []));
         }
 
         var summaryMember = exposedMembers.FirstOrDefault(

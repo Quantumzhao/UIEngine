@@ -118,7 +118,7 @@ public sealed class CliSessionTests
         await new CliTextReaderRunner(session, input).RunAsync();
 
         var transcript = output.ToString();
-        Assert.Contains("error TARGET_UNAVAILABLE", transcript, StringComparison.Ordinal);
+        Assert.Contains("error TARGET_MISSING", transcript, StringComparison.Ordinal);
         Assert.Contains("error CONVERSION_FAILED", transcript, StringComparison.Ordinal);
         Assert.Contains("error INVOCATION_FAILED", transcript, StringComparison.Ordinal);
         Assert.Contains("error INVALID_INPUT", transcript, StringComparison.Ordinal);

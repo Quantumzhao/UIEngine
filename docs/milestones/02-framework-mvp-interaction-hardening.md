@@ -1,6 +1,6 @@
 # Milestone 02 — Framework MVP Interaction Hardening
 
-**Status:** In progress — step 5 complete; remaining step 3 metadata roles are still open
+**Status:** In progress — step 6 complete; remaining step 3 exposure roles are still open
 
 **Acceptance:** Not run
 
@@ -293,10 +293,12 @@ Step 5 completed on 2026-09-19. Core now owns case-sensitive absolute logical pa
 
 ### 6. Complete availability and validation semantics
 
-1. Refine operation payloads so null, empty reference, absent metadata, unavailable target, missing member, and failed access remain distinct.
-2. Add nullability, default-presence, finite-selection, range, and programmatic validation metadata.
-3. Apply conversion and validation in a consistent order for writes and action arguments.
-4. Add structured, contextual issues for value, parameter, action, and permission-like rejection.
+1. [x] Refine operation payloads so null, empty reference, absent metadata, unavailable target, missing member, and failed access remain distinct.
+2. [x] Add nullability, default-presence, finite-selection, range, and programmatic validation metadata.
+3. [x] Apply conversion and validation in a consistent order for writes and action arguments.
+4. [x] Add structured, contextual issues for value, parameter, action, and permission-like rejection.
+
+Step 6 completed on 2026-09-19. Successful scalar nulls and empty references now remain successful payloads while missing members, unavailable containers, and failed access retain distinct structured outcomes. Value and parameter descriptors expose nullability, explicit default presence, finite options, ranges, units/tags, and normalized validation rules; action descriptors expose risk, confirmation, and precondition metadata. Reflection data annotations and host-scoped synchronous/asynchronous programmatic rules run after conversion and before setters or actions, with stable contextual issues for value, parameter, action, and permission-like rejection. The CLI now reports missing members accurately, prints validation issues, and includes the new metadata in `inspect`. `dotnet build UIEngine.sln` completed with zero warnings and errors, and `dotnet test UIEngine.sln --no-build --no-restore` passed all 82 tests (69 framework, 8 CLI, and 5 legacy-characterization tests).
 
 ### 7. Route live access through dispatch
 
