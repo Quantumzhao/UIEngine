@@ -2,6 +2,21 @@ using UIEngine.Attributes;
 
 namespace UIEngine.Samples.CyclicDomain;
 
+/// <summary>Creates the deterministic cyclic graph used by the CLI and integration tests.</summary>
+public static class CyclicWorldFactory
+{
+    public static World Create()
+    {
+        var world = new World("Earth");
+        var nation = new Nation("N1") { Population = 100 };
+        var capital = new City("Capital City", nation);
+        nation.Capital = capital;
+        nation.Cities.Add(capital);
+        world.Nations.Add(nation);
+        return world;
+    }
+}
+
 /// <summary>Provides a deterministic root for the cyclic sample domain.</summary>
 public sealed class World
 {
@@ -35,6 +50,9 @@ public sealed class Nation
 
     [Expose]
     public int Population { get; set; }
+
+    [Expose]
+    public string Motto { get; set; } = "Forward";
 
     [Expose(ReadOnly = true)]
     public int Turn => _Turn;

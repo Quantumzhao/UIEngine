@@ -16,6 +16,7 @@ public sealed class ProjectReferenceGraphTests
             ["Framework/UIEngine.Frontend.Cli/UIEngine.Frontend.Cli.csproj"] =
             [
                 "Framework/UIEngine.Framework/UIEngine.Framework.csproj",
+                "Samples/UIEngine.Samples.CyclicDomain/UIEngine.Samples.CyclicDomain.csproj",
             ],
             ["Framework/UIEngine.Framework/UIEngine.Framework.csproj"] = Array.Empty<string>(),
             ["Samples/UIEngine.Samples.CyclicDomain/UIEngine.Samples.CyclicDomain.csproj"] =
