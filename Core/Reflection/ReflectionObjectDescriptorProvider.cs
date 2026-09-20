@@ -39,6 +39,23 @@ public sealed class ReflectionObjectDescriptorProvider : IObjectDescriptorProvid
         }
 
         var metadata = ReflectionTypeMetadataCache.GetOrCreate(instance.GetType());
+        var invalidAction = metadata.DescriptorMembers
+            .Where(static member => member.Kind == ReflectionMemberKind.ACTION)
+            .Select(static member => (MethodInfo)member.Member)
+            .Select(static method => new
+            {
+                Method = method,
+                Error = ReflectionActionSignature.GetValidationError(method),
+            })
+            .FirstOrDefault(static result => result.Error is not null);
+        if (invalidAction is not null)
+        {
+            return ValueTask.FromResult(InteractionResult.Failure<IObjectDescriptor>(
+                InteractionErrorCode.DESCRIPTOR_UNAVAILABLE,
+                $"Action '{invalidAction.Method.Name}' has an unsupported signature: " +
+                invalidAction.Error));
+        }
+
         IObjectDescriptor descriptor = new ReflectionObjectDescriptor(host, instance, handle, metadata);
         return ValueTask.FromResult(InteractionResult.Success(descriptor));
     }
@@ -60,19 +77,19 @@ internal sealed class ReflectionObjectDescriptor : IObjectDescriptor
 
         Values = metadata.DescriptorMembers
             .Where(static member => member.Kind == ReflectionMemberKind.VALUE)
-            .Select(member => (IValueDescriptor)new ReflectionValueDescriptor(host, instance, member))
+            .Select(member => (IValueDescriptor)new ReflectionValueDescriptor(host, handle, member))
             .ToArray();
         References = metadata.DescriptorMembers
             .Where(static member => member.Kind == ReflectionMemberKind.REFERENCE)
-            .Select(member => (IReferenceDescriptor)new ReflectionReferenceDescriptor(host, instance, member))
+            .Select(member => (IReferenceDescriptor)new ReflectionReferenceDescriptor(host, handle, member))
             .ToArray();
         Collections = metadata.DescriptorMembers
             .Where(static member => member.Kind == ReflectionMemberKind.COLLECTION)
-            .Select(member => (ICollectionDescriptor)new ReflectionCollectionDescriptor(host, instance, member))
+            .Select(member => (ICollectionDescriptor)new ReflectionCollectionDescriptor(host, handle, member))
             .ToArray();
         Actions = metadata.DescriptorMembers
             .Where(static member => member.Kind == ReflectionMemberKind.ACTION)
-            .Select(member => (IActionDescriptor)new ReflectionActionDescriptor(host, instance, member))
+            .Select(member => (IActionDescriptor)new ReflectionActionDescriptor(host, handle, member))
             .ToArray();
     }
 
@@ -118,15 +135,15 @@ internal sealed class ReflectionObjectDescriptor : IObjectDescriptor
 internal abstract class ReflectionMemberDescriptor : IMemberDescriptor
 {
     private readonly UIEngineHost _Host;
-    private readonly WeakReference<object> _Target;
+    private readonly ObjectHandle _Target;
 
     protected ReflectionMemberDescriptor(
         UIEngineHost host,
-        object target,
+        ObjectHandle target,
         ReflectionMemberMetadata metadata)
     {
         _Host = host;
-        _Target = new WeakReference<object>(target);
+        _Target = target;
         Metadata = metadata;
     }
 
@@ -136,9 +153,11 @@ internal abstract class ReflectionMemberDescriptor : IMemberDescriptor
 
     protected ReflectionMemberMetadata Metadata { get; }
 
+    protected UIEngineHost Host => _Host;
+
     protected bool IsHostDisposed => _Host.IsDisposed;
 
-    protected bool TryGetTarget(out object? target) => _Target.TryGetTarget(out target);
+    protected bool TryGetTarget(out object? target) => _Host.TryResolve(_Target, out target);
 
     protected static InteractionResult<T> _DisposedFailure<T>() => InteractionResult.Failure<T>(
         InteractionErrorCode.HOST_DISPOSED,
@@ -150,7 +169,7 @@ internal sealed class ReflectionValueDescriptor : ReflectionMemberDescriptor, IV
 {
     public ReflectionValueDescriptor(
         UIEngineHost host,
-        object target,
+        ObjectHandle target,
         ReflectionMemberMetadata metadata)
         : base(host, target, metadata)
     {
@@ -338,7 +357,7 @@ internal sealed class ReflectionReferenceDescriptor : ReflectionMemberDescriptor
 
     public ReflectionReferenceDescriptor(
         UIEngineHost host,
-        object target,
+        ObjectHandle target,
         ReflectionMemberMetadata metadata)
         : base(host, target, metadata)
     {
@@ -417,7 +436,7 @@ internal sealed class ReflectionCollectionDescriptor :
 
     public ReflectionCollectionDescriptor(
         UIEngineHost host,
-        object target,
+        ObjectHandle target,
         ReflectionMemberMetadata metadata)
         : base(host, target, metadata)
     {
@@ -739,17 +758,121 @@ internal sealed class ReflectionCollectionDescriptor :
     }
 }
 
-/// <summary>Binds named arguments and invokes one exposed synchronous action.</summary>
+/// <summary>Classifies the supported user and provider-supplied parts of an action signature.</summary>
+internal sealed class ReflectionActionSignature
+{
+    private ReflectionActionSignature(MethodInfo method)
+    {
+        MethodParameters = method.GetParameters();
+        UserParameters = MethodParameters
+            .Where(static parameter => !_IsInfrastructureParameter(parameter.ParameterType))
+            .ToArray();
+        CancellationParameter = MethodParameters.SingleOrDefault(
+            static parameter => parameter.ParameterType == typeof(CancellationToken));
+        ProgressParameter = MethodParameters.SingleOrDefault(
+            static parameter => _IsProgressParameter(parameter.ParameterType));
+        IsAsynchronous = typeof(Task).IsAssignableFrom(method.ReturnType) ||
+            method.ReturnType == typeof(ValueTask) ||
+            method.ReturnType.IsGenericType &&
+            method.ReturnType.GetGenericTypeDefinition() == typeof(ValueTask<>);
+        ResultType = _GetResultType(method.ReturnType);
+        ProgressType = ProgressParameter?.ParameterType.GetGenericArguments()[0];
+    }
+
+    public ParameterInfo[] MethodParameters { get; }
+
+    public ParameterInfo[] UserParameters { get; }
+
+    public ParameterInfo? CancellationParameter { get; }
+
+    public ParameterInfo? ProgressParameter { get; }
+
+    public bool IsAsynchronous { get; }
+
+    public Type? ResultType { get; }
+
+    public Type? ProgressType { get; }
+
+    public static ReflectionActionSignature Create(MethodInfo method) => new(method);
+
+    public static string? GetValidationError(MethodInfo method)
+    {
+        if (method.ContainsGenericParameters)
+        {
+            return "open generic methods are not supported.";
+        }
+
+        if (method.ReturnType == typeof(void) &&
+            method.IsDefined(typeof(AsyncStateMachineAttribute), inherit: false))
+        {
+            return "async void methods are not supported.";
+        }
+
+        var parameters = method.GetParameters();
+        if (parameters.Any(static parameter => parameter.ParameterType.IsByRef || parameter.IsOut))
+        {
+            return "ref and out parameters are not supported.";
+        }
+
+        if (parameters.Count(static parameter =>
+                parameter.ParameterType == typeof(CancellationToken)) > 1)
+        {
+            return "only one injected CancellationToken parameter is supported.";
+        }
+
+        if (parameters.Count(static parameter =>
+                _IsProgressParameter(parameter.ParameterType)) > 1)
+        {
+            return "only one injected IProgress<T> parameter is supported.";
+        }
+
+        if (parameters.Any(static parameter => parameter.ParameterType.ContainsGenericParameters))
+        {
+            return "open generic parameter types are not supported.";
+        }
+
+        return null;
+    }
+
+    private static bool _IsInfrastructureParameter(Type parameterType) =>
+        parameterType == typeof(CancellationToken) || _IsProgressParameter(parameterType);
+
+    private static bool _IsProgressParameter(Type parameterType) =>
+        parameterType.IsGenericType &&
+        parameterType.GetGenericTypeDefinition() == typeof(IProgress<>);
+
+    private static Type? _GetResultType(Type returnType)
+    {
+        if (returnType == typeof(void) || returnType == typeof(Task) || returnType == typeof(ValueTask))
+        {
+            return null;
+        }
+
+        if (returnType.IsGenericType)
+        {
+            var genericType = returnType.GetGenericTypeDefinition();
+            if (genericType == typeof(Task<>) || genericType == typeof(ValueTask<>))
+            {
+                return returnType.GetGenericArguments()[0];
+            }
+        }
+
+        return returnType;
+    }
+}
+
+/// <summary>Binds named arguments and starts one normalized reflected action invocation.</summary>
 internal sealed class ReflectionActionDescriptor : ReflectionMemberDescriptor, IActionDescriptor
 {
     private readonly ActionAttribute _ActionMetadata;
     private readonly bool _HasInvalidPrecondition;
     private readonly MethodInfo _Method;
     private readonly MethodInfo? _Precondition;
+    private readonly ReflectionActionSignature _Signature;
 
     public ReflectionActionDescriptor(
         UIEngineHost host,
-        object target,
+        ObjectHandle target,
         ReflectionMemberMetadata metadata)
         : base(host, target, metadata)
     {
@@ -757,69 +880,72 @@ internal sealed class ReflectionActionDescriptor : ReflectionMemberDescriptor, I
         _ActionMetadata = _Method.GetCustomAttribute<ActionAttribute>(inherit: true) ?? new ActionAttribute();
         _Precondition = _ResolvePrecondition(_Method, _ActionMetadata.Precondition);
         _HasInvalidPrecondition = _ActionMetadata.Precondition is not null && _Precondition is null;
-        Parameters = _Method
-            .GetParameters()
+        _Signature = ReflectionActionSignature.Create(_Method);
+        Parameters = _Signature.UserParameters
             .Select(static parameter => (IParameterDescriptor)new ReflectionParameterDescriptor(parameter))
             .ToArray();
     }
 
     public IReadOnlyList<IParameterDescriptor> Parameters { get; }
 
+    public Type? ResultType => _Signature.ResultType;
+
+    public bool IsAsynchronous => _Signature.IsAsynchronous;
+
+    public bool SupportsCancellation => _Signature.CancellationParameter is not null;
+
+    public Type? ProgressType => _Signature.ProgressType;
+
     public ActionRisk Risk => _ActionMetadata.Risk;
 
     public bool RequiresConfirmation => _ActionMetadata.RequiresConfirmation;
 
-    public ValueTask<InteractionResult<object?>> InvokeAsync(
+    public ValueTask<InteractionResult<IActionInvocation>> InvokeAsync(
         IReadOnlyDictionary<string, object?> arguments,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(arguments);
         if (IsHostDisposed)
         {
-            return ValueTask.FromResult(_DisposedFailure<object?>());
+            return ValueTask.FromResult(_DisposedFailure<IActionInvocation>());
         }
 
         if (cancellationToken.IsCancellationRequested)
         {
-            return ValueTask.FromResult(InteractionResult.Failure<object?>(
+            return ValueTask.FromResult(InteractionResult.Failure<IActionInvocation>(
                 InteractionErrorCode.CANCELLED,
                 "Action invocation was cancelled."));
         }
 
-        if (_Method.ContainsGenericParameters ||
-            _Method.GetParameters().Any(static parameter => parameter.ParameterType.IsByRef) ||
-            typeof(Task).IsAssignableFrom(_Method.ReturnType) ||
-            _Method.ReturnType == typeof(ValueTask) ||
-            _Method.ReturnType.IsGenericType &&
-            _Method.ReturnType.GetGenericTypeDefinition() == typeof(ValueTask<>))
+        var signatureError = ReflectionActionSignature.GetValidationError(_Method);
+        if (signatureError is not null)
         {
-            return ValueTask.FromResult(InteractionResult.Failure<object?>(
+            return ValueTask.FromResult(InteractionResult.Failure<IActionInvocation>(
                 InteractionErrorCode.DESCRIPTOR_UNAVAILABLE,
-                $"Action '{Id}' is not a supported synchronous method."));
+                $"Action '{Id}' has an unsupported signature: {signatureError}"));
         }
 
         if (_HasInvalidPrecondition)
         {
-            return ValueTask.FromResult(InteractionResult.Failure<object?>(
+            return ValueTask.FromResult(InteractionResult.Failure<IActionInvocation>(
                 InteractionErrorCode.DESCRIPTOR_UNAVAILABLE,
                 $"Action '{Id}' has an invalid precondition declaration."));
         }
 
         if (!TryGetTarget(out var target) || target is null)
         {
-            return ValueTask.FromResult(InteractionResult.Failure<object?>(
+            return ValueTask.FromResult(InteractionResult.Failure<IActionInvocation>(
                 InteractionErrorCode.TARGET_UNAVAILABLE,
                 "The containing object is no longer available."));
         }
 
-        var methodParameters = _Method.GetParameters();
         var unknownArgument = arguments.Keys.FirstOrDefault(argumentName =>
-            !methodParameters.Any(parameter =>
+            !_Signature.UserParameters.Any(parameter =>
                 string.Equals(parameter.Name, argumentName, StringComparison.Ordinal)));
         if (unknownArgument is not null)
         {
             var message = $"Action '{Id}' has no parameter named '{unknownArgument}'.";
-            return ValueTask.FromResult(InteractionResult.Failure<object?>(
+            return ValueTask.FromResult(InteractionResult.Failure<IActionInvocation>(
                 InteractionErrorCode.INVALID_INPUT,
                 message,
                 [new InteractionIssue(
@@ -829,10 +955,9 @@ internal sealed class ReflectionActionDescriptor : ReflectionMemberDescriptor, I
                     message)]));
         }
 
-        var boundArguments = new object?[methodParameters.Length];
-        for (var index = 0; index < methodParameters.Length; index++)
+        var boundArguments = new object?[_Signature.MethodParameters.Length];
+        foreach (var parameter in _Signature.UserParameters)
         {
-            var parameter = methodParameters[index];
             var suppliedArgument = arguments.FirstOrDefault(argument =>
                 string.Equals(argument.Key, parameter.Name, StringComparison.Ordinal));
             var wasSupplied = suppliedArgument.Key is not null;
@@ -841,7 +966,7 @@ internal sealed class ReflectionActionDescriptor : ReflectionMemberDescriptor, I
                 if (!parameter.IsOptional)
                 {
                     var message = $"Required parameter '{parameter.Name}' was not supplied.";
-                    return ValueTask.FromResult(InteractionResult.Failure<object?>(
+                    return ValueTask.FromResult(InteractionResult.Failure<IActionInvocation>(
                         InteractionErrorCode.INVALID_INPUT,
                         message,
                         [new InteractionIssue(
@@ -851,7 +976,7 @@ internal sealed class ReflectionActionDescriptor : ReflectionMemberDescriptor, I
                             message)]));
                 }
 
-                boundArguments[index] = parameter.DefaultValue;
+                boundArguments[parameter.Position] = parameter.DefaultValue;
                 continue;
             }
 
@@ -863,7 +988,7 @@ internal sealed class ReflectionActionDescriptor : ReflectionMemberDescriptor, I
                 var error = converted.Error ?? new InteractionError(
                     InteractionErrorCode.CONVERSION_FAILED,
                     "The argument could not be converted.");
-                return ValueTask.FromResult(InteractionResult.Failure<object?>(
+                return ValueTask.FromResult(InteractionResult.Failure<IActionInvocation>(
                     error.Code,
                     $"Parameter '{parameter.Name}': {error.Message}",
                     [new InteractionIssue(
@@ -875,16 +1000,18 @@ internal sealed class ReflectionActionDescriptor : ReflectionMemberDescriptor, I
                         error.Message)]));
             }
 
-            boundArguments[index] = converted.Value;
+            boundArguments[parameter.Position] = converted.Value;
         }
 
-        for (var index = 0; index < Parameters.Count; index++)
+        for (var index = 0; index < _Signature.UserParameters.Length; index++)
         {
             var parameter = (ReflectionParameterDescriptor)Parameters[index];
-            var issues = parameter.Validate(boundArguments[index], target);
+            var issues = parameter.Validate(
+                boundArguments[_Signature.UserParameters[index].Position],
+                target);
             if (issues.Count > 0)
             {
-                return ValueTask.FromResult(InteractionResult.Failure<object?>(
+                return ValueTask.FromResult(InteractionResult.Failure<IActionInvocation>(
                     InteractionErrorCode.VALIDATION_FAILED,
                     $"Parameter '{parameter.Id}' failed validation.",
                     issues));
@@ -898,7 +1025,7 @@ internal sealed class ReflectionActionDescriptor : ReflectionMemberDescriptor, I
                 if (_Precondition.Invoke(target, null) is not true)
                 {
                     var message = $"Action '{Id}' is not currently available.";
-                    return ValueTask.FromResult(InteractionResult.Failure<object?>(
+                    return ValueTask.FromResult(InteractionResult.Failure<IActionInvocation>(
                         InteractionErrorCode.VALIDATION_FAILED,
                         message,
                         [new InteractionIssue(
@@ -910,37 +1037,107 @@ internal sealed class ReflectionActionDescriptor : ReflectionMemberDescriptor, I
             }
             catch (TargetInvocationException exception)
             {
-                return ValueTask.FromResult(_InvocationFailure(exception.InnerException ?? exception));
+                return ValueTask.FromResult(_InvocationFailure<IActionInvocation>(
+                    exception.InnerException ?? exception));
             }
         }
 
+        var created = Host.CreateInvocation(Id, SupportsCancellation);
+        if (!created.IsSuccess)
+        {
+            return ValueTask.FromResult(InteractionResult.Failure<IActionInvocation>(
+                created.Error!.Code,
+                created.Error.Message,
+                created.Error.Issues));
+        }
+
+        var invocation = created.Value;
+        if (_Signature.CancellationParameter is not null)
+        {
+            boundArguments[_Signature.CancellationParameter.Position] = invocation.CancellationToken;
+        }
+
+        if (_Signature.ProgressParameter is not null)
+        {
+            boundArguments[_Signature.ProgressParameter.Position] =
+                invocation.CreateProgressReporter(_Signature.ProgressType!);
+        }
+
+        invocation.Start();
         try
         {
-            return ValueTask.FromResult(InteractionResult.Success(
-                _Method.Invoke(target, boundArguments)));
+            var returnValue = _Method.Invoke(target, boundArguments);
+            if (IsAsynchronous)
+            {
+                _ = _CompleteAsync(invocation, returnValue);
+            }
+            else
+            {
+                invocation.CompleteSuccess(returnValue);
+            }
         }
         catch (TargetInvocationException exception)
         {
-            return ValueTask.FromResult(_InvocationFailure(exception.InnerException ?? exception));
+            invocation.CompleteFailure(exception.InnerException ?? exception);
         }
         catch (ArgumentException exception)
         {
-            return ValueTask.FromResult(InteractionResult.Failure<object?>(
-                InteractionErrorCode.INVALID_INPUT,
-                exception.Message,
-                [new InteractionIssue(
-                    InteractionIssueCode.ACTION_REJECTED,
-                    InteractionIssueTarget.ACTION,
-                    Id,
-                    exception.Message)]));
+            invocation.CompleteFailure(exception);
+        }
+
+        return ValueTask.FromResult(InteractionResult.Success<IActionInvocation>(invocation));
+    }
+
+    private async Task _CompleteAsync(ActionInvocation invocation, object? returnValue)
+    {
+        try
+        {
+            object? result;
+            if (returnValue is Task task)
+            {
+                await task.ConfigureAwait(false);
+                result = ResultType is null
+                    ? null
+                    : task.GetType().GetProperty(nameof(Task<object>.Result))?.GetValue(task);
+            }
+            else if (returnValue is ValueTask valueTask)
+            {
+                await valueTask.ConfigureAwait(false);
+                result = null;
+            }
+            else if (returnValue is not null &&
+                _Method.ReturnType.IsGenericType &&
+                _Method.ReturnType.GetGenericTypeDefinition() == typeof(ValueTask<>))
+            {
+                var asTask = (Task)_Method.ReturnType
+                    .GetMethod(nameof(ValueTask<int>.AsTask), Type.EmptyTypes)!
+                    .Invoke(returnValue, null)!;
+                await asTask.ConfigureAwait(false);
+                result = asTask.GetType().GetProperty(nameof(Task<object>.Result))?.GetValue(asTask);
+            }
+            else
+            {
+                throw new InvalidOperationException(
+                    $"Action '{Id}' returned no supported asynchronous operation.");
+            }
+
+            invocation.CompleteSuccess(result);
+        }
+        catch (TargetInvocationException exception)
+        {
+            invocation.CompleteFailure(exception.InnerException ?? exception);
+        }
+        catch (Exception exception)
+        {
+            invocation.CompleteFailure(exception);
         }
     }
 
-    private InteractionResult<object?> _InvocationFailure(Exception exception)
+    private InteractionResult<T> _InvocationFailure<T>(Exception exception)
     {
         if (exception is UnauthorizedAccessException)
         {
-            return InteractionResult.Failure<object?>(
+            return InteractionResult.Failure<T>(
                 InteractionErrorCode.PERMISSION_DENIED,
                 exception.Message,
                 [new InteractionIssue(
@@ -950,7 +1147,7 @@ internal sealed class ReflectionActionDescriptor : ReflectionMemberDescriptor, I
                     exception.Message)]);
         }
 
-        return InteractionResult.Failure<object?>(
+        return InteractionResult.Failure<T>(
             InteractionErrorCode.INVOCATION_FAILED,
             exception.Message,
             [new InteractionIssue(

@@ -35,6 +35,7 @@ public sealed class HostServicesTests
             ObservationAdapters = observationAdapters,
             ObservationPollingInterval = TimeSpan.FromMilliseconds(250),
             CollectionLimits = limits,
+            InvocationProgressBufferCapacity = 12,
             LoggerFactory = loggerFactory,
         });
         providers.Clear();
@@ -51,6 +52,7 @@ public sealed class HostServicesTests
         Assert.Same(loggerFactory, host.Configuration.LoggerFactory);
         Assert.NotSame(limits, host.Configuration.CollectionLimits);
         Assert.Equal(limits, host.Configuration.CollectionLimits);
+        Assert.Equal(12, host.Configuration.InvocationProgressBufferCapacity);
     }
 
     [Fact]
@@ -62,6 +64,7 @@ public sealed class HostServicesTests
         Assert.Equal(100, host.Configuration.CollectionLimits.MaxPageSize);
         Assert.Equal(1_000, host.Configuration.CollectionLimits.MaxSnapshotSize);
         Assert.Equal(256, host.Configuration.CollectionLimits.ObservationBufferCapacity);
+        Assert.Equal(256, host.Configuration.InvocationProgressBufferCapacity);
         Assert.Equal(TimeSpan.FromSeconds(1), host.Configuration.ObservationPollingInterval);
         Assert.False(host.Configuration.IncludeSensitiveDiagnosticData);
     }
@@ -210,6 +213,17 @@ public sealed class HostServicesTests
         var options = new UIEngineHostOptions
         {
             ObservationPollingInterval = TimeSpan.Zero,
+        };
+
+        Assert.Throws<ArgumentOutOfRangeException>(() => new UIEngineHost(options));
+    }
+
+    [Fact]
+    public void HostRejectsNonPositiveInvocationProgressCapacity()
+    {
+        var options = new UIEngineHostOptions
+        {
+            InvocationProgressBufferCapacity = 0,
         };
 
         Assert.Throws<ArgumentOutOfRangeException>(() => new UIEngineHost(options));

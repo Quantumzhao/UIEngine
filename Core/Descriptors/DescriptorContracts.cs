@@ -88,11 +88,19 @@ public interface IActionDescriptor : IMemberDescriptor
 {
     IReadOnlyList<IParameterDescriptor> Parameters { get; }
 
+    Type? ResultType { get; }
+
+    bool IsAsynchronous { get; }
+
+    bool SupportsCancellation { get; }
+
+    Type? ProgressType { get; }
+
     ActionRisk Risk { get; }
 
     bool RequiresConfirmation { get; }
 
-    ValueTask<InteractionResult<object?>> InvokeAsync(
+    ValueTask<InteractionResult<IActionInvocation>> InvokeAsync(
         IReadOnlyDictionary<string, object?> arguments,
         CancellationToken cancellationToken = default);
 }

@@ -48,6 +48,7 @@ public sealed class UIEngineHost : IDisposable, IAsyncDisposable
     private readonly Dictionary<ObjectIdentity, LogicalPath> _CanonicalPaths = [];
     private readonly Dictionary<string, _RootEntry> _Roots = new(StringComparer.Ordinal);
     private readonly HashSet<ObservationSubscription> _Subscriptions = [];
+    private readonly HashSet<ActionInvocation> _Invocations = [];
     private readonly ILogger _Logger;
     private readonly ProgrammaticExposureDescriptorProvider _ProgrammaticExposureProvider;
     private int _IsDisposed;
@@ -610,10 +611,13 @@ public sealed class UIEngineHost : IDisposable, IAsyncDisposable
         }
 
         ObservationSubscription[] subscriptions;
+        ActionInvocation[] invocations;
         lock (_Gate)
         {
             subscriptions = _Subscriptions.ToArray();
+            invocations = _Invocations.ToArray();
             _Subscriptions.Clear();
+            _Invocations.Clear();
             _Roots.Clear();
             _Objects.Clear();
             _DomainIdentities.Clear();
@@ -625,6 +629,11 @@ public sealed class UIEngineHost : IDisposable, IAsyncDisposable
         foreach (var subscription in subscriptions)
         {
             subscription.Dispose();
+        }
+
+        foreach (var invocation in invocations)
+        {
+            invocation.CompleteHostDisposed();
         }
 
         _HOST_DISPOSED(_Logger, null);
@@ -684,6 +693,42 @@ public sealed class UIEngineHost : IDisposable, IAsyncDisposable
         lock (_Gate)
         {
             _Subscriptions.Remove(subscription);
+        }
+    }
+
+    internal InteractionResult<ActionInvocation> CreateInvocation(
+        string actionId,
+        bool supportsCancellation)
+    {
+        if (IsDisposed)
+        {
+            return _DisposedFailure<ActionInvocation>();
+        }
+
+        var invocation = new ActionInvocation(
+            actionId,
+            supportsCancellation,
+            Configuration.InvocationProgressBufferCapacity,
+            _UntrackInvocation);
+        lock (_Gate)
+        {
+            if (IsDisposed)
+            {
+                invocation.CompleteHostDisposed();
+                return _DisposedFailure<ActionInvocation>();
+            }
+
+            _Invocations.Add(invocation);
+        }
+
+        return InteractionResult.Success(invocation);
+    }
+
+    private void _UntrackInvocation(ActionInvocation invocation)
+    {
+        lock (_Gate)
+        {
+            _Invocations.Remove(invocation);
         }
     }
 

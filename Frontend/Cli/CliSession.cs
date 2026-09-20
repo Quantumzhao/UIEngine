@@ -394,14 +394,21 @@ internal sealed class CliSession
             return;
         }
 
-        var invocation = await action.InvokeAsync(arguments, cancellationToken).ConfigureAwait(false);
-        if (!invocation.IsSuccess)
+        var invocationStart = await action.InvokeAsync(arguments, cancellationToken).ConfigureAwait(false);
+        if (!invocationStart.IsSuccess)
         {
-            _WriteFailure(invocation.Error);
+            _WriteFailure(invocationStart.Error);
             return;
         }
 
-        _Output.WriteLine($"{action.Id} => {_FormatValue(invocation.Value)}");
+        var completion = await invocationStart.Value.Completion.ConfigureAwait(false);
+        if (!completion.IsSuccess)
+        {
+            _WriteFailure(completion.Error);
+            return;
+        }
+
+        _Output.WriteLine($"{action.Id} => {_FormatValue(completion.Value)}");
     }
 
     private async ValueTask<IReadOnlyList<string>> _GetNavigationCompletionsAsync(

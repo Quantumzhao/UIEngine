@@ -313,10 +313,10 @@ Stop here if the intended repository state cannot be resolved.
 
 ### 10. Normalize action invocation
 
-1. Add invocation status, completion, progress, fault, and cancellation contracts.
-2. Adapt synchronous results and all supported `Task`/`ValueTask` return shapes.
-3. Classify user parameters versus injected cancellation/progress parameters and complete their metadata and validation.
-4. Test completion, task failure, progress ordering, cancellation support and races, target loss, and host disposal.
+1. [x] Add invocation status, completion, progress, fault, and cancellation contracts.
+2. [x] Adapt synchronous results and all supported `Task`/`ValueTask` return shapes.
+3. [x] Classify user parameters versus injected cancellation/progress parameters and complete their metadata and validation.
+4. [x] Test completion, task failure, progress ordering, cancellation support and races, target loss, and host disposal.
 
 ### 11. Extend the acceptance fixture and CLI
 

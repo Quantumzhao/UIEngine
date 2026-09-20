@@ -39,10 +39,10 @@ Detailed milestones:
 - [x] Distinguish successful null and empty values from missing and unavailable targets.
 - [x] Complete finite-selection, parameter, validation, and action execution metadata.
 - [x] Add validation and dispatcher-mediated reads, writes, and calls.
-- [ ] Make host lifetime explicit and dispose subscriptions and active invocations safely.
+- [x] Make host lifetime explicit and dispose subscriptions and active invocations safely.
 - [x] Add normalized state and collection observation.
 - [x] Add collection snapshots, paging, and virtualization contracts.
-- [ ] Add async actions, progress, and cancellation.
+- [x] Add async actions, progress, and cancellation.
 - [ ] Add structured diagnostics for discovery, binding, mutation, invocation, collection access, dispatch, and capability mismatches.
 - [ ] Extend the CLI with replacement-safe navigation, observation, bounded collection listing, async progress, and cancellation.
 - [ ] Pass the framework MVP acceptance tests through the CLI.

@@ -36,9 +36,9 @@ Consistency rules:
 - **Reboot:** Milestone 01 is implemented beside legacy UIEngine v0.2.3.
 - **Accepted:** clean restore, build, 29 tests, secret scan, and no-package check pass locally and in GitHub Actions.
 - **Phase 2 baseline:** the later removal of `Dataset` and `CLITestProject` is accepted as intentional cleanup; their useful cyclic-fixture role is covered by `Examples/CyclicDomain`, and the current build passes with 29 tests after restoring CLI behavior coverage.
-- **Runtime:** immutable host service configuration, host-scoped programmatic value and summary registration, deterministic programmatic/custom/reflection provider tiers, reentrancy-aware host dispatch with explicit provider opt-out, explicit disposal, structured diagnostic IDs and logging, host-scoped descriptors, opt-in reflection discovery, reference-based runtime identity, normalized interface/attribute/callback domain identity, lazy encountered-object identity indexing, replaceable roots, canonical logical paths with index/key/domain-identity selectors, replacement-safe data-only bindings, cycle-safe graph traversal, availability-bearing nullable reads, normalized nullability/default/selection/range metadata, dispatched synchronous and asynchronous programmatic validation, dispatched live scalar/reference/collection access and synchronous actions, contextual rejection issues, bounded normalized property/collection/custom/polling observation, capability-advertised bounded collection snapshots/pages/virtualized ranges with scalar/null/reference/key entry semantics, structured failures, and a deterministic cyclic sample.
+- **Runtime:** immutable host service configuration, host-scoped programmatic value and summary registration, deterministic programmatic/custom/reflection provider tiers, reentrancy-aware host dispatch with explicit provider opt-out, explicit disposal, structured diagnostic IDs and logging, host-scoped descriptors, opt-in reflection discovery, reference-based runtime identity, normalized interface/attribute/callback domain identity, lazy encountered-object identity indexing, replaceable roots, canonical logical paths with index/key/domain-identity selectors, replacement-safe data-only bindings, cycle-safe graph traversal, availability-bearing nullable reads, normalized nullability/default/selection/range metadata, dispatched synchronous and asynchronous programmatic validation, dispatched live scalar/reference/collection access, normalized synchronous/asynchronous action lifecycles with bounded progress and injected cancellation, contextual rejection issues, bounded normalized property/collection/custom/polling observation, capability-advertised bounded collection snapshots/pages/virtualized ranges with scalar/null/reference/key entry semantics, structured failures, and a deterministic cyclic sample.
 - **CLI:** Core-resolved canonical and replacement-safe navigation plus descriptor-based operations; PrettyPrompt editing, process-local history, and descriptor-aware completion.
-- **Tests:** framework, CLI, dependency, and legacy-characterization projects exist; the current suite passes 105 tests.
+- **Tests:** framework, CLI, dependency, and legacy-characterization projects exist; the current suite passes 119 tests.
 - **Legacy:** the remaining tree-based `Dashboard`/`Node` code is characterized reference material, not the new API foundation.
 - **Missing:** product TUI, layouts, batch engine, and supported package.
 - **Packaging:** disabled until the Product MVP release gate defines APIs, tests, licensing, versioning, compatibility, and support.
@@ -138,7 +138,7 @@ Not in either MVP: persistent layouts, batch operations, arbitrary scripting, au
 ## Near-Term Priorities
 
 1. Complete the remaining programmatic exposure roles and metadata validation.
-2. Bounded collection access and normalized asynchronous invocation.
+2. Extend the acceptance fixture and CLI across the normalized Core services.
 3. Remaining Framework MVP hardening in `REBOOT_PLAN.md`.
 
 ## Deferred Decisions

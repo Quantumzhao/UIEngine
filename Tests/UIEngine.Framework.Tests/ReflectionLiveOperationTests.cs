@@ -130,9 +130,11 @@ public sealed class ReflectionLiveOperationTests
         {
             ["amount"] = "2",
         });
+        var namedCompletion = await named.Value.Completion;
+        var defaultCompletion = await withDefault.Value.Completion;
 
-        Assert.Equal(12, named.Value);
-        Assert.Equal(16, withDefault.Value);
+        Assert.Equal(12, namedCompletion.Value);
+        Assert.Equal(16, defaultCompletion.Value);
         Assert.Equal(16, model.Count);
         Assert.Equal(2, scale.Parameters.Count);
         Assert.True(scale.Parameters[0].IsRequired);
@@ -151,11 +153,12 @@ public sealed class ReflectionLiveOperationTests
         var unknown = await scale.InvokeAsync(new Dictionary<string, object?> { ["Amount"] = "2" });
         var invalid = await scale.InvokeAsync(new Dictionary<string, object?> { ["amount"] = "invalid" });
         var domainFailure = await fail.InvokeAsync(new Dictionary<string, object?>());
+        var domainCompletion = await domainFailure.Value.Completion;
 
         Assert.Equal(InteractionErrorCode.INVALID_INPUT, missing.Error?.Code);
         Assert.Equal(InteractionErrorCode.INVALID_INPUT, unknown.Error?.Code);
         Assert.Equal(InteractionErrorCode.CONVERSION_FAILED, invalid.Error?.Code);
-        Assert.Equal(InteractionErrorCode.INVOCATION_FAILED, domainFailure.Error?.Code);
+        Assert.Equal(InteractionErrorCode.INVOCATION_FAILED, domainCompletion.Error?.Code);
     }
 
     private static async Task<(UIEngineHost Host, IObjectDescriptor Descriptor)> _DescribeAsync(

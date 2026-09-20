@@ -290,17 +290,29 @@ internal sealed class DispatchedObjectDescriptor : IObjectDescriptor
             Parameters = descriptor.Parameters
                 .Select(static parameter => (IParameterDescriptor)new _ParameterDescriptor(parameter))
                 .ToArray();
+            ResultType = descriptor.ResultType;
+            IsAsynchronous = descriptor.IsAsynchronous;
+            SupportsCancellation = descriptor.SupportsCancellation;
+            ProgressType = descriptor.ProgressType;
             Risk = descriptor.Risk;
             RequiresConfirmation = descriptor.RequiresConfirmation;
         }
 
         public IReadOnlyList<IParameterDescriptor> Parameters { get; }
 
+        public Type? ResultType { get; }
+
+        public bool IsAsynchronous { get; }
+
+        public bool SupportsCancellation { get; }
+
+        public Type? ProgressType { get; }
+
         public ActionRisk Risk { get; }
 
         public bool RequiresConfirmation { get; }
 
-        public ValueTask<InteractionResult<object?>> InvokeAsync(
+        public ValueTask<InteractionResult<IActionInvocation>> InvokeAsync(
             IReadOnlyDictionary<string, object?> arguments,
             CancellationToken cancellationToken = default) => Host.ExecuteInteractionAsync(
                 InteractionDispatchOperation.ACTION_INVOKE,

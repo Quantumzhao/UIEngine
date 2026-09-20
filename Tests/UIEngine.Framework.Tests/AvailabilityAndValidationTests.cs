@@ -95,6 +95,7 @@ public sealed class AvailabilityAndValidationTests
         var badRange = await count.WriteAsync("9");
         var badArgument = await apply.InvokeAsync(new Dictionary<string, object?> { ["amount"] = "9" });
         var valid = await apply.InvokeAsync(new Dictionary<string, object?> { ["amount"] = "3" });
+        var validCompletion = await valid.Value.Completion;
 
         Assert.Equal(InteractionIssueCode.CONVERSION_FAILED, Assert.Single(badConversion.Error!.Issues).Code);
         Assert.Equal(InteractionIssueCode.OUT_OF_RANGE, Assert.Single(badRange.Error!.Issues).Code);
@@ -103,7 +104,7 @@ public sealed class AvailabilityAndValidationTests
         Assert.Equal(InteractionIssueTarget.PARAMETER, Assert.Single(badArgument.Error!.Issues).Target);
         Assert.Equal(0, model.SetterInvocationCount);
         Assert.Equal(1, model.ActionInvocationCount);
-        Assert.Equal(3, valid.Value);
+        Assert.Equal(3, validCompletion.Value);
     }
 
     [Fact]
@@ -147,9 +148,10 @@ public sealed class AvailabilityAndValidationTests
         var denied = Assert.Single(descriptor.Actions, action => action.Id == nameof(_ValidationModel.Denied));
 
         var result = await denied.InvokeAsync(new Dictionary<string, object?>());
+        var completion = await result.Value.Completion;
 
-        Assert.Equal(InteractionErrorCode.PERMISSION_DENIED, result.Error?.Code);
-        var issue = Assert.Single(result.Error!.Issues);
+        Assert.Equal(InteractionErrorCode.PERMISSION_DENIED, completion.Error?.Code);
+        var issue = Assert.Single(completion.Error!.Issues);
         Assert.Equal(InteractionIssueCode.PERMISSION_DENIED, issue.Code);
         Assert.Equal(InteractionIssueTarget.PERMISSION, issue.Target);
         Assert.Equal(nameof(_ValidationModel.Denied), issue.TargetId);

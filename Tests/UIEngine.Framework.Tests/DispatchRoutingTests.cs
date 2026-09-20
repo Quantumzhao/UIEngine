@@ -32,13 +32,14 @@ public sealed class DispatchRoutingTests
             CollectionReadRequest.Snapshot(10));
         var invocation = await Assert.Single(descriptor.Actions).InvokeAsync(
             new Dictionary<string, object?> { ["amount"] = "2" });
+        var completion = await invocation.Value.Completion;
 
         Assert.Equal("count 1", descriptor.Summary);
         Assert.Equal(1, read.Value);
         Assert.Equal(3, write.Value);
         Assert.True(reference.IsSuccess);
         Assert.Single(collection.Value.Entries);
-        Assert.Equal(5, invocation.Value);
+        Assert.Equal(5, completion.Value);
         Assert.True(model.SummaryWasRead);
         Assert.True(model.ValidationWasRun);
         Assert.True(model.PreconditionWasRun);

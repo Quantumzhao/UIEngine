@@ -29,6 +29,9 @@ public sealed class UIEngineHostOptions
 
     public CollectionAccessLimits CollectionLimits { get; init; } = new();
 
+    /// <summary>Gets the maximum number of pending progress records retained per invocation.</summary>
+    public int InvocationProgressBufferCapacity { get; init; } = 256;
+
     public ILoggerFactory LoggerFactory { get; init; } = NullLoggerFactory.Instance;
 
     public bool IncludeSensitiveDiagnosticData { get; init; }
@@ -49,6 +52,7 @@ public sealed class UIEngineHostConfiguration
         ArgumentNullException.ThrowIfNull(options.LoggerFactory);
 
         options.CollectionLimits.Validate();
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(options.InvocationProgressBufferCapacity);
         Exposure = options.Exposure.CreateSnapshot();
         DescriptorProviders = _Snapshot(options.DescriptorProviders, nameof(options.DescriptorProviders));
         var reflectionProviders = DescriptorProviders.OfType<ReflectionObjectDescriptorProvider>().ToArray();
@@ -78,6 +82,7 @@ public sealed class UIEngineHostConfiguration
 
         ObservationPollingInterval = options.ObservationPollingInterval;
         CollectionLimits = options.CollectionLimits with { };
+        InvocationProgressBufferCapacity = options.InvocationProgressBufferCapacity;
         LoggerFactory = options.LoggerFactory;
         IncludeSensitiveDiagnosticData = options.IncludeSensitiveDiagnosticData;
     }
@@ -102,6 +107,8 @@ public sealed class UIEngineHostConfiguration
     public TimeSpan ObservationPollingInterval { get; }
 
     public CollectionAccessLimits CollectionLimits { get; }
+
+    public int InvocationProgressBufferCapacity { get; }
 
     public ILoggerFactory LoggerFactory { get; }
 
