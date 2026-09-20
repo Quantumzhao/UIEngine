@@ -1,6 +1,6 @@
 # Milestone 02 — Framework MVP Interaction Hardening
 
-**Status:** In progress — step 6 complete; remaining step 3 exposure roles are still open
+**Status:** In progress — step 8 complete; remaining step 3 exposure roles are still open
 
 **Acceptance:** Not run
 
@@ -299,10 +299,10 @@ Stop here if the intended repository state cannot be resolved.
 
 ### 8. Add normalized observation
 
-1. Introduce the change record and disposable subscription contracts.
-2. Adapt property and collection notifications completely, including wildcard property changes and all collection event shapes.
-3. Add polling and custom-adapter extension points with dispatch, cancellation, bounded buffering, and diagnostics.
-4. Handle source replacement, consumer disposal, and host disposal without stale or duplicate handlers.
+1. [x] Introduce the change record and disposable subscription contracts.
+2. [x] Adapt property and collection notifications completely, including wildcard property changes and all collection event shapes.
+3. [x] Add polling and custom-adapter extension points with dispatch, cancellation, bounded buffering, and diagnostics.
+4. [x] Handle source replacement, consumer disposal, and host disposal without stale or duplicate handlers.
 
 ### 9. Add bounded collection modes
 

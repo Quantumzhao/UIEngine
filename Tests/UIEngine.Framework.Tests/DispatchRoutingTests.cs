@@ -1,4 +1,5 @@
 using System.Collections;
+using System.ComponentModel;
 using System.ComponentModel.DataAnnotations;
 using UIEngine.Core;
 using UIEngine.Core.Attributes;
@@ -181,6 +182,27 @@ public sealed class DispatchRoutingTests
         Assert.Equal(InteractionErrorCode.DISPATCH_FAILED, result.Error?.Code);
     }
 
+    [Fact]
+    public async Task ObservationDiscoveryAndHandlerSetupAreDispatched()
+    {
+        var dispatcher = new _RecordingDispatcher();
+        using var host = new UIEngineHost(new UIEngineHostOptions
+        {
+            DescriptorProviders = [new ReflectionObjectDescriptorProvider()],
+            Dispatcher = dispatcher,
+        });
+        var handle = host.RegisterRoot("model", new _ObservableDispatchModel()).Value;
+
+        var result = await host.ObserveAsync(handle, new ObservationRequest
+        {
+            MemberId = nameof(_ObservableDispatchModel.Value),
+        });
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(2, dispatcher.InvocationCount);
+        result.Value.Dispose();
+    }
+
     private sealed class _RecordingDispatcher : IInteractionDispatcher
     {
         private int _Depth;
@@ -311,6 +333,18 @@ public sealed class DispatchRoutingTests
                 throw new InvalidOperationException("Domain access bypassed the dispatcher.");
             }
         }
+    }
+
+    private sealed class _ObservableDispatchModel : INotifyPropertyChanged
+    {
+        public event PropertyChangedEventHandler? PropertyChanged;
+
+        [Expose]
+        public int Value { get; set; }
+
+        public void Raise() => PropertyChanged?.Invoke(
+            this,
+            new PropertyChangedEventArgs(nameof(Value)));
     }
 
     [AttributeUsage(AttributeTargets.Property | AttributeTargets.Parameter)]

@@ -26,4 +26,6 @@ public enum InteractionErrorCode
     TYPE_MISMATCH = 21,
     PERMISSION_DENIED = 22,
     DISPATCH_FAILED = 23,
+    OBSERVATION_UNAVAILABLE = 24,
+    OBSERVATION_FAILED = 25,
 }

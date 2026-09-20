@@ -33,6 +33,7 @@ public sealed class HostServicesTests
             Dispatcher = dispatcher,
             DomainIdentityProviders = identityProviders,
             ObservationAdapters = observationAdapters,
+            ObservationPollingInterval = TimeSpan.FromMilliseconds(250),
             CollectionLimits = limits,
             LoggerFactory = loggerFactory,
         });
@@ -45,6 +46,7 @@ public sealed class HostServicesTests
         Assert.IsType<ReflectionObjectDescriptorProvider>(host.Configuration.DescriptorProviders[1]);
         Assert.Single(host.Configuration.DomainIdentityProviders);
         Assert.Single(host.Configuration.ObservationAdapters);
+        Assert.Equal(TimeSpan.FromMilliseconds(250), host.Configuration.ObservationPollingInterval);
         Assert.Same(dispatcher, host.Configuration.Dispatcher);
         Assert.Same(loggerFactory, host.Configuration.LoggerFactory);
         Assert.NotSame(limits, host.Configuration.CollectionLimits);
@@ -60,6 +62,7 @@ public sealed class HostServicesTests
         Assert.Equal(100, host.Configuration.CollectionLimits.MaxPageSize);
         Assert.Equal(1_000, host.Configuration.CollectionLimits.MaxSnapshotSize);
         Assert.Equal(256, host.Configuration.CollectionLimits.ObservationBufferCapacity);
+        Assert.Equal(TimeSpan.FromSeconds(1), host.Configuration.ObservationPollingInterval);
         Assert.False(host.Configuration.IncludeSensitiveDiagnosticData);
     }
 
@@ -201,6 +204,17 @@ public sealed class HostServicesTests
         Assert.Throws<ArgumentOutOfRangeException>(() => new UIEngineHost(options));
     }
 
+    [Fact]
+    public void HostRejectsNonPositiveObservationPollingInterval()
+    {
+        var options = new UIEngineHostOptions
+        {
+            ObservationPollingInterval = TimeSpan.Zero,
+        };
+
+        Assert.Throws<ArgumentOutOfRangeException>(() => new UIEngineHost(options));
+    }
+
     private sealed class _UnavailableDescriptorProvider : IObjectDescriptorProvider
     {
         public bool CanDescribe(Type objectType) => false;
@@ -255,6 +269,20 @@ public sealed class HostServicesTests
     private sealed class _ObservationAdapter : IObservationAdapter
     {
         public bool CanObserve(Type objectType) => true;
+
+        public ValueTask<InteractionResult<IDisposable>> SubscribeAsync(
+            ObservationAdapterContext context,
+            Action<ObservationAdapterChange> publish,
+            Action<Exception> reportFailure,
+            CancellationToken cancellationToken = default) => ValueTask.FromResult(
+                InteractionResult.Success<IDisposable>(new _DisposableSubscription()));
+    }
+
+    private sealed class _DisposableSubscription : IDisposable
+    {
+        public void Dispose()
+        {
+        }
     }
 
     private sealed class _DisposableModel

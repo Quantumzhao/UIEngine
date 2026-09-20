@@ -34,6 +34,11 @@ public sealed class UIEngineHost : IDisposable, IAsyncDisposable
             LogLevel.Warning,
             UIEngineDiagnosticEventIds.DISPATCH_FAILED,
             "Interaction dispatch failed for operation {DispatchOperation}.");
+    private static readonly Action<ILogger, Guid, string?, InteractionErrorCode, Exception?> _OBSERVATION_FAILED =
+        LoggerMessage.Define<Guid, string?, InteractionErrorCode>(
+            LogLevel.Warning,
+            UIEngineDiagnosticEventIds.OBSERVATION_FAILED,
+            "Observation failed for runtime object {RuntimeId}, member {MemberId}, with code {ErrorCode}.");
 
     private readonly object _Gate = new();
     private readonly ConditionalWeakTable<object, _IdentityHolder> _Identities = new();
@@ -42,6 +47,7 @@ public sealed class UIEngineHost : IDisposable, IAsyncDisposable
     private readonly Dictionary<DomainIdentity, HashSet<ObjectIdentity>> _DomainIdentityIndex = [];
     private readonly Dictionary<ObjectIdentity, LogicalPath> _CanonicalPaths = [];
     private readonly Dictionary<string, _RootEntry> _Roots = new(StringComparer.Ordinal);
+    private readonly HashSet<ObservationSubscription> _Subscriptions = [];
     private readonly ILogger _Logger;
     private readonly ProgrammaticExposureDescriptorProvider _ProgrammaticExposureProvider;
     private int _IsDisposed;
@@ -462,6 +468,140 @@ public sealed class UIEngineHost : IDisposable, IAsyncDisposable
         }
     }
 
+    /// <summary>Creates a bounded, host-owned stream for one live object or exposed member.</summary>
+    public async ValueTask<InteractionResult<IObservationSubscription>> ObserveAsync(
+        ObjectHandle handle,
+        ObservationRequest? request = null,
+        CancellationToken cancellationToken = default)
+    {
+        request ??= new ObservationRequest();
+        if (IsDisposed)
+        {
+            return _DisposedFailure<IObservationSubscription>();
+        }
+
+        if (request.MemberId is not null && string.IsNullOrWhiteSpace(request.MemberId))
+        {
+            return InteractionResult.Failure<IObservationSubscription>(
+                InteractionErrorCode.INVALID_INPUT,
+                "An observed member identifier cannot be empty or whitespace.");
+        }
+
+        if (request.PollingInterval is { } pollingInterval && pollingInterval <= TimeSpan.Zero)
+        {
+            return InteractionResult.Failure<IObservationSubscription>(
+                InteractionErrorCode.INVALID_INPUT,
+                "An observation polling interval must be positive.");
+        }
+
+        if (cancellationToken.IsCancellationRequested)
+        {
+            return InteractionResult.Failure<IObservationSubscription>(
+                InteractionErrorCode.CANCELLED,
+                "Observation setup was cancelled.");
+        }
+
+        if (!TryResolve(handle, out var instance) || instance is null)
+        {
+            return IsDisposed
+                ? _DisposedFailure<IObservationSubscription>()
+                : InteractionResult.Failure<IObservationSubscription>(
+                    InteractionErrorCode.TARGET_UNAVAILABLE,
+                    "The observed object is no longer available.");
+        }
+
+        var identity = await GetDomainIdentityAsync(handle, cancellationToken).ConfigureAwait(false);
+        if (!identity.IsSuccess)
+        {
+            return InteractionResult.Failure<IObservationSubscription>(
+                identity.Error!.Code,
+                identity.Error.Message);
+        }
+
+        var subscription = new ObservationSubscription(
+            handle,
+            request.MemberId,
+            Configuration.CollectionLimits.ObservationBufferCapacity,
+            _UntrackSubscription,
+            exception => _ReportObservationFailure(
+                handle.Identity,
+                request.MemberId,
+                InteractionErrorCode.OBSERVATION_FAILED,
+                exception));
+        long orderingToken = 0;
+        void Publish(ObservationAdapterChange change)
+        {
+            subscription.Publish(new ChangeRecord(
+                handle.Identity,
+                identity.Value,
+                change.MemberId,
+                change.Kind,
+                change.OldValue,
+                change.NewValue,
+                Interlocked.Increment(ref orderingToken),
+                DateTimeOffset.UtcNow)
+            {
+                OldIndex = change.OldIndex,
+                NewIndex = change.NewIndex,
+            });
+        }
+
+        void ReportFailure(Exception exception) => _ReportObservationFailure(
+            handle.Identity,
+            request.MemberId,
+            InteractionErrorCode.OBSERVATION_FAILED,
+            exception);
+
+        var sourceSubscription = await ObservationSourceFactory.SubscribeAsync(
+            this,
+            instance,
+            handle,
+            identity.Value,
+            request,
+            Publish,
+            ReportFailure,
+            cancellationToken).ConfigureAwait(false);
+        if (!sourceSubscription.IsSuccess)
+        {
+            subscription.Dispose();
+            _ReportObservationFailure(
+                handle.Identity,
+                request.MemberId,
+                sourceSubscription.Error!.Code,
+                null);
+            return InteractionResult.Failure<IObservationSubscription>(
+                sourceSubscription.Error.Code,
+                sourceSubscription.Error.Message);
+        }
+
+        if (sourceSubscription.Value is null)
+        {
+            subscription.Dispose();
+            _ReportObservationFailure(
+                handle.Identity,
+                request.MemberId,
+                InteractionErrorCode.OBSERVATION_FAILED,
+                null);
+            return InteractionResult.Failure<IObservationSubscription>(
+                InteractionErrorCode.OBSERVATION_FAILED,
+                "The observation adapter returned no disposable subscription.");
+        }
+
+        subscription.SetSourceSubscription(sourceSubscription.Value);
+        lock (_Gate)
+        {
+            if (IsDisposed)
+            {
+                subscription.Dispose();
+                return _DisposedFailure<IObservationSubscription>();
+            }
+
+            _Subscriptions.Add(subscription);
+        }
+
+        return InteractionResult.Success<IObservationSubscription>(subscription);
+    }
+
     public void Dispose()
     {
         if (Interlocked.Exchange(ref _IsDisposed, 1) != 0)
@@ -469,14 +609,22 @@ public sealed class UIEngineHost : IDisposable, IAsyncDisposable
             return;
         }
 
+        ObservationSubscription[] subscriptions;
         lock (_Gate)
         {
+            subscriptions = _Subscriptions.ToArray();
+            _Subscriptions.Clear();
             _Roots.Clear();
             _Objects.Clear();
             _DomainIdentities.Clear();
             _DomainIdentityIndex.Clear();
             _CanonicalPaths.Clear();
             _Identities.Clear();
+        }
+
+        foreach (var subscription in subscriptions)
+        {
+            subscription.Dispose();
         }
 
         _HOST_DISPOSED(_Logger, null);
@@ -507,6 +655,35 @@ public sealed class UIEngineHost : IDisposable, IAsyncDisposable
             _Objects.Remove(handle.Identity);
             instance = null;
             return false;
+        }
+    }
+
+    internal void ReportObservationFailure(
+        ObjectIdentity identity,
+        string? memberId,
+        InteractionErrorCode errorCode,
+        Exception? exception = null) =>
+        _ReportObservationFailure(identity, memberId, errorCode, exception);
+
+    private void _ReportObservationFailure(
+        ObjectIdentity identity,
+        string? memberId,
+        InteractionErrorCode errorCode,
+        Exception? exception)
+    {
+        _OBSERVATION_FAILED(
+            _Logger,
+            identity.RuntimeId,
+            memberId,
+            errorCode,
+            Configuration.IncludeSensitiveDiagnosticData ? exception : null);
+    }
+
+    private void _UntrackSubscription(ObservationSubscription subscription)
+    {
+        lock (_Gate)
+        {
+            _Subscriptions.Remove(subscription);
         }
     }
 

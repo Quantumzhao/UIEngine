@@ -24,6 +24,9 @@ public sealed class UIEngineHostOptions
 
     public IEnumerable<IObservationAdapter> ObservationAdapters { get; init; } = [];
 
+    /// <summary>Gets the default interval used by explicitly requested polling subscriptions.</summary>
+    public TimeSpan ObservationPollingInterval { get; init; } = TimeSpan.FromSeconds(1);
+
     public CollectionAccessLimits CollectionLimits { get; init; } = new();
 
     public ILoggerFactory LoggerFactory { get; init; } = NullLoggerFactory.Instance;
@@ -66,6 +69,14 @@ public sealed class UIEngineHostConfiguration
         ObservationAdapters = _Snapshot(
             options.ObservationAdapters,
             nameof(options.ObservationAdapters));
+        if (options.ObservationPollingInterval <= TimeSpan.Zero)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(options),
+                "The observation polling interval must be positive.");
+        }
+
+        ObservationPollingInterval = options.ObservationPollingInterval;
         CollectionLimits = options.CollectionLimits with { };
         LoggerFactory = options.LoggerFactory;
         IncludeSensitiveDiagnosticData = options.IncludeSensitiveDiagnosticData;
@@ -87,6 +98,8 @@ public sealed class UIEngineHostConfiguration
 
     /// <summary>Gets observation adapters in descending precedence order.</summary>
     public IReadOnlyList<IObservationAdapter> ObservationAdapters { get; }
+
+    public TimeSpan ObservationPollingInterval { get; }
 
     public CollectionAccessLimits CollectionLimits { get; }
 

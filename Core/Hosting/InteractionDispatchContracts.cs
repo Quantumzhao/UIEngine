@@ -10,6 +10,8 @@ public enum InteractionDispatchOperation
     REFERENCE_READ,
     COLLECTION_READ,
     ACTION_INVOKE,
+    OBSERVATION_SUBSCRIBE,
+    OBSERVATION_POLL,
 }
 
 /// <summary>
