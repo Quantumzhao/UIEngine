@@ -67,7 +67,12 @@ public interface ICollectionDescriptor : IMemberDescriptor
 {
     Type ElementType { get; }
 
-    ValueTask<InteractionResult<IReadOnlyList<ObjectHandle>>> SnapshotAsync(
+    Type? KeyType { get; }
+
+    CollectionCapabilities Capabilities { get; }
+
+    ValueTask<InteractionResult<CollectionReadResult>> ReadAsync(
+        CollectionReadRequest request,
         CancellationToken cancellationToken = default);
 }
 

@@ -306,10 +306,10 @@ Stop here if the intended repository state cannot be resolved.
 
 ### 9. Add bounded collection modes
 
-1. Introduce collection capability flags, entry semantics, bounded requests, page/range results, and continuation metadata.
-2. Adapt common reflection collection shapes according to their actual finite, indexed, keyed, and observable capabilities.
-3. Add custom provider support for native paging and virtualization.
-4. Prove null/scalar/reference entries, dictionaries, one-shot sequences, external mutations, and non-materialization of large/lazy sources.
+1. [x] Introduce collection capability flags, entry semantics, bounded requests, page/range results, and continuation metadata.
+2. [x] Adapt common reflection collection shapes according to their actual finite, indexed, keyed, and observable capabilities.
+3. [x] Add custom provider support for native paging and virtualization.
+4. [x] Prove null/scalar/reference entries, dictionaries, one-shot sequences, external mutations, and non-materialization of large/lazy sources.
 
 ### 10. Normalize action invocation
 

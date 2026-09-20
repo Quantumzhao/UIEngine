@@ -105,12 +105,13 @@ public sealed class ReflectionLiveOperationTests
 
         Assert.Equal(0, items.EnumerationCount);
 
-        var snapshot = await Assert.Single(descriptor.Collections).SnapshotAsync();
+        var snapshot = await Assert.Single(descriptor.Collections).ReadAsync(
+            CollectionReadRequest.Snapshot(10));
 
         Assert.Equal(1, items.EnumerationCount);
-        Assert.Equal(2, snapshot.Value.Count);
-        Assert.Equal(snapshot.Value[0], snapshot.Value[1]);
-        Assert.Equal(host.GetOrCreateHandle(item), snapshot.Value[0]);
+        Assert.Equal(2, snapshot.Value.Entries.Count);
+        Assert.Equal(snapshot.Value.Entries[0].Reference, snapshot.Value.Entries[1].Reference);
+        Assert.Equal(host.GetOrCreateHandle(item), snapshot.Value.Entries[0].Reference);
     }
 
     [Fact]
@@ -174,7 +175,7 @@ public sealed class ReflectionLiveOperationTests
         [Expose]
         public int FieldValue = 0;
 
-        public _LiveModel(IEnumerable<object>? items = null)
+        public _LiveModel(IReadOnlyCollection<object>? items = null)
         {
             Items = items ?? Array.Empty<object>();
         }
@@ -210,7 +211,7 @@ public sealed class ReflectionLiveOperationTests
         public int? OptionalCount { get; set; }
 
         [Children]
-        public IEnumerable<object> Items { get; }
+        public IReadOnlyCollection<object> Items { get; }
 
         [Action]
         public int Scale(int amount, int factor = 2)
@@ -225,7 +226,7 @@ public sealed class ReflectionLiveOperationTests
     }
 
     /// <summary>Counts enumeration requests while yielding a fixed sequence.</summary>
-    private sealed class _TrackingCollection : IEnumerable<object>
+    private sealed class _TrackingCollection : IReadOnlyCollection<object>
     {
         private readonly object[] _Items;
 
@@ -235,6 +236,8 @@ public sealed class ReflectionLiveOperationTests
         }
 
         public int EnumerationCount { get; private set; }
+
+        public int Count => _Items.Length;
 
         public IEnumerator<object> GetEnumerator()
         {

@@ -271,45 +271,106 @@ public sealed class LogicalPathResolver
     {
         if (selector.Kind == CollectionSelectorKind.KEY)
         {
-            return collection is ICollectionPathSelector keyed
+            return collection.Capabilities.HasFlag(CollectionCapabilities.KEYED) &&
+                collection is ICollectionPathSelector keyed
                 ? await keyed.SelectByKeyAsync(selector.Value, cancellationToken).ConfigureAwait(false)
                 : InteractionResult.Failure<IReadOnlyList<ObjectHandle>>(
                     InteractionErrorCode.TARGET_MISSING,
                     $"Collection '{collection.Id}' does not support keyed selection.");
         }
 
-        var snapshot = await collection.SnapshotAsync(cancellationToken).ConfigureAwait(false);
+        if (selector.Kind == CollectionSelectorKind.INDEX &&
+            collection.Capabilities.HasFlag(CollectionCapabilities.VIRTUALIZED_RANGE))
+        {
+            var index = int.Parse(selector.Value, NumberStyles.None, CultureInfo.InvariantCulture);
+            var range = await collection.ReadAsync(
+                CollectionReadRequest.Range(index, 1),
+                cancellationToken).ConfigureAwait(false);
+            return !range.IsSuccess
+                ? InteractionResult.Failure<IReadOnlyList<ObjectHandle>>(
+                    range.Error!.Code,
+                    range.Error.Message,
+                    range.Error.Issues)
+                : _ReferenceHandles(collection, range.Value.Entries);
+        }
+
+        if (!collection.Capabilities.HasFlag(CollectionCapabilities.FINITE_SNAPSHOT))
+        {
+            return InteractionResult.Failure<IReadOnlyList<ObjectHandle>>(
+                InteractionErrorCode.COLLECTION_ACCESS_UNSUPPORTED,
+                $"Collection '{collection.Id}' cannot be traversed with selector '{selector.Kind}'.");
+        }
+
+        var snapshot = await collection.ReadAsync(
+            CollectionReadRequest.Snapshot(_Host.Configuration.CollectionLimits.MaxSnapshotSize),
+            cancellationToken).ConfigureAwait(false);
         if (!snapshot.IsSuccess)
         {
-            return snapshot;
+            return InteractionResult.Failure<IReadOnlyList<ObjectHandle>>(
+                snapshot.Error!.Code,
+                snapshot.Error.Message,
+                snapshot.Error.Issues);
         }
 
         if (selector.Kind == CollectionSelectorKind.INDEX)
         {
             var index = int.Parse(selector.Value, NumberStyles.None, CultureInfo.InvariantCulture);
-            return (uint)index < (uint)snapshot.Value.Count
-                ? InteractionResult.Success<IReadOnlyList<ObjectHandle>>([snapshot.Value[index]])
-                : InteractionResult.Success<IReadOnlyList<ObjectHandle>>([]);
+            var entries = (uint)index < (uint)snapshot.Value.Entries.Count
+                ? new[] { snapshot.Value.Entries[index] }
+                : [];
+            return _ReferenceHandles(collection, entries);
         }
 
         var matches = new List<ObjectHandle>();
-        foreach (var handle in snapshot.Value)
+        foreach (var entry in snapshot.Value.Entries)
         {
-            var identity = await _Host.GetDomainIdentityAsync(handle, cancellationToken).ConfigureAwait(false);
-            if (!identity.IsSuccess)
+            if (entry.Kind != CollectionEntryKind.REFERENCE || entry.Reference is not { } handle)
             {
-                return InteractionResult.Failure<IReadOnlyList<ObjectHandle>>(
-                    identity.Error!.Code,
-                    identity.Error.Message);
+                continue;
             }
 
-            if (identity.Value is { } value && StringComparer.Ordinal.Equals(value.Value, selector.Value))
+            var identity = entry.DomainIdentity;
+            if (identity is null)
+            {
+                var discovered = await _Host.GetDomainIdentityAsync(handle, cancellationToken).ConfigureAwait(false);
+                if (!discovered.IsSuccess)
+                {
+                    return InteractionResult.Failure<IReadOnlyList<ObjectHandle>>(
+                        discovered.Error!.Code,
+                        discovered.Error.Message,
+                        discovered.Error.Issues);
+                }
+
+                identity = discovered.Value;
+            }
+
+            if (identity is { } value && StringComparer.Ordinal.Equals(value.Value, selector.Value))
             {
                 matches.Add(handle);
             }
         }
 
         return InteractionResult.Success<IReadOnlyList<ObjectHandle>>(matches);
+    }
+
+    private static InteractionResult<IReadOnlyList<ObjectHandle>> _ReferenceHandles(
+        ICollectionDescriptor collection,
+        IReadOnlyList<CollectionEntry> entries)
+    {
+        if (entries.Count == 0)
+        {
+            return InteractionResult.Success<IReadOnlyList<ObjectHandle>>([]);
+        }
+
+        if (entries.Any(static entry => entry.Kind != CollectionEntryKind.REFERENCE))
+        {
+            return InteractionResult.Failure<IReadOnlyList<ObjectHandle>>(
+                InteractionErrorCode.TYPE_MISMATCH,
+                $"Collection '{collection.Id}' selector does not identify a reference object.");
+        }
+
+        return InteractionResult.Success<IReadOnlyList<ObjectHandle>>(
+            entries.Select(static entry => entry.Reference!.Value).ToArray());
     }
 
     private static List<(DescriptorKind Kind, IMemberDescriptor Descriptor)> _FindMembers(

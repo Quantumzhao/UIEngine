@@ -117,7 +117,9 @@ public sealed class DomainIdentityTests
             InteractionErrorCode.DOMAIN_IDENTITY_NOT_FOUND,
             host.ResolveDomainIdentity(new DomainIdentity("child/1")).Error?.Code);
 
-        var childHandle = Assert.Single((await Assert.Single(rootDescriptor.Collections).SnapshotAsync()).Value);
+        var snapshot = await Assert.Single(rootDescriptor.Collections).ReadAsync(
+            CollectionReadRequest.Snapshot(10));
+        var childHandle = Assert.Single(snapshot.Value.Entries).Reference!.Value;
 
         Assert.Equal(1, children.EnumerationCount);
         Assert.Equal(childHandle, host.ResolveDomainIdentity(new DomainIdentity("child/1")).Value);
@@ -238,15 +240,17 @@ public sealed class DomainIdentityTests
         public int Identity { get; }
     }
 
-    private sealed class _IdentityRoot(IEnumerable<_InterfaceIdentity> children)
+    private sealed class _IdentityRoot(IReadOnlyCollection<_InterfaceIdentity> children)
     {
         [Children]
-        public IEnumerable<_InterfaceIdentity> Children { get; } = children;
+        public IReadOnlyCollection<_InterfaceIdentity> Children { get; } = children;
     }
 
-    private sealed class _TrackingEnumerable(params _InterfaceIdentity[] items) : IEnumerable<_InterfaceIdentity>
+    private sealed class _TrackingEnumerable(params _InterfaceIdentity[] items) : IReadOnlyCollection<_InterfaceIdentity>
     {
         public int EnumerationCount { get; private set; }
+
+        public int Count => items.Length;
 
         public IEnumerator<_InterfaceIdentity> GetEnumerator()
         {

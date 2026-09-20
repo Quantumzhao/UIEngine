@@ -41,7 +41,7 @@ Detailed milestones:
 - [x] Add validation and dispatcher-mediated reads, writes, and calls.
 - [ ] Make host lifetime explicit and dispose subscriptions and active invocations safely.
 - [x] Add normalized state and collection observation.
-- [ ] Add collection snapshots, paging, and virtualization contracts.
+- [x] Add collection snapshots, paging, and virtualization contracts.
 - [ ] Add async actions, progress, and cancellation.
 - [ ] Add structured diagnostics for discovery, binding, mutation, invocation, collection access, dispatch, and capability mismatches.
 - [ ] Extend the CLI with replacement-safe navigation, observation, bounded collection listing, async progress, and cancellation.

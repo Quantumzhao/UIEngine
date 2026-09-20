@@ -1,4 +1,5 @@
 using System.Collections;
+using System.Collections.Specialized;
 using System.Reflection;
 using System.Runtime.CompilerServices;
 using UIEngine.Core.Attributes;
@@ -406,7 +407,7 @@ internal sealed class ReflectionReferenceDescriptor : ReflectionMemberDescriptor
     }
 }
 
-/// <summary>Produces explicitly requested finite handle snapshots of an exposed collection.</summary>
+/// <summary>Provides bounded access that reflects the collection's declared shape.</summary>
 internal sealed class ReflectionCollectionDescriptor :
     ReflectionMemberDescriptor,
     ICollectionDescriptor,
@@ -422,28 +423,50 @@ internal sealed class ReflectionCollectionDescriptor :
     {
         _Host = host;
         ElementType = ReflectionTypeClassifier.GetCollectionElementType(metadata.MemberType);
+        KeyType = ReflectionTypeClassifier.GetDictionaryKeyType(metadata.MemberType);
+        Capabilities = ReflectionTypeClassifier.GetCollectionCapabilities(metadata.MemberType);
     }
 
     public Type ElementType { get; }
 
-    public async ValueTask<InteractionResult<IReadOnlyList<ObjectHandle>>> SnapshotAsync(
+    public Type? KeyType { get; }
+
+    public CollectionCapabilities Capabilities { get; }
+
+    public async ValueTask<InteractionResult<CollectionReadResult>> ReadAsync(
+        CollectionReadRequest request,
         CancellationToken cancellationToken = default)
     {
+        ArgumentNullException.ThrowIfNull(request);
         if (IsHostDisposed)
         {
-            return _DisposedFailure<IReadOnlyList<ObjectHandle>>();
+            return _DisposedFailure<CollectionReadResult>();
         }
 
         if (cancellationToken.IsCancellationRequested)
         {
-            return InteractionResult.Failure<IReadOnlyList<ObjectHandle>>(
+            return InteractionResult.Failure<CollectionReadResult>(
                 InteractionErrorCode.CANCELLED,
                 "Collection enumeration was cancelled.");
         }
 
+        var requiredCapability = request.Mode switch
+        {
+            CollectionAccessMode.SNAPSHOT => CollectionCapabilities.FINITE_SNAPSHOT,
+            CollectionAccessMode.PAGE => CollectionCapabilities.PAGING,
+            CollectionAccessMode.VIRTUALIZED_RANGE => CollectionCapabilities.VIRTUALIZED_RANGE,
+            _ => CollectionCapabilities.NONE,
+        };
+        if ((Capabilities & requiredCapability) == 0)
+        {
+            return InteractionResult.Failure<CollectionReadResult>(
+                InteractionErrorCode.COLLECTION_ACCESS_UNSUPPORTED,
+                $"Collection '{Id}' does not support {request.Mode}.");
+        }
+
         if (!TryGetTarget(out var target) || target is null)
         {
-            return InteractionResult.Failure<IReadOnlyList<ObjectHandle>>(
+            return InteractionResult.Failure<CollectionReadResult>(
                 InteractionErrorCode.TARGET_UNAVAILABLE,
                 "The containing object is no longer available.");
         }
@@ -452,65 +475,35 @@ internal sealed class ReflectionCollectionDescriptor :
         {
             if (ReflectionMemberAccess.Read(Metadata.Member, target) is not IEnumerable collection)
             {
-                return InteractionResult.Failure<IReadOnlyList<ObjectHandle>>(
+                return InteractionResult.Failure<CollectionReadResult>(
                     InteractionErrorCode.TARGET_UNAVAILABLE,
                     $"Collection '{Id}' is null or unavailable.");
             }
 
-            var items = new List<object>();
-            var index = 0;
-            foreach (var item in collection)
+            return request.Mode switch
             {
-                if (cancellationToken.IsCancellationRequested)
-                {
-                    return InteractionResult.Failure<IReadOnlyList<ObjectHandle>>(
-                        InteractionErrorCode.CANCELLED,
-                        "Collection enumeration was cancelled.");
-                }
-
-                if (item is null)
-                {
-                    return InteractionResult.Failure<IReadOnlyList<ObjectHandle>>(
-                        InteractionErrorCode.TARGET_UNAVAILABLE,
-                        $"Collection '{Id}' contains a null element at index {index}.");
-                }
-
-                if (item.GetType().IsValueType)
-                {
-                    return InteractionResult.Failure<IReadOnlyList<ObjectHandle>>(
-                        InteractionErrorCode.UNSUPPORTED_TARGET_TYPE,
-                        $"Collection '{Id}' contains a value-type element at index {index}.");
-                }
-
-                items.Add(item);
-                index++;
-            }
-
-            var handles = new List<ObjectHandle>(items.Count);
-            foreach (var item in items)
-            {
-                var encountered = await _Host.EncounterAsync(item, cancellationToken).ConfigureAwait(false);
-                if (!encountered.IsSuccess)
-                {
-                    return InteractionResult.Failure<IReadOnlyList<ObjectHandle>>(
-                        encountered.Error!.Code,
-                        encountered.Error.Message);
-                }
-
-                handles.Add(encountered.Value);
-            }
-
-            return InteractionResult.Success<IReadOnlyList<ObjectHandle>>(handles.ToArray());
+                CollectionAccessMode.SNAPSHOT => await _ReadSnapshotAsync(
+                    collection,
+                    request,
+                    cancellationToken).ConfigureAwait(false),
+                CollectionAccessMode.VIRTUALIZED_RANGE => await _ReadRangeAsync(
+                    collection,
+                    request,
+                    cancellationToken).ConfigureAwait(false),
+                _ => InteractionResult.Failure<CollectionReadResult>(
+                    InteractionErrorCode.COLLECTION_ACCESS_UNSUPPORTED,
+                    $"Collection '{Id}' does not support {request.Mode}."),
+            };
         }
         catch (TargetInvocationException exception)
         {
-            return InteractionResult.Failure<IReadOnlyList<ObjectHandle>>(
+            return InteractionResult.Failure<CollectionReadResult>(
                 InteractionErrorCode.INVOCATION_FAILED,
                 exception.InnerException?.Message ?? exception.Message);
         }
-        catch (InvalidOperationException exception)
+        catch (Exception exception) when (exception is InvalidOperationException or ArgumentException)
         {
-            return InteractionResult.Failure<IReadOnlyList<ObjectHandle>>(
+            return InteractionResult.Failure<CollectionReadResult>(
                 InteractionErrorCode.INVOCATION_FAILED,
                 exception.Message);
         }
@@ -588,6 +581,161 @@ internal sealed class ReflectionCollectionDescriptor :
                 InteractionErrorCode.INVOCATION_FAILED,
                 exception.Message);
         }
+    }
+
+    private async ValueTask<InteractionResult<CollectionReadResult>> _ReadSnapshotAsync(
+        IEnumerable collection,
+        CollectionReadRequest request,
+        CancellationToken cancellationToken)
+    {
+        if (!ReflectionTypeClassifier.TryGetCollectionCount(collection, out var initialCount))
+        {
+            return InteractionResult.Failure<CollectionReadResult>(
+                InteractionErrorCode.COLLECTION_ACCESS_UNSUPPORTED,
+                $"Collection '{Id}' no longer has a finite collection shape.");
+        }
+
+        if (initialCount > request.Limit)
+        {
+            return InteractionResult.Failure<CollectionReadResult>(
+                InteractionErrorCode.COLLECTION_LIMIT_EXCEEDED,
+                $"Collection '{Id}' contains {initialCount} entries, exceeding the requested snapshot limit {request.Limit}.");
+        }
+
+        var entries = new List<CollectionEntry>(initialCount);
+        foreach (var item in collection)
+        {
+            if (cancellationToken.IsCancellationRequested)
+            {
+                return InteractionResult.Failure<CollectionReadResult>(
+                    InteractionErrorCode.CANCELLED,
+                    "Collection enumeration was cancelled.");
+            }
+
+            if (entries.Count == request.Limit)
+            {
+                return InteractionResult.Failure<CollectionReadResult>(
+                    InteractionErrorCode.COLLECTION_LIMIT_EXCEEDED,
+                    $"Collection '{Id}' grew beyond the requested snapshot limit {request.Limit}.");
+            }
+
+            var split = ReflectionTypeClassifier.SplitDictionaryEntry(collection, item);
+            var entry = await _CreateEntryAsync(
+                entries.Count,
+                split.Value,
+                split.HasKey ? new CollectionEntryKey(split.Key) : null,
+                cancellationToken).ConfigureAwait(false);
+            if (!entry.IsSuccess)
+            {
+                return InteractionResult.Failure<CollectionReadResult>(
+                    entry.Error!.Code,
+                    entry.Error.Message,
+                    entry.Error.Issues);
+            }
+
+            entries.Add(entry.Value);
+        }
+
+        return InteractionResult.Success(new CollectionReadResult(
+            CollectionAccessMode.SNAPSHOT,
+            entries,
+            0,
+            entries.Count,
+            hasMore: false));
+    }
+
+    private async ValueTask<InteractionResult<CollectionReadResult>> _ReadRangeAsync(
+        IEnumerable collection,
+        CollectionReadRequest request,
+        CancellationToken cancellationToken)
+    {
+        if (!ReflectionTypeClassifier.TryGetIndexedCollection(collection, out var count, out var readAt))
+        {
+            return InteractionResult.Failure<CollectionReadResult>(
+                InteractionErrorCode.COLLECTION_ACCESS_UNSUPPORTED,
+                $"Collection '{Id}' no longer has an indexed collection shape.");
+        }
+
+        var entries = new List<CollectionEntry>();
+        if (request.Offset < count)
+        {
+            var end = Math.Min((long)count, request.Offset + request.Limit);
+            for (var position = request.Offset; position < end; position++)
+            {
+                if (cancellationToken.IsCancellationRequested)
+                {
+                    return InteractionResult.Failure<CollectionReadResult>(
+                        InteractionErrorCode.CANCELLED,
+                        "Collection range access was cancelled.");
+                }
+
+                var entry = await _CreateEntryAsync(
+                    position,
+                    readAt(checked((int)position)),
+                    key: null,
+                    cancellationToken).ConfigureAwait(false);
+                if (!entry.IsSuccess)
+                {
+                    return InteractionResult.Failure<CollectionReadResult>(
+                        entry.Error!.Code,
+                        entry.Error.Message,
+                        entry.Error.Issues);
+                }
+
+                entries.Add(entry.Value);
+            }
+        }
+
+        var nextOffset = request.Offset + entries.Count;
+        return InteractionResult.Success(new CollectionReadResult(
+            CollectionAccessMode.VIRTUALIZED_RANGE,
+            entries,
+            request.Offset,
+            count,
+            nextOffset < count));
+    }
+
+    private async ValueTask<InteractionResult<CollectionEntry>> _CreateEntryAsync(
+        long position,
+        object? value,
+        CollectionEntryKey? key,
+        CancellationToken cancellationToken)
+    {
+        if (value is null)
+        {
+            return InteractionResult.Success(CollectionEntry.Null(position, key));
+        }
+
+        if (ReflectionTypeClassifier.IsScalar(value.GetType()))
+        {
+            return InteractionResult.Success(CollectionEntry.Scalar(position, value, key));
+        }
+
+        var encountered = await _Host.EncounterAsync(value, cancellationToken).ConfigureAwait(false);
+        if (!encountered.IsSuccess)
+        {
+            return InteractionResult.Failure<CollectionEntry>(
+                encountered.Error!.Code,
+                encountered.Error.Message,
+                encountered.Error.Issues);
+        }
+
+        var domainIdentity = await _Host.GetDomainIdentityAsync(
+            encountered.Value,
+            cancellationToken).ConfigureAwait(false);
+        if (!domainIdentity.IsSuccess)
+        {
+            return InteractionResult.Failure<CollectionEntry>(
+                domainIdentity.Error!.Code,
+                domainIdentity.Error.Message,
+                domainIdentity.Error.Issues);
+        }
+
+        return InteractionResult.Success(CollectionEntry.ReferenceValue(
+            position,
+            encountered.Value,
+            domainIdentity.Value,
+            key));
     }
 }
 
@@ -947,6 +1095,15 @@ internal static class ReflectionTypeClassifier
 {
     public static Type GetCollectionElementType(Type collectionType)
     {
+        var dictionaryType = _FindGenericShape(
+            collectionType,
+            typeof(IDictionary<,>),
+            typeof(IReadOnlyDictionary<,>));
+        if (dictionaryType is not null)
+        {
+            return dictionaryType.GetGenericArguments()[1];
+        }
+
         if (collectionType.IsArray)
         {
             return collectionType.GetElementType() ?? typeof(object);
@@ -959,4 +1116,154 @@ internal static class ReflectionTypeClassifier
             .FirstOrDefault(static type => type.GetGenericTypeDefinition() == typeof(IEnumerable<>));
         return enumerableType?.GetGenericArguments()[0] ?? typeof(object);
     }
+
+    public static Type? GetDictionaryKeyType(Type collectionType)
+    {
+        if (typeof(IDictionary).IsAssignableFrom(collectionType))
+        {
+            var genericDictionary = _FindGenericShape(
+                collectionType,
+                typeof(IDictionary<,>),
+                typeof(IReadOnlyDictionary<,>));
+            return genericDictionary?.GetGenericArguments()[0] ?? typeof(object);
+        }
+
+        return _FindGenericShape(
+            collectionType,
+            typeof(IDictionary<,>),
+            typeof(IReadOnlyDictionary<,>))?.GetGenericArguments()[0];
+    }
+
+    public static CollectionCapabilities GetCollectionCapabilities(Type collectionType)
+    {
+        var capabilities = CollectionCapabilities.NONE;
+        if (_IsFiniteCollection(collectionType))
+        {
+            capabilities |= CollectionCapabilities.FINITE_SNAPSHOT;
+        }
+
+        if (_IsIndexedCollection(collectionType))
+        {
+            capabilities |= CollectionCapabilities.INDEXED |
+                CollectionCapabilities.VIRTUALIZED_RANGE;
+        }
+
+        if (GetDictionaryKeyType(collectionType) is not null)
+        {
+            capabilities |= CollectionCapabilities.KEYED;
+        }
+
+        if (typeof(INotifyCollectionChanged).IsAssignableFrom(collectionType))
+        {
+            capabilities |= CollectionCapabilities.LIVE_OBSERVATION;
+        }
+
+        return capabilities;
+    }
+
+    public static bool IsScalar(Type type)
+    {
+        var underlyingType = Nullable.GetUnderlyingType(type) ?? type;
+        return underlyingType.IsValueType || underlyingType == typeof(string);
+    }
+
+    public static bool TryGetCollectionCount(IEnumerable collection, out int count)
+    {
+        if (collection is ICollection nonGenericCollection)
+        {
+            count = nonGenericCollection.Count;
+            return true;
+        }
+
+        var collectionInterface = _FindGenericShape(
+            collection.GetType(),
+            typeof(ICollection<>),
+            typeof(IReadOnlyCollection<>));
+        if (collectionInterface?.GetProperty(nameof(ICollection<object>.Count))?.GetValue(collection) is int value)
+        {
+            count = value;
+            return true;
+        }
+
+        count = 0;
+        return false;
+    }
+
+    public static bool TryGetIndexedCollection(
+        IEnumerable collection,
+        out int count,
+        out Func<int, object?> readAt)
+    {
+        if (collection is IList list)
+        {
+            count = list.Count;
+            readAt = index => list[index];
+            return true;
+        }
+
+        var listInterface = _FindGenericShape(
+            collection.GetType(),
+            typeof(IList<>),
+            typeof(IReadOnlyList<>));
+        var itemProperty = listInterface?.GetProperty("Item");
+        if (itemProperty is not null && TryGetCollectionCount(collection, out var value))
+        {
+            count = value;
+            readAt = index => itemProperty.GetValue(collection, [index]);
+            return true;
+        }
+
+        count = 0;
+        readAt = static _ => null;
+        return false;
+    }
+
+    public static (bool HasKey, object? Key, object? Value) SplitDictionaryEntry(
+        IEnumerable collection,
+        object? entry)
+    {
+        if (GetDictionaryKeyType(collection.GetType()) is null)
+        {
+            return (false, null, entry);
+        }
+
+        if (entry is DictionaryEntry dictionaryEntry)
+        {
+            return (true, dictionaryEntry.Key, dictionaryEntry.Value);
+        }
+
+        if (entry is not null)
+        {
+            var type = entry.GetType();
+            if (type.IsGenericType && type.GetGenericTypeDefinition() == typeof(KeyValuePair<,>))
+            {
+                return (
+                    true,
+                    type.GetProperty(nameof(KeyValuePair<object, object>.Key))!.GetValue(entry),
+                    type.GetProperty(nameof(KeyValuePair<object, object>.Value))!.GetValue(entry));
+            }
+        }
+
+        return (false, null, entry);
+    }
+
+    private static bool _IsFiniteCollection(Type collectionType) =>
+        typeof(ICollection).IsAssignableFrom(collectionType) ||
+        _FindGenericShape(
+            collectionType,
+            typeof(ICollection<>),
+            typeof(IReadOnlyCollection<>)) is not null;
+
+    private static bool _IsIndexedCollection(Type collectionType) =>
+        typeof(IList).IsAssignableFrom(collectionType) ||
+        _FindGenericShape(
+            collectionType,
+            typeof(IList<>),
+            typeof(IReadOnlyList<>)) is not null;
+
+    private static Type? _FindGenericShape(Type type, params Type[] genericDefinitions) =>
+        type.GetInterfaces()
+            .Append(type)
+            .Where(static candidate => candidate.IsGenericType)
+            .FirstOrDefault(candidate => genericDefinitions.Contains(candidate.GetGenericTypeDefinition()));
 }

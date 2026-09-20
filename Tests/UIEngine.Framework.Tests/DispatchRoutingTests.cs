@@ -28,7 +28,8 @@ public sealed class DispatchRoutingTests
         var read = await count.ReadAsync();
         var write = await count.WriteAsync("3");
         var reference = await Assert.Single(descriptor.References).ReadAsync();
-        var collection = await Assert.Single(descriptor.Collections).SnapshotAsync();
+        var collection = await Assert.Single(descriptor.Collections).ReadAsync(
+            CollectionReadRequest.Snapshot(10));
         var invocation = await Assert.Single(descriptor.Actions).InvokeAsync(
             new Dictionary<string, object?> { ["amount"] = "2" });
 
@@ -36,7 +37,7 @@ public sealed class DispatchRoutingTests
         Assert.Equal(1, read.Value);
         Assert.Equal(3, write.Value);
         Assert.True(reference.IsSuccess);
-        Assert.Single(collection.Value);
+        Assert.Single(collection.Value.Entries);
         Assert.Equal(5, invocation.Value);
         Assert.True(model.SummaryWasRead);
         Assert.True(model.ValidationWasRun);
@@ -302,7 +303,7 @@ public sealed class DispatchRoutingTests
         }
 
         [Children]
-        public IEnumerable<object> Items
+        public IReadOnlyCollection<object> Items
         {
             get
             {
@@ -361,8 +362,21 @@ public sealed class DispatchRoutingTests
         }
     }
 
-    private sealed class _DispatchEnumerable(_RecordingDispatcher dispatcher) : IEnumerable<object>
+    private sealed class _DispatchEnumerable(_RecordingDispatcher dispatcher) : IReadOnlyCollection<object>
     {
+        public int Count
+        {
+            get
+            {
+                if (!dispatcher.CheckAccess())
+                {
+                    throw new InvalidOperationException("Collection access bypassed the dispatcher.");
+                }
+
+                return 1;
+            }
+        }
+
         public IEnumerator<object> GetEnumerator()
         {
             if (!dispatcher.CheckAccess())

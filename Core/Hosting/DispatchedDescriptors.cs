@@ -192,16 +192,64 @@ internal sealed class DispatchedObjectDescriptor : IObjectDescriptor
         {
             _Descriptor = descriptor;
             ElementType = descriptor.ElementType;
+            KeyType = descriptor.KeyType;
+            Capabilities = descriptor.Capabilities;
         }
 
         public Type ElementType { get; }
 
-        public ValueTask<InteractionResult<IReadOnlyList<ObjectHandle>>> SnapshotAsync(
-            CancellationToken cancellationToken = default) => Host.ExecuteInteractionAsync(
+        public Type? KeyType { get; }
+
+        public CollectionCapabilities Capabilities { get; }
+
+        public async ValueTask<InteractionResult<CollectionReadResult>> ReadAsync(
+            CollectionReadRequest request,
+            CancellationToken cancellationToken = default)
+        {
+            ArgumentNullException.ThrowIfNull(request);
+            var requiredCapability = request.Mode switch
+            {
+                CollectionAccessMode.SNAPSHOT => CollectionCapabilities.FINITE_SNAPSHOT,
+                CollectionAccessMode.PAGE => CollectionCapabilities.PAGING,
+                CollectionAccessMode.VIRTUALIZED_RANGE => CollectionCapabilities.VIRTUALIZED_RANGE,
+                _ => CollectionCapabilities.NONE,
+            };
+            if ((Capabilities & requiredCapability) == 0)
+            {
+                return InteractionResult.Failure<CollectionReadResult>(
+                    InteractionErrorCode.COLLECTION_ACCESS_UNSUPPORTED,
+                    $"Collection '{Id}' does not support {request.Mode}.");
+            }
+
+            var maximum = request.Mode == CollectionAccessMode.SNAPSHOT
+                ? Host.Configuration.CollectionLimits.MaxSnapshotSize
+                : Host.Configuration.CollectionLimits.MaxPageSize;
+            if (request.Limit > maximum)
+            {
+                return InteractionResult.Failure<CollectionReadResult>(
+                    InteractionErrorCode.COLLECTION_LIMIT_EXCEEDED,
+                    $"Collection request limit {request.Limit} exceeds the configured maximum {maximum}.");
+            }
+
+            var result = await Host.ExecuteInteractionAsync(
                 InteractionDispatchOperation.COLLECTION_READ,
                 CanExecuteDirectly(InteractionDispatchOperation.COLLECTION_READ),
-                () => _Descriptor.SnapshotAsync(cancellationToken),
-                cancellationToken);
+                () => _Descriptor.ReadAsync(request, cancellationToken),
+                cancellationToken).ConfigureAwait(false);
+            if (!result.IsSuccess)
+            {
+                return result;
+            }
+
+            if (result.Value.Mode != request.Mode || result.Value.Entries.Count > request.Limit)
+            {
+                return InteractionResult.Failure<CollectionReadResult>(
+                    InteractionErrorCode.DESCRIPTOR_UNAVAILABLE,
+                    $"Collection provider for '{Id}' returned a result outside the requested bounds.");
+            }
+
+            return result;
+        }
     }
 
     private sealed class DispatchedKeyedCollectionDescriptor :
