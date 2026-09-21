@@ -31,6 +31,7 @@ Use `NN-short-descriptive-name.md`, with two-digit chronological numbers allocat
 |---|---|---|
 | [01 — Architecture Runway and CLI Walking Skeleton](01-architecture-runway-cli-walking-skeleton.md) | Complete | Establish the safety baseline and prove a minimal graph-aware runtime through the CLI. |
 | [02 — Framework MVP Interaction Hardening](02-framework-mvp-interaction-hardening.md) | Superseded | Its capability outcomes remain, while the provider/interface-heavy implementation was replaced by the streamlined concrete Core. |
+| [03 — Product MVP TUI](03-product-mvp-tui.md) | Draft | Build a reusable XenoAtom-based TUI library that turns a Core-hosted domain graph into an interactive application. |
 
 The post-Milestone-02 streamlining is recorded in
 [REBOOT_PLAN.md](../../REBOOT_PLAN.md), while [architecture.md](../architecture.md) is authoritative
