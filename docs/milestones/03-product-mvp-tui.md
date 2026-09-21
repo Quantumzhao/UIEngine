@@ -1,11 +1,14 @@
 # Milestone 03 — Product MVP TUI
 
-**Status:** Draft
+**Status:** In Progress
 
 **Toolkit recommendation:** Adopt `XenoAtom.Terminal.UI` behind a UIEngine-owned adapter after the
 Phase 1 compatibility spike passes. Pin the accepted package version; do not use a floating range.
 
 **Research baseline:** `XenoAtom.Terminal.UI` 3.9.0, reviewed on 2026-09-21.
+
+**Qualified version:** `XenoAtom.Terminal.UI` 3.9.0, accepted on 2026-09-21. See the
+[qualification record](../spikes/xenoatom-terminal-ui-3.9.0.md).
 
 **Prerequisite:** The streamlined Framework MVP capabilities described by
 [Project context](../../PROJECT_CONTEXT.md) and [the current architecture](../architecture.md) are

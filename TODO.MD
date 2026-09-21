@@ -53,7 +53,7 @@ the future roadmap. Completed milestone records remain under [docs/milestones](d
 
 ## Product MVP — TUI
 
-- [ ] Select a TUI toolkit without coupling it to Core.
+- [x] Select and qualify XenoAtom.Terminal.UI 3.9.0 without coupling it to Core.
 - [ ] Define only the frontend capability negotiation required by the selected toolkit.
 - [ ] Build graph browsing with navigation history or breadcrumbs.
 - [ ] Generate value editors and action forms from the concrete descriptors.

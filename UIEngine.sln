@@ -23,6 +23,8 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Examples", "Examples", "{93
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Tests", "Tests", "{29E944E2-1678-45BA-B59A-748A333AB9D2}"
 EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Spikes", "Spikes", "{5326C9F9-79F1-40EE-B4CA-A497C21C99A7}"
+EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Core", "Core\Core.csproj", "{5DA214BF-A217-456A-AE65-571024FFD439}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Cli", "Frontend\Cli\Cli.csproj", "{EAC7A310-E711-4503-A095-C0F5C9ACE30E}"
@@ -32,6 +34,8 @@ EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "UIEngine.Framework.Tests", "Tests\UIEngine.Framework.Tests\UIEngine.Framework.Tests.csproj", "{C1A65C07-E00E-431A-8ABF-656AB9E82B78}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "UIEngine.Frontend.Cli.Tests", "Tests\UIEngine.Frontend.Cli.Tests\UIEngine.Frontend.Cli.Tests.csproj", "{E5E8D5E1-346E-4860-A932-4EA9C18DAE23}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "XenoAtom.Terminal.UI.Spike", "Spikes\XenoAtom.Terminal.UI.Spike\XenoAtom.Terminal.UI.Spike.csproj", "{B9BE8E78-3FFE-4D89-BC44-E77E319EE9C3}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -59,6 +63,10 @@ Global
 		{E5E8D5E1-346E-4860-A932-4EA9C18DAE23}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{E5E8D5E1-346E-4860-A932-4EA9C18DAE23}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{E5E8D5E1-346E-4860-A932-4EA9C18DAE23}.Release|Any CPU.Build.0 = Release|Any CPU
+		{B9BE8E78-3FFE-4D89-BC44-E77E319EE9C3}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{B9BE8E78-3FFE-4D89-BC44-E77E319EE9C3}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{B9BE8E78-3FFE-4D89-BC44-E77E319EE9C3}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{B9BE8E78-3FFE-4D89-BC44-E77E319EE9C3}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(NestedProjects) = preSolution
 		{5DA214BF-A217-456A-AE65-571024FFD439} = {7B29D791-D6ED-4B16-B869-E6D148908A74}
@@ -66,6 +74,7 @@ Global
 		{34B37633-1EEB-472A-B932-0582945491D6} = {93F14414-36BA-4AF7-A513-4B474F4A8839}
 		{C1A65C07-E00E-431A-8ABF-656AB9E82B78} = {29E944E2-1678-45BA-B59A-748A333AB9D2}
 		{E5E8D5E1-346E-4860-A932-4EA9C18DAE23} = {29E944E2-1678-45BA-B59A-748A333AB9D2}
+		{B9BE8E78-3FFE-4D89-BC44-E77E319EE9C3} = {5326C9F9-79F1-40EE-B4CA-A497C21C99A7}
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
