@@ -21,6 +21,8 @@ The CLI is an architectural proving frontend rather than the product TUI. It cov
 
 - [Project context](PROJECT_CONTEXT.md) — concise source of settled intent and constraints.
 - [Architecture, reboot audit, and plan](REBOOT_PLAN.md) — target specification, detailed assessment, decisions, risks, and phased implementation plan.
+- [CLI command reference](docs/cli-command-reference.md) — current command grammar, logical paths, output, and examples.
+- [Implemented architecture and core modules](docs/architecture.md) — runtime flow, project boundaries, and module responsibilities.
 - [Progress tracker](TODO.MD) — concise checklist derived from the reboot plan.
 - `Core/` — reboot runtime contracts, attributes, host, and reflection provider.
 - `Frontend/Cli/` — descriptor-driven CLI proving frontend.
