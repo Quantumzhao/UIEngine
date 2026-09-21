@@ -145,13 +145,18 @@ internal sealed class DispatchedObjectDescriptor : IObjectDescriptor
                 () => _Descriptor.ReadAsync(cancellationToken),
                 cancellationToken);
 
-        public ValueTask<InteractionResult<object?>> WriteAsync(
+        public async ValueTask<InteractionResult<object?>> WriteAsync(
             object? value,
-            CancellationToken cancellationToken = default) => Host.ExecuteInteractionAsync(
+            CancellationToken cancellationToken = default)
+        {
+            var result = await Host.ExecuteInteractionAsync(
                 InteractionDispatchOperation.VALUE_WRITE,
                 CanExecuteDirectly(InteractionDispatchOperation.VALUE_WRITE),
                 () => _Descriptor.WriteAsync(value, cancellationToken),
-                cancellationToken);
+                cancellationToken).ConfigureAwait(false);
+            Host.RecordMutationDiagnostic(Id, result.Error);
+            return result;
+        }
     }
 
     private sealed class DispatchedReferenceDescriptor :
@@ -216,9 +221,12 @@ internal sealed class DispatchedObjectDescriptor : IObjectDescriptor
             };
             if ((Capabilities & requiredCapability) == 0)
             {
-                return InteractionResult.Failure<CollectionReadResult>(
+                var unsupported = InteractionResult.Failure<CollectionReadResult>(
                     InteractionErrorCode.COLLECTION_ACCESS_UNSUPPORTED,
                     $"Collection '{Id}' does not support {request.Mode}.");
+                Host.RecordCapabilityMismatch(Id, request.Mode.ToString());
+                Host.RecordCollectionDiagnostic(Id, unsupported.Error!);
+                return unsupported;
             }
 
             var maximum = request.Mode == CollectionAccessMode.SNAPSHOT
@@ -226,9 +234,11 @@ internal sealed class DispatchedObjectDescriptor : IObjectDescriptor
                 : Host.Configuration.CollectionLimits.MaxPageSize;
             if (request.Limit > maximum)
             {
-                return InteractionResult.Failure<CollectionReadResult>(
+                var exceeded = InteractionResult.Failure<CollectionReadResult>(
                     InteractionErrorCode.COLLECTION_LIMIT_EXCEEDED,
                     $"Collection request limit {request.Limit} exceeds the configured maximum {maximum}.");
+                Host.RecordCollectionDiagnostic(Id, exceeded.Error!);
+                return exceeded;
             }
 
             var result = await Host.ExecuteInteractionAsync(
@@ -238,14 +248,17 @@ internal sealed class DispatchedObjectDescriptor : IObjectDescriptor
                 cancellationToken).ConfigureAwait(false);
             if (!result.IsSuccess)
             {
+                Host.RecordCollectionDiagnostic(Id, result.Error!);
                 return result;
             }
 
             if (result.Value.Mode != request.Mode || result.Value.Entries.Count > request.Limit)
             {
-                return InteractionResult.Failure<CollectionReadResult>(
+                var invalid = InteractionResult.Failure<CollectionReadResult>(
                     InteractionErrorCode.DESCRIPTOR_UNAVAILABLE,
                     $"Collection provider for '{Id}' returned a result outside the requested bounds.");
+                Host.RecordCollectionDiagnostic(Id, invalid.Error!);
+                return invalid;
             }
 
             return result;
@@ -312,13 +325,24 @@ internal sealed class DispatchedObjectDescriptor : IObjectDescriptor
 
         public bool RequiresConfirmation { get; }
 
-        public ValueTask<InteractionResult<IActionInvocation>> InvokeAsync(
+        public async ValueTask<InteractionResult<IActionInvocation>> InvokeAsync(
             IReadOnlyDictionary<string, object?> arguments,
-            CancellationToken cancellationToken = default) => Host.ExecuteInteractionAsync(
+            CancellationToken cancellationToken = default)
+        {
+            var result = await Host.ExecuteInteractionAsync(
                 InteractionDispatchOperation.ACTION_INVOKE,
                 CanExecuteDirectly(InteractionDispatchOperation.ACTION_INVOKE),
                 () => _Descriptor.InvokeAsync(arguments, cancellationToken),
-                cancellationToken);
+                cancellationToken).ConfigureAwait(false);
+            if (!result.IsSuccess)
+            {
+                Host.RecordInvocationFailure(Id, result.Error!);
+                return result;
+            }
+
+            _ = Host.TrackInvocationAsync(Id, result.Value);
+            return result;
+        }
     }
 
     private sealed class _ParameterDescriptor : IParameterDescriptor

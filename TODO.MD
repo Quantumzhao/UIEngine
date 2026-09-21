@@ -18,7 +18,7 @@ See [REBOOT_PLAN.md](REBOOT_PLAN.md) for rationale, dependencies, risks, and exi
 - [x] Enable nullable analysis and analyzers.
 - [x] Add CI and clean-checkout verification.
 
-## Framework MVP — Core and CLI
+## Framework MVP — Core and CLI (implementation complete; CI confirmation pending)
 
 Detailed milestones:
 
@@ -33,7 +33,7 @@ Detailed milestones:
 - [x] Prove the vertical slice with shared-reference and cyclic fixtures.
 - [x] Confirm Milestone 01 acceptance in GitHub Actions after publishing the local commits.
 - [x] Reconcile the post-acceptance repository baseline and restore acceptance-equivalent CLI behavior coverage.
-- [ ] Complete programmatic exposure roles and metadata validation.
+- [x] Complete programmatic exposure roles and metadata validation.
 - [x] Add stable domain identity providers, lazy identity indexing, and root replacement.
 - [x] Add logical paths, binding states, and binding recovery.
 - [x] Distinguish successful null and empty values from missing and unavailable targets.
@@ -43,9 +43,10 @@ Detailed milestones:
 - [x] Add normalized state and collection observation.
 - [x] Add collection snapshots, paging, and virtualization contracts.
 - [x] Add async actions, progress, and cancellation.
-- [ ] Add structured diagnostics for discovery, binding, mutation, invocation, collection access, dispatch, and capability mismatches.
+- [x] Add structured diagnostics for discovery, binding, mutation, invocation, collection access, dispatch, and capability mismatches.
 - [x] Extend the CLI with replacement-safe navigation, observation, bounded collection listing, async progress, and cancellation.
 - [x] Pass the framework MVP acceptance tests through the CLI.
+- [ ] Confirm Milestone 02 acceptance in GitHub Actions after publishing the local commits.
 
 ## Product MVP — TUI
 

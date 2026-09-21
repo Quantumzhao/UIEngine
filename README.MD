@@ -2,7 +2,7 @@
 
 UIEngine is a .NET framework under active development for exposing live domain objects as a navigable, mutable, and invocable object space with pluggable frontends.
 
-> **Reboot status:** the first runtime-and-CLI milestone is implemented beside the legacy UIEngine v0.2.3 prototype. Clean-checkout and GitHub Actions acceptance have passed.
+> **Reboot status:** the Framework MVP runtime and proving CLI are implementation-complete beside the legacy UIEngine v0.2.3 prototype. Local and artifact-free CI build/test/package-equivalent acceptance pass; GitHub Actions confirmation for Milestone 02 awaits publication.
 
 ## Build, Test, and Run the CLI
 
@@ -15,7 +15,7 @@ dotnet test UIEngine.sln
 dotnet run --project Frontend/Cli/Cli.csproj
 ```
 
-The CLI is an architectural proving frontend rather than the product TUI. Use `ls` to list roots or members, `cd` to navigate, and `exit` to quit.
+The CLI is an architectural proving frontend rather than the product TUI. It covers descriptor-aware navigation and inspection, live reads and validated writes, bounded collection listing, observation, and normalized synchronous/asynchronous calls with progress and cancellation.
 
 ## Repository Guide
 

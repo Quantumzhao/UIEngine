@@ -36,9 +36,9 @@ Consistency rules:
 - **Reboot:** Milestone 01 is implemented beside legacy UIEngine v0.2.3.
 - **Accepted:** clean restore, build, 29 tests, secret scan, and no-package check pass locally and in GitHub Actions.
 - **Phase 2 baseline:** the later removal of `Dataset` and `CLITestProject` is accepted as intentional cleanup; their useful cyclic-fixture role is covered by `Examples/CyclicDomain`, and the current build passes with 29 tests after restoring CLI behavior coverage.
-- **Runtime:** immutable host service configuration, host-scoped programmatic value and summary registration, deterministic programmatic/custom/reflection provider tiers, reentrancy-aware host dispatch with explicit provider opt-out, explicit disposal, structured diagnostic IDs and logging, host-scoped descriptors, opt-in reflection discovery, reference-based runtime identity, normalized interface/attribute/callback domain identity, lazy encountered-object identity indexing, replaceable roots, canonical logical paths with index/key/domain-identity selectors, replacement-safe data-only bindings, cycle-safe graph traversal, availability-bearing nullable reads, normalized nullability/default/selection/range metadata, dispatched synchronous and asynchronous programmatic validation, dispatched live scalar/reference/collection access, normalized synchronous/asynchronous action lifecycles with bounded progress and injected cancellation, contextual rejection issues, bounded normalized property/collection/custom/polling observation, capability-advertised bounded collection snapshots/pages/virtualized ranges with scalar/null/reference/key entry semantics, structured failures, and a deterministic cyclic sample.
+- **Runtime:** immutable host service configuration, complete host-scoped programmatic role registration and custom descriptor factories, deterministic programmatic/custom/reflection provider tiers, reentrancy-aware host dispatch with explicit provider opt-out, explicit disposal, structured redacted diagnostics across Phase 2 operations, host-scoped descriptors, opt-in reflection discovery, reference-based runtime identity, normalized interface/attribute/callback domain identity, lazy encountered-object identity indexing, replaceable roots, canonical logical paths with index/key/domain-identity selectors, replacement-safe data-only bindings, cycle-safe graph traversal, availability-bearing nullable reads, normalized nullability/default/selection/range metadata, dispatched synchronous and asynchronous programmatic validation, dispatched live scalar/reference/collection access, normalized synchronous/asynchronous action lifecycles with bounded progress and injected cancellation, contextual rejection issues, bounded normalized property/collection/custom/polling observation, capability-advertised bounded collection snapshots/pages/virtualized ranges with scalar/null/reference/key entry semantics, structured failures, and a deterministic cyclic sample.
 - **CLI:** Core binding- and path-resolved replacement-safe navigation, bounded collection listing, normalized observation and invocation progress/cancellation, descriptor-based operations and completion, PrettyPrompt editing, and process-local history.
-- **Tests:** framework, CLI, dependency, and legacy-characterization projects exist; the current suite passes 130 tests.
+- **Tests:** framework, CLI, dependency, and legacy-characterization projects exist; the current suite passes 134 tests. Local Debug and artifact-free CI build/test/package-equivalent Release acceptance pass with zero build warnings or errors; the GitHub Actions confirmation, including its secret scan, awaits publication.
 - **Legacy:** the remaining tree-based `Dashboard`/`Node` code is characterized reference material, not the new API foundation.
 - **Missing:** product TUI, layouts, batch engine, and supported package.
 - **Packaging:** disabled until the Product MVP release gate defines APIs, tests, licensing, versioning, compatibility, and support.
@@ -137,9 +137,8 @@ Not in either MVP: persistent layouts, batch operations, arbitrary scripting, au
 
 ## Near-Term Priorities
 
-1. Complete the remaining programmatic exposure roles and metadata validation.
-2. Complete the remaining structured diagnostic coverage.
-3. Run Milestone 02 acceptance after the remaining Framework MVP hardening.
+1. Publish the completed Framework MVP changes and confirm Milestone 02 in GitHub Actions.
+2. Select the Product MVP TUI milestone only after that final CI gate passes.
 
 ## Deferred Decisions
 

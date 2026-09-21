@@ -117,6 +117,7 @@ public sealed class ProgrammaticExposureTests
     [Fact]
     public void MultipleReflectionFallbacksAreRejectedWhenHostIsBuilt()
     {
+        var loggerFactory = new RecordingLoggerFactory();
         var options = new UIEngineHostOptions
         {
             DescriptorProviders =
@@ -124,14 +125,120 @@ public sealed class ProgrammaticExposureTests
                 new ReflectionObjectDescriptorProvider(),
                 new ReflectionObjectDescriptorProvider(),
             ],
+            LoggerFactory = loggerFactory,
         };
 
         Assert.Throws<ArgumentException>(() => new UIEngineHost(options));
+        var diagnostic = Assert.Single(
+            loggerFactory.Entries,
+            entry => entry.EventId == UIEngineDiagnosticEventIds.CONFIGURATION_INVALID);
+        Assert.Equal("HostOptions", diagnostic.Properties["ConfigurationArea"]);
+        Assert.Null(diagnostic.Exception);
+    }
+
+    [Fact]
+    public async Task ProgrammaticReferencesCollectionsKeysAndActionsUseSemanticContracts()
+    {
+        var registry = new ExposureRegistry();
+        registry.For<_ProgrammaticModel>()
+            .Reference("current", static model => model.Current)
+            .Collection("items", static model => model.Items, static child => child.Key)
+            .Action(
+                "increase",
+                [new ProgrammaticParameter(
+                    "amount",
+                    typeof(int),
+                    options: [new SelectionOption(1, "One"), new SelectionOption(2, "Two")],
+                    range: new ValueRange(1, 2),
+                    unit: "items",
+                    tags: ["mutation"])],
+                static (model, arguments) => model.Count += (int)arguments["amount"]!);
+        using var host = new UIEngineHost(new UIEngineHostOptions { Exposure = registry });
+        var child = new _Child("child-1");
+        var model = new _ProgrammaticModel { Current = child };
+        model.Items.Add(child);
+        var descriptor = (await host.DescribeAsync(host.RegisterRoot("model", model).Value)).Value;
+
+        var reference = Assert.Single(descriptor.References);
+        var collection = Assert.Single(descriptor.Collections);
+        var action = Assert.Single(descriptor.Actions);
+        var referenceResult = await reference.ReadAsync();
+        var range = await collection.ReadAsync(CollectionReadRequest.Range(0, 10));
+        var keyed = await ((ICollectionPathSelector)collection).SelectByKeyAsync("child-1");
+        var invocation = await action.InvokeAsync(new Dictionary<string, object?> { ["amount"] = "2" });
+        var completion = await invocation.Value.Completion;
+
+        Assert.NotNull(referenceResult.Value);
+        Assert.Equal(CollectionCapabilities.KEYED, collection.Capabilities & CollectionCapabilities.KEYED);
+        Assert.Equal("child-1", Assert.Single(range.Value.Entries).Key?.Value);
+        Assert.Single(keyed.Value);
+        var parameter = Assert.Single(action.Parameters);
+        Assert.Equal("items", parameter.Unit);
+        Assert.Equal(["mutation"], parameter.Tags);
+        Assert.Equal(2, completion.Value);
+        Assert.Equal(2, model.Count);
+    }
+
+    [Fact]
+    public async Task ProgrammaticDescriptorFactoryCanSupplySpecializedRoles()
+    {
+        var registry = new ExposureRegistry();
+        registry.For<_ThirdPartyModel>().DescriptorFactory(
+            static (_, _, handle, _) => ValueTask.FromResult(
+                InteractionResult.Success<IObjectDescriptor>(new _FactoryDescriptor(handle.Identity))));
+        using var host = new UIEngineHost(new UIEngineHostOptions { Exposure = registry });
+
+        var descriptor = (await host.DescribeAsync(
+            host.RegisterRoot("model", new _ThirdPartyModel()).Value)).Value;
+
+        Assert.Equal("factory", descriptor.DisplayName);
+    }
+
+    [Fact]
+    public void ProgrammaticDefinitionsValidateIdentifiersAndActionParametersAtHostConstruction()
+    {
+        var duplicateRegistry = new ExposureRegistry();
+        duplicateRegistry.For<_ProgrammaticModel>()
+            .Value("duplicate", static model => model.Count)
+            .Reference("duplicate", static model => model.Current);
+        var invalidActionRegistry = new ExposureRegistry();
+        invalidActionRegistry.For<_ProgrammaticModel>().Action(
+            "invalid",
+            [new ProgrammaticParameter("open", typeof(List<>))],
+            static (_, _) => 0);
+
+        Assert.Throws<ArgumentException>(() =>
+            new UIEngineHost(new UIEngineHostOptions { Exposure = duplicateRegistry }));
+        Assert.Throws<ArgumentException>(() =>
+            new UIEngineHost(new UIEngineHostOptions { Exposure = invalidActionRegistry }));
     }
 
     private sealed class _ThirdPartyModel
     {
         public int Count { get; set; }
+    }
+
+    private sealed class _ProgrammaticModel
+    {
+        public int Count;
+
+        public _Child? Current { get; set; }
+
+        public List<_Child> Items { get; } = [];
+    }
+
+    private sealed record _Child(string Key);
+
+    private sealed class _FactoryDescriptor(ObjectIdentity identity) : IObjectDescriptor
+    {
+        public ObjectIdentity Identity { get; } = identity;
+        public string TypeName => nameof(_ThirdPartyModel);
+        public string DisplayName => "factory";
+        public string? Summary => null;
+        public IReadOnlyList<IValueDescriptor> Values => [];
+        public IReadOnlyList<IReferenceDescriptor> References => [];
+        public IReadOnlyList<ICollectionDescriptor> Collections => [];
+        public IReadOnlyList<IActionDescriptor> Actions => [];
     }
 
     private sealed class _CustomModel;

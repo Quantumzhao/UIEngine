@@ -29,6 +29,11 @@ public sealed class UIEngineHost : IDisposable, IAsyncDisposable
             LogLevel.Warning,
             UIEngineDiagnosticEventIds.DISCOVERY_FAILED,
             "Descriptor discovery failed for runtime object {RuntimeId} with code {ErrorCode}.");
+    private static readonly Action<ILogger, string, Exception?> _CONFIGURATION_INVALID =
+        LoggerMessage.Define<string>(
+            LogLevel.Error,
+            UIEngineDiagnosticEventIds.CONFIGURATION_INVALID,
+            "UIEngine host configuration is invalid in area {ConfigurationArea}.");
     private static readonly Action<ILogger, InteractionDispatchOperation, Exception?> _DISPATCH_FAILED =
         LoggerMessage.Define<InteractionDispatchOperation>(
             LogLevel.Warning,
@@ -39,6 +44,56 @@ public sealed class UIEngineHost : IDisposable, IAsyncDisposable
             LogLevel.Warning,
             UIEngineDiagnosticEventIds.OBSERVATION_FAILED,
             "Observation failed for runtime object {RuntimeId}, member {MemberId}, with code {ErrorCode}.");
+    private static readonly Action<ILogger, BindingResolutionState, Exception?> _BINDING_RESOLVED =
+        LoggerMessage.Define<BindingResolutionState>(
+            LogLevel.Debug,
+            UIEngineDiagnosticEventIds.BINDING_RESOLVED,
+            "Binding resolution completed with state {BindingState}.");
+    private static readonly Action<ILogger, BindingResolutionState, InteractionErrorCode, Exception?>
+        _BINDING_BROKEN = LoggerMessage.Define<BindingResolutionState, InteractionErrorCode>(
+            LogLevel.Warning,
+            UIEngineDiagnosticEventIds.BINDING_BROKEN,
+            "Binding resolution failed with state {BindingState} and code {ErrorCode}.");
+    private static readonly Action<ILogger, string, InteractionErrorCode, Exception?> _VALIDATION_FAILED =
+        LoggerMessage.Define<string, InteractionErrorCode>(
+            LogLevel.Warning,
+            UIEngineDiagnosticEventIds.VALIDATION_FAILED,
+            "Validation failed for member {MemberId} with code {ErrorCode}.");
+    private static readonly Action<ILogger, string, Exception?> _MUTATION_COMPLETED =
+        LoggerMessage.Define<string>(
+            LogLevel.Debug,
+            UIEngineDiagnosticEventIds.MUTATION_COMPLETED,
+            "Mutation completed for member {MemberId}.");
+    private static readonly Action<ILogger, string, InteractionErrorCode, Exception?> _MUTATION_FAILED =
+        LoggerMessage.Define<string, InteractionErrorCode>(
+            LogLevel.Warning,
+            UIEngineDiagnosticEventIds.MUTATION_FAILED,
+            "Mutation failed for member {MemberId} with code {ErrorCode}.");
+    private static readonly Action<ILogger, string, Exception?> _INVOCATION_STARTED =
+        LoggerMessage.Define<string>(
+            LogLevel.Debug,
+            UIEngineDiagnosticEventIds.INVOCATION_STARTED,
+            "Invocation started for action {ActionId}.");
+    private static readonly Action<ILogger, string, InvocationStatus, Exception?> _INVOCATION_COMPLETED =
+        LoggerMessage.Define<string, InvocationStatus>(
+            LogLevel.Debug,
+            UIEngineDiagnosticEventIds.INVOCATION_COMPLETED,
+            "Invocation completed for action {ActionId} with status {InvocationStatus}.");
+    private static readonly Action<ILogger, string, InteractionErrorCode, Exception?> _INVOCATION_FAILED =
+        LoggerMessage.Define<string, InteractionErrorCode>(
+            LogLevel.Warning,
+            UIEngineDiagnosticEventIds.INVOCATION_FAILED,
+            "Invocation failed for action {ActionId} with code {ErrorCode}.");
+    private static readonly Action<ILogger, string, InteractionErrorCode, Exception?> _COLLECTION_ACCESS_FAILED =
+        LoggerMessage.Define<string, InteractionErrorCode>(
+            LogLevel.Warning,
+            UIEngineDiagnosticEventIds.COLLECTION_ACCESS_FAILED,
+            "Collection access failed for member {MemberId} with code {ErrorCode}.");
+    private static readonly Action<ILogger, string, string, Exception?> _CAPABILITY_MISMATCH =
+        LoggerMessage.Define<string, string>(
+            LogLevel.Warning,
+            UIEngineDiagnosticEventIds.CAPABILITY_MISMATCH,
+            "Member {MemberId} does not provide required capability {Capability}.");
 
     private readonly object _Gate = new();
     private readonly ConditionalWeakTable<object, _IdentityHolder> _Identities = new();
@@ -65,7 +120,7 @@ public sealed class UIEngineHost : IDisposable, IAsyncDisposable
 
     public UIEngineHost(UIEngineHostOptions options)
     {
-        Configuration = new UIEngineHostConfiguration(options);
+        Configuration = _CreateConfiguration(options);
         _ProgrammaticExposureProvider = new ProgrammaticExposureDescriptorProvider(
             Configuration.Exposure,
             Configuration.ReflectionProvider);
@@ -73,6 +128,25 @@ public sealed class UIEngineHost : IDisposable, IAsyncDisposable
         Bindings = new BindingResolver(this, Paths);
         _Logger = Configuration.LoggerFactory.CreateLogger<UIEngineHost>();
         _HOST_CREATED(_Logger, Configuration.DescriptorProviders.Count, null);
+    }
+
+    private static UIEngineHostConfiguration _CreateConfiguration(UIEngineHostOptions options)
+    {
+        try
+        {
+            return new UIEngineHostConfiguration(options);
+        }
+        catch (Exception exception)
+        {
+            var loggerFactory = options?.LoggerFactory ??
+                Microsoft.Extensions.Logging.Abstractions.NullLoggerFactory.Instance;
+            var logger = loggerFactory.CreateLogger<UIEngineHost>();
+            _CONFIGURATION_INVALID(
+                logger,
+                "HostOptions",
+                options?.IncludeSensitiveDiagnosticData == true ? exception : null);
+            throw;
+        }
     }
 
     public UIEngineHostConfiguration Configuration { get; }
@@ -722,6 +796,70 @@ public sealed class UIEngineHost : IDisposable, IAsyncDisposable
         }
 
         return InteractionResult.Success(invocation);
+    }
+
+    internal void RecordBindingDiagnostic(BindingResolution resolution)
+    {
+        if (resolution.IsResolved)
+        {
+            _BINDING_RESOLVED(_Logger, resolution.State, null);
+            return;
+        }
+
+        _BINDING_BROKEN(
+            _Logger,
+            resolution.State,
+            resolution.Error?.Code ?? InteractionErrorCode.TARGET_MISSING,
+            null);
+    }
+
+    internal void RecordMutationDiagnostic(string memberId, InteractionError? error)
+    {
+        if (error is null)
+        {
+            _MUTATION_COMPLETED(_Logger, memberId, null);
+            return;
+        }
+
+        if (error.Code == InteractionErrorCode.VALIDATION_FAILED)
+        {
+            _VALIDATION_FAILED(_Logger, memberId, error.Code, null);
+        }
+
+        _MUTATION_FAILED(_Logger, memberId, error.Code, null);
+    }
+
+    internal void RecordCollectionDiagnostic(string memberId, InteractionError error) =>
+        _COLLECTION_ACCESS_FAILED(_Logger, memberId, error.Code, null);
+
+    internal void RecordCapabilityMismatch(string memberId, string capability) =>
+        _CAPABILITY_MISMATCH(_Logger, memberId, capability, null);
+
+    internal void RecordInvocationFailure(string actionId, InteractionError error)
+    {
+        if (error.Code == InteractionErrorCode.VALIDATION_FAILED)
+        {
+            _VALIDATION_FAILED(_Logger, actionId, error.Code, null);
+        }
+
+        _INVOCATION_FAILED(_Logger, actionId, error.Code, null);
+    }
+
+    internal async Task TrackInvocationAsync(string actionId, IActionInvocation invocation)
+    {
+        _INVOCATION_STARTED(_Logger, actionId, null);
+        var completion = await invocation.Completion.ConfigureAwait(false);
+        if (completion.IsSuccess)
+        {
+            _INVOCATION_COMPLETED(_Logger, actionId, invocation.Status, null);
+            return;
+        }
+
+        _INVOCATION_FAILED(
+            _Logger,
+            actionId,
+            completion.Error!.Code,
+            Configuration.IncludeSensitiveDiagnosticData ? invocation.Fault?.Exception : null);
     }
 
     private void _UntrackInvocation(ActionInvocation invocation)

@@ -16,6 +16,15 @@ public sealed class BindingResolver
         BindingReference binding,
         CancellationToken cancellationToken = default)
     {
+        var resolution = await _ResolveCoreAsync(binding, cancellationToken).ConfigureAwait(false);
+        _Host.RecordBindingDiagnostic(resolution);
+        return resolution;
+    }
+
+    private async ValueTask<BindingResolution> _ResolveCoreAsync(
+        BindingReference binding,
+        CancellationToken cancellationToken)
+    {
         ArgumentNullException.ThrowIfNull(binding);
 
         var validation = _Validate(binding);

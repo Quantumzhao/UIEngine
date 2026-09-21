@@ -1,6 +1,6 @@
 # UIEngine Architecture, Reboot Audit, and Plan
 
-**Status:** consolidated target specification and implementation plan; architecture runway and CLI walking skeleton complete; Framework MVP hardening next
+**Status:** consolidated target specification and implementation plan; Framework MVP implementation and local acceptance complete; Milestone 02 GitHub Actions confirmation pending publication
 
 **Legacy baseline:** UIEngine v0.2.3
 
@@ -25,9 +25,9 @@ This document is the consolidated target architecture and implementation plan. I
 | Area | Purpose | Current condition |
 |---|---|---|
 | `UIEngine/` | Legacy reflection and node library | Builds on .NET 10; retained as a characterized baseline |
-| `Core/` | Reboot runtime contracts, attributes, host, and reflection provider | Milestone 01 implementation complete |
-| `Frontend/Cli/` | Descriptor-driven proving frontend | Milestone 01 implementation complete |
-| `Examples/CyclicDomain/` | Deterministic reboot fixture | Covers cyclic and shared-reference traversal |
+| `Core/` | Reboot runtime contracts, attributes, host, and reflection provider | Framework MVP implementation complete |
+| `Frontend/Cli/` | Descriptor-driven proving frontend | Framework MVP implementation complete |
+| `Examples/CyclicDomain/` | Deterministic reboot fixture | Covers the complete Framework MVP workflow |
 | `Tests/` | Framework, CLI, dependency, and legacy-characterization tests | 29 tests pass in the Phase 2 starting baseline |
 | `REBOOT_PLAN.md` | Target architecture, legacy audit, migration plan, risks, and acceptance criteria | Consolidated authoritative design and execution plan |
 | `README.MD` | Repository entry point | Describes current status without presenting planned APIs as shipped |

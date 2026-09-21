@@ -1,8 +1,8 @@
 # Milestone 02 — Framework MVP Interaction Hardening
 
-**Status:** In progress — step 11 complete; step 3 exposure roles and milestone acceptance remain open
+**Status:** Active — implementation and local acceptance complete; GitHub Actions confirmation pending publication
 
-**Acceptance:** Not run
+**Acceptance:** Local and artifact-free CI build/test/package-equivalent checks passed on 2026-09-21: Debug and Release builds completed with zero warnings/errors, all 134 tests passed, packaging remained disabled, and the clean output contained no package. The configured GitHub Actions run, including its secret scan, remains pending until these changes are published.
 
 **Prerequisite:** [Milestone 01 — Architecture Runway and CLI Walking Skeleton](01-architecture-runway-cli-walking-skeleton.md) is complete, and its post-acceptance repository baseline has been reconciled as described below.  
 **Governing documents:** [Project context](../../PROJECT_CONTEXT.md) and [architecture and reboot plan](../../REBOOT_PLAN.md)
@@ -265,9 +265,9 @@ Stop here if the intended repository state cannot be resolved.
 ### 3. Add programmatic exposure and complete metadata
 
 1. [x] Implement the host-scoped registration model and deterministic composition with reflection.
-2. Add value, selection, reference, collection, action, summary, validation, key, and identity registrations needed by the acceptance fixtures.
-3. Separate immutable type metadata from host-, context-, instance-, and live-state evaluation.
-4. Validate definitions and provider selection before executing live operations.
+2. [x] Add value, selection, reference, collection, action, summary, validation, key, and identity registrations needed by the acceptance fixtures.
+3. [x] Separate immutable type metadata from host-, context-, instance-, and live-state evaluation.
+4. [x] Validate definitions and provider selection before executing live operations.
 
 ### 4. Normalize domain identity and replacement
 
@@ -327,9 +327,9 @@ Stop here if the intended repository state cannot be resolved.
 
 ### 12. Run milestone acceptance
 
-1. Run all exposure, identity, path, binding, availability, validation, dispatcher, observation, collection, invocation, diagnostic, CLI, dependency, repository, and legacy-characterization tests.
-2. Run `dotnet build UIEngine.sln`, requiring zero warnings and errors, then verify the same checks from a clean checkout in CI.
-3. Confirm that packaging remains disabled, no package is produced, and no deferred subsystem entered the implementation.
-4. Confirm every exit criterion above, update current-state documentation, and check only genuinely completed items in [TODO.MD](../../TODO.MD).
+1. [x] Run all exposure, identity, path, binding, availability, validation, dispatcher, observation, collection, invocation, diagnostic, CLI, dependency, repository, and legacy-characterization tests.
+2. [ ] Run `dotnet build UIEngine.sln`, requiring zero warnings and errors, then verify the same checks from a clean checkout in CI. The local build and artifact-free CI build/test/package-equivalent Release checks pass; the GitHub Actions run awaits publication.
+3. [x] Confirm that packaging remains disabled, no package is produced, and no deferred subsystem entered the implementation.
+4. [ ] Confirm every exit criterion above, update current-state documentation, and check only genuinely completed items in [TODO.MD](../../TODO.MD). Documentation and the checklist are current; remote CI is the only remaining exit criterion.
 
 Milestone 03 may select and build the Product MVP TUI only after this milestone satisfies every exit criterion.
