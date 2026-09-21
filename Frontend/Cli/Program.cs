@@ -9,9 +9,13 @@ internal static class Program
 {
     private static async Task Main()
     {
-        var host = new UIEngineHost([new ReflectionObjectDescriptorProvider()]);
+        var host = new UIEngineHost(new UIEngineHostOptions
+        {
+            Exposure = CyclicWorldFactory.CreateExposureRegistry(),
+            DescriptorProviders = [new ReflectionObjectDescriptorProvider()],
+        });
         host.RegisterRoot("world", CyclicWorldFactory.Create());
-        var session = new CliSession(host, Console.Out);
+        await using var session = new CliSession(host, Console.Out);
 
         if (Console.IsInputRedirected || Console.IsOutputRedirected)
         {

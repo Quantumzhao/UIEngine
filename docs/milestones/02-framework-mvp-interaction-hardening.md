@@ -1,6 +1,6 @@
 # Milestone 02 — Framework MVP Interaction Hardening
 
-**Status:** In progress — step 8 complete; remaining step 3 exposure roles are still open
+**Status:** In progress — step 11 complete; step 3 exposure roles and milestone acceptance remain open
 
 **Acceptance:** Not run
 
@@ -320,10 +320,10 @@ Stop here if the intended repository state cannot be resolved.
 
 ### 11. Extend the acceptance fixture and CLI
 
-1. Add readable deterministic examples for programmatic exposure, domain identity, replacement, notification, scalable collection, validation, and async action behavior.
-2. Replace CLI-private path and snapshot logic with Core path, binding, collection, observation, and invocation services.
-3. Extend `ls`, `cd`, `inspect`, `get`, `set`, and `call`; add `watch`; and update descriptor-aware completion without eager enumeration.
-4. Add redirected-input/session integration tests for the complete Framework MVP workflow, including failure and cancellation paths.
+1. [x] Add readable deterministic examples for programmatic exposure, domain identity, replacement, notification, scalable collection, validation, and async action behavior.
+2. [x] Replace CLI-private path and snapshot logic with Core path, binding, collection, observation, and invocation services.
+3. [x] Extend `ls`, `cd`, `inspect`, `get`, `set`, and `call`; add `watch`; and update descriptor-aware completion without eager enumeration.
+4. [x] Add redirected-input/session integration tests for the complete Framework MVP workflow, including failure and cancellation paths.
 
 ### 12. Run milestone acceptance
 

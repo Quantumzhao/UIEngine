@@ -1,5 +1,7 @@
 using System.Globalization;
+using System.Text;
 using UIEngine.Core;
+using UIEngine.Core.Attributes;
 using UIEngine.Core.Reflection;
 using UIEngine.Examples.CyclicDomain;
 using Xunit;
@@ -52,10 +54,10 @@ public sealed class CliSessionTests
     }
 
     [Fact]
-    public async Task NavigationUsesCanonicalCorePathsAndRecoversRootReplacement()
+    public async Task NavigationRecoversCompatibleReplacementAndRefusesDifferentIdentity()
     {
         var output = new StringWriter(CultureInfo.InvariantCulture);
-        using var host = new UIEngineHost([new ReflectionObjectDescriptorProvider()]);
+        using var host = _CreateHost();
         host.RegisterRoot("world", CyclicWorldFactory.Create());
         var session = new CliSession(host, output);
 
@@ -63,10 +65,17 @@ public sealed class CliSessionTests
         Assert.Equal("/world/Nations[index=0]", session.CurrentPath);
 
         await session.ExecuteAsync("cd /world");
+        var originalHandle = session.CurrentHandle;
+        host.ReplaceRoot("world", new World("Earth"));
+        await session.ExecuteAsync("get Name");
+        var replacementHandle = session.CurrentHandle;
+
         host.ReplaceRoot("world", new World("Mars"));
         await session.ExecuteAsync("get Name");
 
-        Assert.Contains("Name = Mars", output.ToString(), StringComparison.Ordinal);
+        Assert.NotEqual(originalHandle, replacementHandle);
+        Assert.Contains("Name = Earth", output.ToString(), StringComparison.Ordinal);
+        Assert.Contains("error TARGET_MISSING", output.ToString(), StringComparison.Ordinal);
     }
 
     [Fact]
@@ -153,12 +162,253 @@ public sealed class CliSessionTests
 
         var parameterCompletions = await session.GetCompletionsAsync("call AdvanceTurn ", 17);
         Assert.Contains("populationDelta=", parameterCompletions);
+
+        var collectionCompletions = await session.GetCompletionsAsync("ls C", 4);
+        Assert.Contains("Cities", collectionCompletions);
+
+        var watchCompletions = await session.GetCompletionsAsync("watch P", 7);
+        Assert.Contains("Population", watchCompletions);
     }
 
-    private static CliSession _CreateSession(TextWriter output)
+    [Fact]
+    public async Task RedirectedWorkflowCoversBoundedCollectionsValidationAndAsyncProgress()
     {
-        var host = new UIEngineHost([new ReflectionObjectDescriptorProvider()]);
+        var input = new StringReader(
+            "ls\n" +
+            "cd /world\n" +
+            "inspect\n" +
+            "ls PopulationForecast offset=9998 limit=2\n" +
+            "ls PopulationForecast limit=101\n" +
+            "cd /world/Nations/0\n" +
+            "set Population -1\n" +
+            "set Population 120\n" +
+            "call SimulateGrowthAsync years=3 populationPerYear=2\n" +
+            "cd /world/Economy\n" +
+            "get GrossDomesticProduct\n" +
+            "set GrossDomesticProduct 1250\n" +
+            "exit\n");
+        var output = new StringWriter(CultureInfo.InvariantCulture);
+        var host = _CreateHost();
         host.RegisterRoot("world", CyclicWorldFactory.Create());
+        var session = new CliSession(host, output);
+
+        await new CliTextReaderRunner(session, input).RunAsync();
+
+        var transcript = output.ToString();
+        Assert.Contains("domain-identity: world/Earth", transcript, StringComparison.Ordinal);
+        Assert.Contains(
+            "collection PopulationForecast mode=VIRTUALIZED_RANGE offset=9998 count=2 total=10000",
+            transcript,
+            StringComparison.Ordinal);
+        Assert.Contains("[9998] value=10098", transcript, StringComparison.Ordinal);
+        Assert.Contains("[9999] value=10099", transcript, StringComparison.Ordinal);
+        Assert.Contains("error COLLECTION_LIMIT_EXCEEDED", transcript, StringComparison.Ordinal);
+        Assert.Contains("error VALIDATION_FAILED", transcript, StringComparison.Ordinal);
+        Assert.Equal(3, _CountLinesStartingWith(transcript, "progress SimulateGrowthAsync"));
+        Assert.Contains("SimulateGrowthAsync => 126", transcript, StringComparison.Ordinal);
+        Assert.Contains("GrossDomesticProduct = 1000", transcript, StringComparison.Ordinal);
+        Assert.Contains("GrossDomesticProduct = 1250", transcript, StringComparison.Ordinal);
+        Assert.EndsWith($"bye{Environment.NewLine}", transcript, StringComparison.Ordinal);
+        Assert.True(host.IsDisposed);
+    }
+
+    [Theory]
+    [InlineData(nameof(Nation.Population), ChangeKind.MEMBER_CHANGED)]
+    [InlineData(nameof(Nation.Cities), ChangeKind.COLLECTION_ITEMS_ADDED)]
+    public async Task RedirectedWatchStreamsChangesUntilCancellation(
+        string memberId,
+        ChangeKind expectedKind)
+    {
+        var world = CyclicWorldFactory.Create();
+        var nation = Assert.Single(world.Nations);
+        var output = new _SignalingWriter();
+        var host = _CreateHost();
+        host.RegisterRoot("world", world);
+        await using var session = new CliSession(host, output);
+        using var cancellation = new CancellationTokenSource();
+        var input = new StringReader($"cd /world/Nations/0\nwatch {memberId}\n");
+
+        var run = new CliTextReaderRunner(session, input).RunAsync(cancellation.Token);
+        await output.Watching.WaitAsync(TimeSpan.FromSeconds(5));
+        if (memberId == nameof(Nation.Population))
+        {
+            nation.Population = 101;
+        }
+        else
+        {
+            nation.Cities.Add(new City("city/second", "Second City", nation));
+        }
+
+        await output.Change.WaitAsync(TimeSpan.FromSeconds(5));
+        cancellation.Cancel();
+        await run;
+
+        Assert.Contains($"kind={expectedKind}", output.ToString(), StringComparison.Ordinal);
+        Assert.Contains("watch cancelled", output.ToString(), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task RedirectedCallForwardsCancellationToSupportedInvocation()
+    {
+        var output = new _SignalingWriter();
+        var host = new UIEngineHost([new ReflectionObjectDescriptorProvider()]);
+        host.RegisterRoot("model", new _CancellableModel());
+        await using var session = new CliSession(host, output);
+        using var cancellation = new CancellationTokenSource();
+        var input = new StringReader("cd /model\ncall WaitForCancellationAsync\n");
+
+        var run = new CliTextReaderRunner(session, input).RunAsync(cancellation.Token);
+        await output.Progress.WaitAsync(TimeSpan.FromSeconds(5));
+        cancellation.Cancel();
+        await run;
+
+        Assert.Contains("progress WaitForCancellationAsync", output.ToString(), StringComparison.Ordinal);
+        Assert.Contains("error CANCELLED", output.ToString(), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task MemberBindingRecoversCapitalReplacementWithTheSameIdentity()
+    {
+        var world = CyclicWorldFactory.Create();
+        var nation = Assert.Single(world.Nations);
+        var output = new StringWriter(CultureInfo.InvariantCulture);
+        await using var session = _CreateSession(output, world);
+
+        await session.ExecuteAsync("cd /world/Nations/0/Capital");
+        var originalHandle = session.CurrentHandle;
+        nation.ReplaceCapital("Replacement Capital");
+        await session.ExecuteAsync("get Name");
+
+        Assert.NotEqual(originalHandle, session.CurrentHandle);
+        Assert.Contains("Name = Replacement Capital", output.ToString(), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task SuccessfulNullAndUnavailableLocationHaveDistinctOutput()
+    {
+        var output = new StringWriter(CultureInfo.InvariantCulture);
+        var host = _CreateHost();
+        host.RegisterRoot("world", CyclicWorldFactory.Create());
+        await using var session = new CliSession(host, output);
+
+        await session.ExecuteAsync("cd /world/Nations/0");
+        await session.ExecuteAsync("get OptionalNote");
+        host.UnregisterRoot("world");
+        await session.ExecuteAsync("get OptionalNote");
+
+        var transcript = output.ToString();
+        Assert.Contains("OptionalNote = null", transcript, StringComparison.Ordinal);
+        Assert.Contains("error TARGET_MISSING", transcript, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task CollectionListingPreservesPositionsKeysAndNullEntries()
+    {
+        var output = new StringWriter(CultureInfo.InvariantCulture);
+        var host = new UIEngineHost([new ReflectionObjectDescriptorProvider()]);
+        host.RegisterRoot("model", new _CollectionOutputModel());
+        await using var session = new CliSession(host, output);
+
+        await session.ExecuteAsync("cd /model");
+        await session.ExecuteAsync("ls Items limit=3");
+
+        var transcript = output.ToString();
+        Assert.Contains("collection Items mode=SNAPSHOT", transcript, StringComparison.Ordinal);
+        Assert.Contains("[0] key=empty null", transcript, StringComparison.Ordinal);
+        Assert.Contains("[1] key=number value=7", transcript, StringComparison.Ordinal);
+        Assert.Contains("[2] key=text value=hello", transcript, StringComparison.Ordinal);
+    }
+
+    private static CliSession _CreateSession(TextWriter output, World? world = null)
+    {
+        var host = _CreateHost();
+        host.RegisterRoot("world", world ?? CyclicWorldFactory.Create());
         return new CliSession(host, output);
+    }
+
+    private static UIEngineHost _CreateHost() => new(new UIEngineHostOptions
+    {
+        Exposure = CyclicWorldFactory.CreateExposureRegistry(),
+        DescriptorProviders = [new ReflectionObjectDescriptorProvider()],
+    });
+
+    private static int _CountLinesStartingWith(string text, string prefix) => text
+        .Split(Environment.NewLine, StringSplitOptions.RemoveEmptyEntries)
+        .Count(line => line.StartsWith(prefix, StringComparison.Ordinal));
+
+    private sealed class _CancellableModel
+    {
+        private int _InvocationCount;
+
+        [Action]
+        public async Task WaitForCancellationAsync(
+            IProgress<int> progress,
+            CancellationToken cancellationToken)
+        {
+            progress.Report(++_InvocationCount);
+            await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
+        }
+    }
+
+    private sealed class _CollectionOutputModel
+    {
+        [Children]
+        public Dictionary<string, object?> Items { get; } = new()
+        {
+            ["empty"] = null,
+            ["number"] = 7,
+            ["text"] = "hello",
+        };
+    }
+
+    private sealed class _SignalingWriter : TextWriter
+    {
+        private readonly object _Gate = new();
+        private readonly StringWriter _Writer = new(CultureInfo.InvariantCulture);
+        private readonly TaskCompletionSource _Watching =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
+        private readonly TaskCompletionSource _Change =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
+        private readonly TaskCompletionSource _Progress =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public override Encoding Encoding => Encoding.UTF8;
+
+        public Task Watching => _Watching.Task;
+
+        public Task Change => _Change.Task;
+
+        public Task Progress => _Progress.Task;
+
+        public override void WriteLine(string? value)
+        {
+            lock (_Gate)
+            {
+                _Writer.WriteLine(value);
+            }
+
+            if (value?.StartsWith("watching ", StringComparison.Ordinal) == true)
+            {
+                _Watching.TrySetResult();
+            }
+
+            if (value?.StartsWith("change ", StringComparison.Ordinal) == true)
+            {
+                _Change.TrySetResult();
+            }
+
+            if (value?.StartsWith("progress ", StringComparison.Ordinal) == true)
+            {
+                _Progress.TrySetResult();
+            }
+        }
+
+        public override string ToString()
+        {
+            lock (_Gate)
+            {
+                return _Writer.ToString();
+            }
+        }
     }
 }

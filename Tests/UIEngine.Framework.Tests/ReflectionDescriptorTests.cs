@@ -43,7 +43,7 @@ public sealed class ReflectionDescriptorTests
         Assert.Equal(typeof(City), reference.ReferenceType);
         Assert.Equal(nameof(Nation.Cities), collection.Id);
         Assert.Equal(typeof(City), collection.ElementType);
-        Assert.Equal(nameof(Nation.AdvanceTurn), Assert.Single(first.Actions).Id);
+        Assert.Contains(first.Actions, action => action.Id == nameof(Nation.AdvanceTurn));
         Assert.Equal("N1: 0 resident(s), turn 0", first.Summary);
 
         var firstIdentifiers = _GetIdentifiers(first);
