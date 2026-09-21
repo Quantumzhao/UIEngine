@@ -2,175 +2,47 @@ using System.Reflection;
 using System.Runtime.CompilerServices;
 using Microsoft.Extensions.Logging;
 using UIEngine.Core.Attributes;
-using UIEngine.Core.Exposure;
 
 namespace UIEngine.Core;
 
-public sealed class UIEngineHost : IDisposable, IAsyncDisposable
+/// <summary>Owns roots, runtime identity, dispatch, observation, and action lifetime.</summary>
+public sealed class UIEngineHost : IDisposable
 {
-    private static readonly Action<ILogger, int, Exception?> _HOST_CREATED = LoggerMessage.Define<int>(
-        LogLevel.Debug,
-        UIEngineDiagnosticEventIds.HOST_CREATED,
-        "UIEngine host created with {DescriptorProviderCount} descriptor providers.");
-    private static readonly Action<ILogger, Exception?> _HOST_DISPOSED = LoggerMessage.Define(
-        LogLevel.Debug,
-        UIEngineDiagnosticEventIds.HOST_DISPOSED,
-        "UIEngine host disposed.");
-    private static readonly Action<ILogger, Guid, Exception?> _DISCOVERY_STARTED = LoggerMessage.Define<Guid>(
-        LogLevel.Debug,
-        UIEngineDiagnosticEventIds.DISCOVERY_STARTED,
-        "Descriptor discovery started for runtime object {RuntimeId}.");
-    private static readonly Action<ILogger, Guid, Exception?> _DISCOVERY_COMPLETED = LoggerMessage.Define<Guid>(
-        LogLevel.Debug,
-        UIEngineDiagnosticEventIds.DISCOVERY_COMPLETED,
-        "Descriptor discovery completed for runtime object {RuntimeId}.");
-    private static readonly Action<ILogger, Guid, InteractionErrorCode, Exception?> _DISCOVERY_FAILED =
-        LoggerMessage.Define<Guid, InteractionErrorCode>(
-            LogLevel.Warning,
-            UIEngineDiagnosticEventIds.DISCOVERY_FAILED,
-            "Descriptor discovery failed for runtime object {RuntimeId} with code {ErrorCode}.");
-    private static readonly Action<ILogger, string, Exception?> _CONFIGURATION_INVALID =
-        LoggerMessage.Define<string>(
-            LogLevel.Error,
-            UIEngineDiagnosticEventIds.CONFIGURATION_INVALID,
-            "UIEngine host configuration is invalid in area {ConfigurationArea}.");
-    private static readonly Action<ILogger, InteractionDispatchOperation, Exception?> _DISPATCH_FAILED =
-        LoggerMessage.Define<InteractionDispatchOperation>(
-            LogLevel.Warning,
-            UIEngineDiagnosticEventIds.DISPATCH_FAILED,
-            "Interaction dispatch failed for operation {DispatchOperation}.");
-    private static readonly Action<ILogger, Guid, string?, InteractionErrorCode, Exception?> _OBSERVATION_FAILED =
-        LoggerMessage.Define<Guid, string?, InteractionErrorCode>(
-            LogLevel.Warning,
-            UIEngineDiagnosticEventIds.OBSERVATION_FAILED,
-            "Observation failed for runtime object {RuntimeId}, member {MemberId}, with code {ErrorCode}.");
-    private static readonly Action<ILogger, BindingResolutionState, Exception?> _BINDING_RESOLVED =
-        LoggerMessage.Define<BindingResolutionState>(
-            LogLevel.Debug,
-            UIEngineDiagnosticEventIds.BINDING_RESOLVED,
-            "Binding resolution completed with state {BindingState}.");
-    private static readonly Action<ILogger, BindingResolutionState, InteractionErrorCode, Exception?>
-        _BINDING_BROKEN = LoggerMessage.Define<BindingResolutionState, InteractionErrorCode>(
-            LogLevel.Warning,
-            UIEngineDiagnosticEventIds.BINDING_BROKEN,
-            "Binding resolution failed with state {BindingState} and code {ErrorCode}.");
-    private static readonly Action<ILogger, string, InteractionErrorCode, Exception?> _VALIDATION_FAILED =
-        LoggerMessage.Define<string, InteractionErrorCode>(
-            LogLevel.Warning,
-            UIEngineDiagnosticEventIds.VALIDATION_FAILED,
-            "Validation failed for member {MemberId} with code {ErrorCode}.");
-    private static readonly Action<ILogger, string, Exception?> _MUTATION_COMPLETED =
-        LoggerMessage.Define<string>(
-            LogLevel.Debug,
-            UIEngineDiagnosticEventIds.MUTATION_COMPLETED,
-            "Mutation completed for member {MemberId}.");
-    private static readonly Action<ILogger, string, InteractionErrorCode, Exception?> _MUTATION_FAILED =
-        LoggerMessage.Define<string, InteractionErrorCode>(
-            LogLevel.Warning,
-            UIEngineDiagnosticEventIds.MUTATION_FAILED,
-            "Mutation failed for member {MemberId} with code {ErrorCode}.");
-    private static readonly Action<ILogger, string, Exception?> _INVOCATION_STARTED =
-        LoggerMessage.Define<string>(
-            LogLevel.Debug,
-            UIEngineDiagnosticEventIds.INVOCATION_STARTED,
-            "Invocation started for action {ActionId}.");
-    private static readonly Action<ILogger, string, InvocationStatus, Exception?> _INVOCATION_COMPLETED =
-        LoggerMessage.Define<string, InvocationStatus>(
-            LogLevel.Debug,
-            UIEngineDiagnosticEventIds.INVOCATION_COMPLETED,
-            "Invocation completed for action {ActionId} with status {InvocationStatus}.");
-    private static readonly Action<ILogger, string, InteractionErrorCode, Exception?> _INVOCATION_FAILED =
-        LoggerMessage.Define<string, InteractionErrorCode>(
-            LogLevel.Warning,
-            UIEngineDiagnosticEventIds.INVOCATION_FAILED,
-            "Invocation failed for action {ActionId} with code {ErrorCode}.");
-    private static readonly Action<ILogger, string, InteractionErrorCode, Exception?> _COLLECTION_ACCESS_FAILED =
-        LoggerMessage.Define<string, InteractionErrorCode>(
-            LogLevel.Warning,
-            UIEngineDiagnosticEventIds.COLLECTION_ACCESS_FAILED,
-            "Collection access failed for member {MemberId} with code {ErrorCode}.");
-    private static readonly Action<ILogger, string, string, Exception?> _CAPABILITY_MISMATCH =
-        LoggerMessage.Define<string, string>(
-            LogLevel.Warning,
-            UIEngineDiagnosticEventIds.CAPABILITY_MISMATCH,
-            "Member {MemberId} does not provide required capability {Capability}.");
-
     private readonly object _Gate = new();
-    private readonly ConditionalWeakTable<object, _IdentityHolder> _Identities = new();
-    private readonly Dictionary<ObjectIdentity, WeakReference<object>> _Objects = [];
-    private readonly Dictionary<ObjectIdentity, DomainIdentity?> _DomainIdentities = [];
-    private readonly Dictionary<DomainIdentity, HashSet<ObjectIdentity>> _DomainIdentityIndex = [];
-    private readonly Dictionary<ObjectIdentity, LogicalPath> _CanonicalPaths = [];
+    private readonly ConditionalWeakTable<object, _HandleHolder> _Handles = new();
+    private readonly Dictionary<ObjectHandle, WeakReference<object>> _Objects = [];
     private readonly Dictionary<string, _RootEntry> _Roots = new(StringComparer.Ordinal);
+    private readonly Dictionary<ObjectHandle, DomainIdentity?> _DomainIdentities = [];
+    private readonly Dictionary<DomainIdentity, HashSet<ObjectHandle>> _DomainIdentityIndex = [];
+    private readonly Dictionary<ObjectHandle, LogicalPath> _CanonicalPaths = [];
     private readonly HashSet<ObservationSubscription> _Subscriptions = [];
     private readonly HashSet<ActionInvocation> _Invocations = [];
+    private readonly HostSettings _Settings;
     private readonly ILogger _Logger;
-    private readonly ProgrammaticExposureDescriptorProvider _ProgrammaticExposureProvider;
-    private int _IsDisposed;
+    private int _Disposed;
 
-    public UIEngineHost()
-        : this(new UIEngineHostOptions())
+    public UIEngineHost(UIEngineHostOptions? options = null)
     {
+        _Settings = new HostSettings(options ?? new UIEngineHostOptions());
+        _Logger = _Settings.LoggerFactory.CreateLogger<UIEngineHost>();
     }
 
-    public UIEngineHost(IEnumerable<IObjectDescriptorProvider> providers)
-        : this(new UIEngineHostOptions { DescriptorProviders = providers })
-    {
-    }
+    public bool IsDisposed => Volatile.Read(ref _Disposed) != 0;
 
-    public UIEngineHost(UIEngineHostOptions options)
-    {
-        Configuration = _CreateConfiguration(options);
-        _ProgrammaticExposureProvider = new ProgrammaticExposureDescriptorProvider(
-            Configuration.Exposure,
-            Configuration.ReflectionProvider);
-        Paths = new LogicalPathResolver(this);
-        Bindings = new BindingResolver(this, Paths);
-        _Logger = Configuration.LoggerFactory.CreateLogger<UIEngineHost>();
-        _HOST_CREATED(_Logger, Configuration.DescriptorProviders.Count, null);
-    }
-
-    private static UIEngineHostConfiguration _CreateConfiguration(UIEngineHostOptions options)
-    {
-        try
-        {
-            return new UIEngineHostConfiguration(options);
-        }
-        catch (Exception exception)
-        {
-            var loggerFactory = options?.LoggerFactory ??
-                Microsoft.Extensions.Logging.Abstractions.NullLoggerFactory.Instance;
-            var logger = loggerFactory.CreateLogger<UIEngineHost>();
-            _CONFIGURATION_INVALID(
-                logger,
-                "HostOptions",
-                options?.IncludeSensitiveDiagnosticData == true ? exception : null);
-            throw;
-        }
-    }
-
-    public UIEngineHostConfiguration Configuration { get; }
-
-    public IReadOnlyList<IObjectDescriptorProvider> Providers => Configuration.DescriptorProviders;
-
-    public LogicalPathResolver Paths { get; }
-
-    public BindingResolver Bindings { get; }
-
-    public bool IsDisposed => Volatile.Read(ref _IsDisposed) != 0;
-
-    public IReadOnlyList<RegisteredRoot> Roots
+    public IReadOnlyList<RootRegistration> Roots
     {
         get
         {
             lock (_Gate)
             {
-                return _Roots.Values.Select(static entry => entry.Registration).ToArray();
+                return _Roots.Values.Select(static root => root.Registration).ToArray();
             }
         }
     }
 
-    public InteractionResult<ObjectHandle> RegisterRoot(string identifier, object instance)
+    internal int MaxCollectionItems => _Settings.MaxCollectionItems;
+
+    public InteractionResult<ObjectHandle> SetRoot(string identifier, object instance)
     {
         if (IsDisposed)
         {
@@ -180,16 +52,14 @@ public sealed class UIEngineHost : IDisposable, IAsyncDisposable
         if (string.IsNullOrWhiteSpace(identifier))
         {
             return InteractionResult.Failure<ObjectHandle>(
-                InteractionErrorCode.INVALID_ROOT_IDENTIFIER,
+                InteractionErrorCode.INVALID_INPUT,
                 "A root identifier cannot be empty or whitespace.");
         }
-
-        ArgumentNullException.ThrowIfNull(instance);
 
         if (instance.GetType().IsValueType)
         {
             return InteractionResult.Failure<ObjectHandle>(
-                InteractionErrorCode.UNSUPPORTED_TARGET_TYPE,
+                InteractionErrorCode.TYPE_MISMATCH,
                 "A root must be a reference type.");
         }
 
@@ -200,117 +70,54 @@ public sealed class UIEngineHost : IDisposable, IAsyncDisposable
                 return _DisposedFailure<ObjectHandle>();
             }
 
-            if (_Roots.ContainsKey(identifier))
-            {
-                return InteractionResult.Failure<ObjectHandle>(
-                    InteractionErrorCode.DUPLICATE_ROOT_IDENTIFIER,
-                    $"A root with identifier '{identifier}' is already registered.");
-            }
-
-            var handle = _GetOrCreateHandleCore(instance);
-            var registration = new RegisteredRoot(identifier, handle, instance.GetType());
-            _Roots.Add(identifier, new _RootEntry(registration, instance));
-            _CanonicalPaths[handle.Identity] = LogicalPath.Root.Append(identifier);
-            return InteractionResult.Success(handle);
-        }
-    }
-
-    public InteractionResult<ObjectHandle> ReplaceRoot(string identifier, object instance)
-    {
-        if (IsDisposed)
-        {
-            return _DisposedFailure<ObjectHandle>();
-        }
-
-        if (string.IsNullOrWhiteSpace(identifier))
-        {
-            return InteractionResult.Failure<ObjectHandle>(
-                InteractionErrorCode.INVALID_ROOT_IDENTIFIER,
-                "A root identifier cannot be empty or whitespace.");
-        }
-
-        ArgumentNullException.ThrowIfNull(instance);
-
-        if (instance.GetType().IsValueType)
-        {
-            return InteractionResult.Failure<ObjectHandle>(
-                InteractionErrorCode.UNSUPPORTED_TARGET_TYPE,
-                "A root must be a reference type.");
-        }
-
-        lock (_Gate)
-        {
-            if (IsDisposed)
-            {
-                return _DisposedFailure<ObjectHandle>();
-            }
-
-            if (!_Roots.ContainsKey(identifier))
-            {
-                return InteractionResult.Failure<ObjectHandle>(
-                    InteractionErrorCode.ROOT_NOT_FOUND,
-                    $"No root with identifier '{identifier}' is registered.");
-            }
-
-            var handle = _GetOrCreateHandleCore(instance);
-            var registration = new RegisteredRoot(identifier, handle, instance.GetType());
+            var handle = _GetOrCreateHandle(instance);
+            var registration = new RootRegistration(identifier, handle);
             _Roots[identifier] = new _RootEntry(registration, instance);
-            _CanonicalPaths[handle.Identity] = LogicalPath.Root.Append(identifier);
+            _CanonicalPaths[handle] = LogicalPath.Root.Append(identifier);
             return InteractionResult.Success(handle);
         }
     }
 
-    public InteractionResult<RegisteredRoot> UnregisterRoot(string identifier)
+    public InteractionResult<RootRegistration> RemoveRoot(string identifier)
     {
         if (IsDisposed)
         {
-            return _DisposedFailure<RegisteredRoot>();
+            return _DisposedFailure<RootRegistration>();
         }
 
         if (string.IsNullOrWhiteSpace(identifier))
         {
-            return InteractionResult.Failure<RegisteredRoot>(
-                InteractionErrorCode.INVALID_ROOT_IDENTIFIER,
+            return InteractionResult.Failure<RootRegistration>(
+                InteractionErrorCode.INVALID_INPUT,
                 "A root identifier cannot be empty or whitespace.");
         }
 
         lock (_Gate)
         {
-            if (IsDisposed)
-            {
-                return _DisposedFailure<RegisteredRoot>();
-            }
-
-            if (!_Roots.Remove(identifier, out var entry))
-            {
-                return InteractionResult.Failure<RegisteredRoot>(
-                    InteractionErrorCode.ROOT_NOT_FOUND,
-                    $"No root with identifier '{identifier}' is registered.");
-            }
-
-            return InteractionResult.Success(entry.Registration);
+            return _Roots.Remove(identifier, out var root)
+                ? InteractionResult.Success(root.Registration)
+                : InteractionResult.Failure<RootRegistration>(
+                    InteractionErrorCode.NOT_FOUND,
+                    $"Root '{identifier}' was not found.");
         }
     }
 
     public ObjectHandle GetOrCreateHandle(object instance)
     {
         ObjectDisposedException.ThrowIf(IsDisposed, this);
-        ArgumentNullException.ThrowIfNull(instance);
-
         if (instance.GetType().IsValueType)
         {
-            throw new ArgumentException("Runtime identity requires a reference type.", nameof(instance));
+            throw new ArgumentException("Runtime handles require reference types.", nameof(instance));
         }
 
         lock (_Gate)
         {
             ObjectDisposedException.ThrowIf(IsDisposed, this);
-            return _GetOrCreateHandleCore(instance);
+            return _GetOrCreateHandle(instance);
         }
     }
 
-    /// <summary>Gets and indexes the optional domain identity for an encountered runtime object.</summary>
-    public async ValueTask<InteractionResult<DomainIdentity?>> GetDomainIdentityAsync(
+    public async Task<InteractionResult<DomainIdentity?>> GetDomainIdentityAsync(
         ObjectHandle handle,
         CancellationToken cancellationToken = default)
     {
@@ -319,31 +126,24 @@ public sealed class UIEngineHost : IDisposable, IAsyncDisposable
             return _DisposedFailure<DomainIdentity?>();
         }
 
-        if (cancellationToken.IsCancellationRequested)
-        {
-            return InteractionResult.Failure<DomainIdentity?>(
-                InteractionErrorCode.CANCELLED,
-                "Domain identity discovery was cancelled.");
-        }
-
-        if (!TryResolve(handle, out var instance) || instance is null)
-        {
-            return IsDisposed
-                ? _DisposedFailure<DomainIdentity?>()
-                : InteractionResult.Failure<DomainIdentity?>(
-                    InteractionErrorCode.TARGET_UNAVAILABLE,
-                    "The target object is no longer available.");
-        }
-
         lock (_Gate)
         {
-            if (_DomainIdentities.TryGetValue(handle.Identity, out var cached))
+            if (_DomainIdentities.TryGetValue(handle, out var cached))
             {
                 return InteractionResult.Success(cached);
             }
         }
 
-        var discovered = await _DiscoverDomainIdentityAsync(instance, cancellationToken).ConfigureAwait(false);
+        var target = ResolveTarget(handle);
+        if (!target.IsSuccess)
+        {
+            return InteractionResult.Failure<DomainIdentity?>(target.Error!);
+        }
+
+        var discovered = await ExecuteAsync(
+            "discover domain identity",
+            () => Task.FromResult(_DiscoverDomainIdentity(target.Value)),
+            cancellationToken);
         if (!discovered.IsSuccess)
         {
             return discovered;
@@ -351,33 +151,27 @@ public sealed class UIEngineHost : IDisposable, IAsyncDisposable
 
         lock (_Gate)
         {
-            if (IsDisposed)
-            {
-                return _DisposedFailure<DomainIdentity?>();
-            }
-
-            if (_DomainIdentities.TryGetValue(handle.Identity, out var cached))
+            if (_DomainIdentities.TryGetValue(handle, out var cached))
             {
                 return InteractionResult.Success(cached);
             }
 
-            _DomainIdentities.Add(handle.Identity, discovered.Value);
+            _DomainIdentities[handle] = discovered.Value;
             if (discovered.Value is { } identity)
             {
-                if (!_DomainIdentityIndex.TryGetValue(identity, out var matches))
+                if (!_DomainIdentityIndex.TryGetValue(identity, out var handles))
                 {
-                    matches = [];
-                    _DomainIdentityIndex.Add(identity, matches);
+                    handles = [];
+                    _DomainIdentityIndex.Add(identity, handles);
                 }
 
-                matches.Add(handle.Identity);
+                handles.Add(handle);
             }
-
-            return discovered;
         }
+
+        return discovered;
     }
 
-    /// <summary>Resolves one encountered domain identity without traversing the object graph.</summary>
     public InteractionResult<ObjectHandle> ResolveDomainIdentity(DomainIdentity identity)
     {
         if (IsDisposed)
@@ -385,301 +179,344 @@ public sealed class UIEngineHost : IDisposable, IAsyncDisposable
             return _DisposedFailure<ObjectHandle>();
         }
 
-        if (string.IsNullOrWhiteSpace(identity.Value))
-        {
-            return InteractionResult.Failure<ObjectHandle>(
-                InteractionErrorCode.INVALID_DOMAIN_IDENTITY,
-                "A domain identity cannot be empty or whitespace.");
-        }
-
         lock (_Gate)
         {
-            if (IsDisposed)
-            {
-                return _DisposedFailure<ObjectHandle>();
-            }
-
-            if (!_DomainIdentityIndex.TryGetValue(identity, out var indexedIdentities))
+            if (!_DomainIdentityIndex.TryGetValue(identity, out var handles))
             {
                 return _DomainIdentityNotFound(identity);
             }
 
-            indexedIdentities.RemoveWhere(runtimeIdentity =>
-                !_Objects.TryGetValue(runtimeIdentity, out var reference) ||
-                !reference.TryGetTarget(out _));
-            if (indexedIdentities.Count == 0)
+            handles.RemoveWhere(handle =>
+                !_Objects.TryGetValue(handle, out var reference) || !reference.TryGetTarget(out _));
+            if (handles.Count == 0)
             {
                 _DomainIdentityIndex.Remove(identity);
                 return _DomainIdentityNotFound(identity);
             }
 
-            if (indexedIdentities.Count > 1)
-            {
-                return InteractionResult.Failure<ObjectHandle>(
-                    InteractionErrorCode.AMBIGUOUS_DOMAIN_IDENTITY,
+            return handles.Count == 1
+                ? InteractionResult.Success(handles.Single())
+                : InteractionResult.Failure<ObjectHandle>(
+                    InteractionErrorCode.AMBIGUOUS,
                     $"Domain identity '{identity}' matches multiple live objects.");
-            }
-
-            return InteractionResult.Success(new ObjectHandle(indexedIdentities.Single()));
         }
     }
 
-    public async ValueTask<InteractionResult<IObjectDescriptor>> DescribeAsync(
+    public async Task<InteractionResult<ObjectDescriptor>> DescribeAsync(
         ObjectHandle handle,
         CancellationToken cancellationToken = default)
     {
-        if (IsDisposed)
+        var target = ResolveTarget(handle);
+        if (!target.IsSuccess)
         {
-            return _DisposedFailure<IObjectDescriptor>();
+            return InteractionResult.Failure<ObjectDescriptor>(target.Error!);
         }
 
-        if (cancellationToken.IsCancellationRequested)
-        {
-            return InteractionResult.Failure<IObjectDescriptor>(
-                InteractionErrorCode.CANCELLED,
-                "Descriptor discovery was cancelled.");
-        }
-
-        if (!TryResolve(handle, out var instance) || instance is null)
-        {
-            return IsDisposed
-                ? _DisposedFailure<IObjectDescriptor>()
-                : InteractionResult.Failure<IObjectDescriptor>(
-                    InteractionErrorCode.TARGET_UNAVAILABLE,
-                    "The target object is no longer available.");
-        }
-
-        var domainIdentity = await GetDomainIdentityAsync(handle, cancellationToken).ConfigureAwait(false);
-        if (!domainIdentity.IsSuccess)
-        {
-            _DISCOVERY_FAILED(_Logger, handle.Identity.RuntimeId, domainIdentity.Error!.Code, null);
-            return InteractionResult.Failure<IObjectDescriptor>(
-                domainIdentity.Error.Code,
-                domainIdentity.Error.Message);
-        }
-
-        var hasProgrammaticExposure = _ProgrammaticExposureProvider.CanDescribe(instance.GetType());
-        var provider = hasProgrammaticExposure
-            ? null
-            : Configuration.CustomDescriptorProviders.FirstOrDefault(
-                candidate => candidate.CanDescribe(instance.GetType()));
-        provider ??= hasProgrammaticExposure
-            ? null
-            : Configuration.ReflectionProvider is not null &&
-                Configuration.ReflectionProvider.CanDescribe(instance.GetType())
-                    ? Configuration.ReflectionProvider
-                    : null;
-        if (!hasProgrammaticExposure && provider is null)
-        {
-            var unavailable = InteractionResult.Failure<IObjectDescriptor>(
-                InteractionErrorCode.DESCRIPTOR_UNAVAILABLE,
-                $"No descriptor provider supports '{instance.GetType().FullName}'.");
-            _DISCOVERY_FAILED(_Logger, handle.Identity.RuntimeId, unavailable.Error!.Code, null);
-            return unavailable;
-        }
-
-        _DISCOVERY_STARTED(_Logger, handle.Identity.RuntimeId, null);
-        try
-        {
-            var policy = provider as IInteractionDispatchPolicy;
-            var canDiscoverDirectly = policy?.CanExecuteDirectly(
-                InteractionDispatchOperation.DESCRIPTOR_DISCOVERY) == true;
-            var result = await ExecuteInteractionAsync(
-                InteractionDispatchOperation.DESCRIPTOR_DISCOVERY,
-                canDiscoverDirectly,
-                async () =>
-                {
-                    var discovered = hasProgrammaticExposure
-                        ? await _ProgrammaticExposureProvider
-                            .DescribeAsync(this, instance, handle, cancellationToken)
-                            .ConfigureAwait(false)
-                        : await provider!
-                            .DescribeAsync(this, instance, handle, cancellationToken)
-                            .ConfigureAwait(false);
-                    return discovered.IsSuccess
-                        ? await DispatchedObjectDescriptor.CreateAsync(
-                            this,
-                            discovered.Value,
-                            domainIdentity.Value,
-                            policy,
-                            cancellationToken).ConfigureAwait(false)
-                        : discovered;
-                },
-                cancellationToken).ConfigureAwait(false);
-            if (result.IsSuccess)
-            {
-                _DISCOVERY_COMPLETED(_Logger, handle.Identity.RuntimeId, null);
-                return result;
-            }
-
-            _DISCOVERY_FAILED(_Logger, handle.Identity.RuntimeId, result.Error!.Code, null);
-            return result;
-        }
-        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
-        {
-            var cancelled = InteractionResult.Failure<IObjectDescriptor>(
-                InteractionErrorCode.CANCELLED,
-                "Descriptor discovery was cancelled.");
-            _DISCOVERY_FAILED(_Logger, handle.Identity.RuntimeId, cancelled.Error!.Code, null);
-            return cancelled;
-        }
-        catch (ObjectDisposedException) when (IsDisposed)
-        {
-            var disposed = _DisposedFailure<IObjectDescriptor>();
-            _DISCOVERY_FAILED(_Logger, handle.Identity.RuntimeId, disposed.Error!.Code, null);
-            return disposed;
-        }
-        catch (Exception exception)
-        {
-            var failed = InteractionResult.Failure<IObjectDescriptor>(
-                InteractionErrorCode.DESCRIPTOR_UNAVAILABLE,
-                exception.Message);
-            _DISCOVERY_FAILED(
-                _Logger,
-                handle.Identity.RuntimeId,
-                failed.Error!.Code,
-                Configuration.IncludeSensitiveDiagnosticData ? exception : null);
-            return failed;
-        }
-    }
-
-    /// <summary>Creates a bounded, host-owned stream for one live object or exposed member.</summary>
-    public async ValueTask<InteractionResult<IObservationSubscription>> ObserveAsync(
-        ObjectHandle handle,
-        ObservationRequest? request = null,
-        CancellationToken cancellationToken = default)
-    {
-        request ??= new ObservationRequest();
-        if (IsDisposed)
-        {
-            return _DisposedFailure<IObservationSubscription>();
-        }
-
-        if (request.MemberId is not null && string.IsNullOrWhiteSpace(request.MemberId))
-        {
-            return InteractionResult.Failure<IObservationSubscription>(
-                InteractionErrorCode.INVALID_INPUT,
-                "An observed member identifier cannot be empty or whitespace.");
-        }
-
-        if (request.PollingInterval is { } pollingInterval && pollingInterval <= TimeSpan.Zero)
-        {
-            return InteractionResult.Failure<IObservationSubscription>(
-                InteractionErrorCode.INVALID_INPUT,
-                "An observation polling interval must be positive.");
-        }
-
-        if (cancellationToken.IsCancellationRequested)
-        {
-            return InteractionResult.Failure<IObservationSubscription>(
-                InteractionErrorCode.CANCELLED,
-                "Observation setup was cancelled.");
-        }
-
-        if (!TryResolve(handle, out var instance) || instance is null)
-        {
-            return IsDisposed
-                ? _DisposedFailure<IObservationSubscription>()
-                : InteractionResult.Failure<IObservationSubscription>(
-                    InteractionErrorCode.TARGET_UNAVAILABLE,
-                    "The observed object is no longer available.");
-        }
-
-        var identity = await GetDomainIdentityAsync(handle, cancellationToken).ConfigureAwait(false);
+        var identity = await GetDomainIdentityAsync(handle, cancellationToken);
         if (!identity.IsSuccess)
         {
-            return InteractionResult.Failure<IObservationSubscription>(
-                identity.Error!.Code,
-                identity.Error.Message);
+            return InteractionResult.Failure<ObjectDescriptor>(identity.Error!);
         }
+
+        return await ExecuteAsync(
+            "describe object",
+            () => Task.FromResult(_CreateDescriptor(target.Value, handle, identity.Value)),
+            cancellationToken);
+    }
+
+    public Task<InteractionResult<ResolvedPath>> ResolvePathAsync(
+        string path,
+        CancellationToken cancellationToken = default)
+    {
+        var parsed = LogicalPath.Parse(path);
+        return parsed.IsSuccess
+            ? ResolvePathAsync(parsed.Value, cancellationToken)
+            : Task.FromResult(InteractionResult.Failure<ResolvedPath>(parsed.Error!));
+    }
+
+    public Task<InteractionResult<ResolvedPath>> ResolvePathAsync(
+        LogicalPath path,
+        CancellationToken cancellationToken = default) => ExecuteAsync(
+        "resolve path",
+        () => PathResolution.ResolveAsync(this, path, cancellationToken),
+        cancellationToken);
+
+    public async Task<InteractionResult<ResolvedBinding>> ResolveBindingAsync(
+        BindingReference binding,
+        CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(binding.Path) ||
+            string.IsNullOrWhiteSpace(binding.MemberId))
+        {
+            return InteractionResult.Failure<ResolvedBinding>(
+                InteractionErrorCode.INVALID_INPUT,
+                "A binding requires a path and member identifier.");
+        }
+
+        var parsed = LogicalPath.Parse(binding.Path);
+        if (!parsed.IsSuccess)
+        {
+            return InteractionResult.Failure<ResolvedBinding>(parsed.Error!);
+        }
+
+        ObjectHandle? identityHandle = null;
+        ObjectDescriptor? identityDescriptor = null;
+        LogicalPath? identityPath = null;
+        if (binding.DomainIdentity is not null)
+        {
+            DomainIdentity identity;
+            try
+            {
+                identity = new DomainIdentity(binding.DomainIdentity);
+            }
+            catch (ArgumentException exception)
+            {
+                return InteractionResult.Failure<ResolvedBinding>(
+                    InteractionErrorCode.INVALID_INPUT,
+                    exception.Message);
+            }
+
+            var resolvedIdentity = ResolveDomainIdentity(identity);
+            if (resolvedIdentity.IsSuccess)
+            {
+                identityHandle = resolvedIdentity.Value;
+                var described = await DescribeAsync(resolvedIdentity.Value, cancellationToken);
+                if (!described.IsSuccess)
+                {
+                    return InteractionResult.Failure<ResolvedBinding>(described.Error!);
+                }
+
+                identityDescriptor = described.Value;
+                TryGetCanonicalPath(resolvedIdentity.Value, out identityPath);
+            }
+            else if (resolvedIdentity.Error!.Code is not (
+                InteractionErrorCode.NOT_FOUND or InteractionErrorCode.AMBIGUOUS))
+            {
+                return InteractionResult.Failure<ResolvedBinding>(resolvedIdentity.Error);
+            }
+        }
+
+        var resolvedPath = await ResolvePathAsync(parsed.Value, cancellationToken);
+        ObjectHandle owner;
+        ObjectDescriptor descriptor;
+        LogicalPath canonical;
+        if (resolvedPath.IsSuccess && resolvedPath.Value.IsObject)
+        {
+            if (binding.DomainIdentity is not null && !StringComparer.Ordinal.Equals(
+                    resolvedPath.Value.OwnerDescriptor.DomainIdentity?.Value,
+                    binding.DomainIdentity))
+            {
+                return InteractionResult.Failure<ResolvedBinding>(
+                    InteractionErrorCode.NOT_FOUND,
+                    "The binding path resolves to a conflicting domain identity.");
+            }
+
+            owner = resolvedPath.Value.OwnerHandle;
+            descriptor = resolvedPath.Value.OwnerDescriptor;
+            canonical = resolvedPath.Value.CanonicalPath;
+        }
+        else if (identityHandle is not null && identityDescriptor is not null && identityPath is not null)
+        {
+            owner = identityHandle.Value;
+            descriptor = identityDescriptor;
+            canonical = identityPath;
+        }
+        else if (!resolvedPath.IsSuccess)
+        {
+            return InteractionResult.Failure<ResolvedBinding>(resolvedPath.Error!);
+        }
+        else
+        {
+            return InteractionResult.Failure<ResolvedBinding>(
+                InteractionErrorCode.NOT_FOUND,
+                "The binding path no longer identifies the expected domain object.");
+        }
+
+        var members = descriptor.Members
+            .Where(member => StringComparer.Ordinal.Equals(member.Id, binding.MemberId))
+            .ToArray();
+        if (members.Length == 0)
+        {
+            return InteractionResult.Failure<ResolvedBinding>(
+                InteractionErrorCode.NOT_FOUND,
+                $"Member '{binding.MemberId}' was not found.");
+        }
+
+        if (members.Length > 1)
+        {
+            return InteractionResult.Failure<ResolvedBinding>(
+                InteractionErrorCode.AMBIGUOUS,
+                $"Member '{binding.MemberId}' is ambiguous.");
+        }
+
+        if (members[0].Kind != binding.ExpectedKind)
+        {
+            return InteractionResult.Failure<ResolvedBinding>(
+                InteractionErrorCode.TYPE_MISMATCH,
+                $"Member '{binding.MemberId}' is {members[0].Kind}, not {binding.ExpectedKind}.");
+        }
+
+        return InteractionResult.Success(new ResolvedBinding(
+            owner,
+            descriptor,
+            members[0],
+            canonical));
+    }
+
+    public async Task<InteractionResult<ObservationSubscription>> ObserveAsync(
+        ObjectHandle handle,
+        string? memberId = null,
+        TimeSpan? pollingInterval = null,
+        CancellationToken cancellationToken = default)
+    {
+        if (pollingInterval is { } interval && interval <= TimeSpan.Zero)
+        {
+            return InteractionResult.Failure<ObservationSubscription>(
+                InteractionErrorCode.INVALID_INPUT,
+                "A polling interval must be positive.");
+        }
+
+        var target = ResolveTarget(handle);
+        if (!target.IsSuccess)
+        {
+            return InteractionResult.Failure<ObservationSubscription>(target.Error!);
+        }
+
+        var described = await DescribeAsync(handle, cancellationToken);
+        if (!described.IsSuccess)
+        {
+            return InteractionResult.Failure<ObservationSubscription>(described.Error!);
+        }
+
+        MemberDescriptor? member = null;
+        if (memberId is not null)
+        {
+            member = described.Value.Members.FirstOrDefault(candidate =>
+                StringComparer.Ordinal.Equals(candidate.Id, memberId));
+            if (member is null)
+            {
+                return InteractionResult.Failure<ObservationSubscription>(
+                    InteractionErrorCode.NOT_FOUND,
+                    $"Member '{memberId}' was not found.");
+            }
+
+            if (member is ActionDescriptor)
+            {
+                return InteractionResult.Failure<ObservationSubscription>(
+                    InteractionErrorCode.UNSUPPORTED,
+                    "Actions cannot be observed.");
+            }
+        }
+
+        if (pollingInterval is not null && member is not ValueDescriptor and not ReferenceDescriptor)
+        {
+            return InteractionResult.Failure<ObservationSubscription>(
+                InteractionErrorCode.UNSUPPORTED,
+                "Polling requires one value or reference member.");
+        }
+
+        var identity = described.Value.DomainIdentity;
+        long ordering = 0;
+        ChangeRecord CreateChange(
+            string? changedMember,
+            ChangeKind kind,
+            ObservationValue oldValue,
+            ObservationValue newValue,
+            int? oldIndex,
+            int? newIndex) => new(
+                handle,
+                identity,
+                changedMember,
+                kind,
+                oldValue,
+                newValue,
+                Interlocked.Increment(ref ordering))
+            {
+                OldIndex = oldIndex,
+                NewIndex = newIndex,
+            };
 
         var subscription = new ObservationSubscription(
             handle,
-            request.MemberId,
-            Configuration.CollectionLimits.ObservationBufferCapacity,
+            memberId,
+            _Settings.ObservationBufferCapacity,
+            dropped => CreateChange(
+                memberId,
+                ChangeKind.BUFFER_OVERFLOW,
+                ObservationValue.NotSupplied,
+                ObservationValue.NotSupplied,
+                null,
+                null) with { DroppedChangeCount = dropped },
             _UntrackSubscription,
-            exception => _ReportObservationFailure(
-                handle.Identity,
-                request.MemberId,
-                InteractionErrorCode.OBSERVATION_FAILED,
-                exception));
-        long orderingToken = 0;
-        void Publish(ObservationAdapterChange change)
+            exception => _ReportUnexpected("observation", exception));
+
+        IDisposable sourceSubscription;
+        if (pollingInterval is { } polling)
         {
-            subscription.Publish(new ChangeRecord(
-                handle.Identity,
-                identity.Value,
-                change.MemberId,
-                change.Kind,
-                change.OldValue,
-                change.NewValue,
-                Interlocked.Increment(ref orderingToken),
-                DateTimeOffset.UtcNow)
+            var initial = await _ReadObservableAsync(member!, cancellationToken);
+            if (!initial.IsSuccess)
             {
-                OldIndex = change.OldIndex,
-                NewIndex = change.NewIndex,
-            });
+                subscription.Dispose();
+                return InteractionResult.Failure<ObservationSubscription>(initial.Error!);
+            }
+
+            sourceSubscription = new PollingObserver(
+                initial.Value,
+                polling,
+                token => _ReadObservableAsync(member!, token),
+                (oldValue, newValue) => subscription.Publish(CreateChange(
+                    memberId,
+                    ChangeKind.MEMBER_CHANGED,
+                    ObservationValue.Supplied(oldValue),
+                    ObservationValue.Supplied(newValue),
+                    null,
+                    null)),
+                exception => _ReportUnexpected("observation polling", exception));
         }
-
-        void ReportFailure(Exception exception) => _ReportObservationFailure(
-            handle.Identity,
-            request.MemberId,
-            InteractionErrorCode.OBSERVATION_FAILED,
-            exception);
-
-        var sourceSubscription = await ObservationSourceFactory.SubscribeAsync(
-            this,
-            instance,
-            handle,
-            identity.Value,
-            request,
-            Publish,
-            ReportFailure,
-            cancellationToken).ConfigureAwait(false);
-        if (!sourceSubscription.IsSuccess)
+        else
         {
-            subscription.Dispose();
-            _ReportObservationFailure(
-                handle.Identity,
-                request.MemberId,
-                sourceSubscription.Error!.Code,
-                null);
-            return InteractionResult.Failure<IObservationSubscription>(
-                sourceSubscription.Error.Code,
-                sourceSubscription.Error.Message);
+            var source = await NotificationObserver.CreateAsync(
+                target.Value,
+                memberId,
+                described.Value,
+                member,
+                (changedMember, kind, oldValue, newValue, oldIndex, newIndex) =>
+                    subscription.Publish(CreateChange(
+                        changedMember,
+                        kind,
+                        oldValue,
+                        newValue,
+                        oldIndex,
+                        newIndex)),
+                exception => _ReportUnexpected("observation notification", exception),
+                cancellationToken);
+            if (!source.IsSuccess)
+            {
+                subscription.Dispose();
+                return InteractionResult.Failure<ObservationSubscription>(source.Error!);
+            }
+
+            sourceSubscription = source.Value;
         }
 
-        if (sourceSubscription.Value is null)
-        {
-            subscription.Dispose();
-            _ReportObservationFailure(
-                handle.Identity,
-                request.MemberId,
-                InteractionErrorCode.OBSERVATION_FAILED,
-                null);
-            return InteractionResult.Failure<IObservationSubscription>(
-                InteractionErrorCode.OBSERVATION_FAILED,
-                "The observation adapter returned no disposable subscription.");
-        }
-
-        subscription.SetSourceSubscription(sourceSubscription.Value);
+        subscription.SetSourceSubscription(sourceSubscription);
         lock (_Gate)
         {
             if (IsDisposed)
             {
                 subscription.Dispose();
-                return _DisposedFailure<IObservationSubscription>();
+                return _DisposedFailure<ObservationSubscription>();
             }
 
             _Subscriptions.Add(subscription);
         }
 
-        return InteractionResult.Success<IObservationSubscription>(subscription);
+        return InteractionResult.Success(subscription);
     }
 
     public void Dispose()
     {
-        if (Interlocked.Exchange(ref _IsDisposed, 1) != 0)
+        if (Interlocked.Exchange(ref _Disposed, 1) != 0)
         {
             return;
         }
@@ -697,7 +534,7 @@ public sealed class UIEngineHost : IDisposable, IAsyncDisposable
             _DomainIdentities.Clear();
             _DomainIdentityIndex.Clear();
             _CanonicalPaths.Clear();
-            _Identities.Clear();
+            _Handles.Clear();
         }
 
         foreach (var subscription in subscriptions)
@@ -707,59 +544,344 @@ public sealed class UIEngineHost : IDisposable, IAsyncDisposable
 
         foreach (var invocation in invocations)
         {
-            invocation.CompleteHostDisposed();
+            try
+            {
+                invocation.CompleteHostDisposed();
+            }
+            catch (AggregateException exception)
+            {
+                _ReportUnexpected("invocation cancellation", exception);
+            }
         }
-
-        _HOST_DISPOSED(_Logger, null);
     }
 
-    public ValueTask DisposeAsync()
-    {
-        Dispose();
-        return ValueTask.CompletedTask;
-    }
-
-    internal bool TryResolve(ObjectHandle handle, out object? instance)
+    internal InteractionResult<object> ResolveTarget(ObjectHandle handle)
     {
         if (IsDisposed)
         {
-            instance = null;
-            return false;
+            return _DisposedFailure<object>();
         }
 
         lock (_Gate)
         {
-            if (_Objects.TryGetValue(handle.Identity, out var reference) &&
-                reference.TryGetTarget(out instance))
+            if (_Objects.TryGetValue(handle, out var reference) && reference.TryGetTarget(out var target))
             {
-                return true;
+                return InteractionResult.Success(target);
             }
 
-            _Objects.Remove(handle.Identity);
-            instance = null;
-            return false;
+            _Objects.Remove(handle);
+            return InteractionResult.Failure<object>(
+                InteractionErrorCode.UNAVAILABLE,
+                "The target object is no longer available.");
         }
     }
 
-    internal void ReportObservationFailure(
-        ObjectIdentity identity,
-        string? memberId,
-        InteractionErrorCode errorCode,
-        Exception? exception = null) =>
-        _ReportObservationFailure(identity, memberId, errorCode, exception);
-
-    private void _ReportObservationFailure(
-        ObjectIdentity identity,
-        string? memberId,
-        InteractionErrorCode errorCode,
-        Exception? exception)
+    internal async Task<InteractionResult<T>> ExecuteAsync<T>(
+        string operation,
+        Func<Task<InteractionResult<T>>> action,
+        CancellationToken cancellationToken)
     {
-        _OBSERVATION_FAILED(
-            _Logger,
-            identity.RuntimeId,
-            memberId,
-            errorCode,
-            Configuration.IncludeSensitiveDiagnosticData ? exception : null);
+        if (IsDisposed)
+        {
+            return _DisposedFailure<T>();
+        }
+
+        if (cancellationToken.IsCancellationRequested)
+        {
+            return InteractionResult.Failure<T>(
+                InteractionErrorCode.CANCELLED,
+                $"The {operation} operation was cancelled.");
+        }
+
+        try
+        {
+            if (_Settings.Dispatcher.CheckAccess())
+            {
+                return await _ExecuteCheckedAsync(action, cancellationToken);
+            }
+
+            return await _Settings.Dispatcher.InvokeAsync(
+                () => _ExecuteCheckedAsync(action, cancellationToken),
+                cancellationToken);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            return InteractionResult.Failure<T>(
+                InteractionErrorCode.CANCELLED,
+                $"The {operation} operation was cancelled.");
+        }
+        catch (ObjectDisposedException) when (IsDisposed)
+        {
+            return _DisposedFailure<T>();
+        }
+        catch (UnauthorizedAccessException exception)
+        {
+            return InteractionResult.Failure<T>(
+                InteractionErrorCode.PERMISSION_DENIED,
+                exception.Message);
+        }
+        catch (TargetInvocationException exception) when (exception.InnerException is not null)
+        {
+            return _UnexpectedFailure<T>(operation, exception.InnerException);
+        }
+        catch (Exception exception)
+        {
+            return _UnexpectedFailure<T>(operation, exception);
+        }
+    }
+
+    internal ActionInvocation CreateInvocation(string actionId, bool supportsCancellation)
+    {
+        var invocation = new ActionInvocation(
+            actionId,
+            supportsCancellation,
+            _Settings.InvocationProgressBufferCapacity,
+            _InvocationCompleted);
+        lock (_Gate)
+        {
+            if (IsDisposed)
+            {
+                invocation.CompleteHostDisposed();
+                return invocation;
+            }
+
+            _Invocations.Add(invocation);
+        }
+
+        return invocation;
+    }
+
+    internal void RecordCanonicalPath(ObjectHandle handle, LogicalPath path)
+    {
+        lock (_Gate)
+        {
+            if (!IsDisposed)
+            {
+                _CanonicalPaths[handle] = path;
+            }
+        }
+    }
+
+    internal bool TryGetCanonicalPath(ObjectHandle handle, out LogicalPath? path)
+    {
+        lock (_Gate)
+        {
+            return _CanonicalPaths.TryGetValue(handle, out path);
+        }
+    }
+
+    private ObjectHandle _GetOrCreateHandle(object instance)
+    {
+        if (_Handles.TryGetValue(instance, out var existing))
+        {
+            return existing.Handle;
+        }
+
+        var handle = new ObjectHandle(Guid.NewGuid());
+        _Handles.Add(instance, new _HandleHolder(handle));
+        _Objects.Add(handle, new WeakReference<object>(instance));
+        return handle;
+    }
+
+    private InteractionResult<DomainIdentity?> _DiscoverDomainIdentity(object instance)
+    {
+        if (_Settings.Exposures.TryGetValue(instance.GetType(), out var exposure))
+        {
+            return _NormalizeIdentity(exposure.GetDomainIdentity(instance));
+        }
+
+        var metadata = ReflectionMetadata.Get(instance.GetType());
+        string? attributed = null;
+        if (metadata.DomainIdentityMember is { } member)
+        {
+            if (member is PropertyInfo { PropertyType: var propertyType } property &&
+                propertyType == typeof(string) && ReflectionMetadata.CanRead(property))
+            {
+                attributed = (string?)ReflectionMetadata.Read(property, instance);
+            }
+            else if (member is FieldInfo { FieldType: var fieldType } field &&
+                fieldType == typeof(string))
+            {
+                attributed = (string?)ReflectionMetadata.Read(field, instance);
+            }
+            else
+            {
+                return InteractionResult.Failure<DomainIdentity?>(
+                    InteractionErrorCode.INVALID_INPUT,
+                    "A domain identity member must be a readable string field or property.");
+            }
+        }
+
+        var fromInterface = (instance as IStableDomainIdentity)?.DomainIdentity;
+        if (fromInterface is not null && attributed is not null &&
+            !StringComparer.Ordinal.Equals(fromInterface, attributed))
+        {
+            return InteractionResult.Failure<DomainIdentity?>(
+                InteractionErrorCode.AMBIGUOUS,
+                "The object supplies conflicting domain identities.");
+        }
+
+        return _NormalizeIdentity(fromInterface ?? attributed);
+    }
+
+    private InteractionResult<ObjectDescriptor> _CreateDescriptor(
+        object instance,
+        ObjectHandle handle,
+        DomainIdentity? identity)
+    {
+        var metadata = ReflectionMetadata.Get(instance.GetType());
+        _Settings.Exposures.TryGetValue(instance.GetType(), out var exposure);
+        var programmaticIds = exposure?.Values.Select(static value => value.Id)
+            .ToHashSet(StringComparer.Ordinal) ?? [];
+        var members = new List<MemberDescriptor>();
+        foreach (var member in metadata.Members.Where(member => !programmaticIds.Contains(member.Id)))
+        {
+            switch (member.Kind)
+            {
+                case MemberKind.VALUE:
+                    members.Add(new ValueDescriptor(
+                        this,
+                        handle,
+                        member.Id,
+                        member.ValueType,
+                        ReflectionMetadata.CanRead(member.Member),
+                        ReflectionMetadata.CanWrite(member.Member) &&
+                            member.Member.GetCustomAttribute<ExposeAttribute>(inherit: true)?.ReadOnly != true,
+                        member.IsNullable,
+                        member.Options,
+                        member.Range,
+                        member.ValidationAttributes,
+                        target => ReflectionMetadata.Read(member.Member, target),
+                        ReflectionMetadata.CanWrite(member.Member)
+                            ? (target, value) => ReflectionMetadata.Write(member.Member, target, value)
+                            : null));
+                    break;
+                case MemberKind.REFERENCE:
+                    members.Add(new ReferenceDescriptor(
+                        this,
+                        handle,
+                        member.Id,
+                        member.ValueType,
+                        target => ReflectionMetadata.Read(member.Member, target)));
+                    break;
+                case MemberKind.COLLECTION:
+                    members.Add(new CollectionDescriptor(
+                        this,
+                        handle,
+                        member.Id,
+                        member.ValueType,
+                        target => ReflectionMetadata.Read(member.Member, target)));
+                    break;
+                case MemberKind.ACTION:
+                    var action = ReflectedAction.Create((MethodInfo)member.Member);
+                    if (!action.IsSuccess)
+                    {
+                        return InteractionResult.Failure<ObjectDescriptor>(action.Error!);
+                    }
+
+                    members.Add(new ActionDescriptor(this, handle, member.Id, action.Value));
+                    break;
+                default:
+                    throw new InvalidOperationException("Unknown member kind.");
+            }
+        }
+
+        if (exposure is not null)
+        {
+            members.AddRange(exposure.Values.Select(value => (MemberDescriptor)new ValueDescriptor(
+                this,
+                handle,
+                value.Id,
+                value.ValueType,
+                canRead: true,
+                value.CanWrite,
+                value.IsNullable,
+                ValueConversion.GetEnumOptions(value.ValueType),
+                value.Range,
+                [],
+                value.Read,
+                value.CanWrite ? value.Write : null)));
+        }
+
+        string? summary = null;
+        if (exposure is not null)
+        {
+            summary = exposure.GetSummary(instance);
+        }
+        else if (metadata.SummaryMember is not null)
+        {
+            summary = ReflectionMetadata.Read(metadata.SummaryMember, instance)?.ToString();
+        }
+
+        return InteractionResult.Success(new ObjectDescriptor(
+            handle,
+            identity,
+            instance.GetType().FullName ?? instance.GetType().Name,
+            summary,
+            members.OrderBy(static member => member.Id, StringComparer.Ordinal)
+                .ThenBy(static member => member.Kind)
+                .ToArray()));
+    }
+
+    private static async Task<InteractionResult<object?>> _ReadObservableAsync(
+        MemberDescriptor member,
+        CancellationToken cancellationToken) => member switch
+    {
+        ValueDescriptor value => await value.ReadAsync(cancellationToken),
+        ReferenceDescriptor reference => await _ReadReferenceAsync(reference, cancellationToken),
+        _ => InteractionResult.Failure<object?>(
+            InteractionErrorCode.UNSUPPORTED,
+            $"Member '{member.Id}' cannot be polled."),
+    };
+
+    private static async Task<InteractionResult<object?>> _ReadReferenceAsync(
+        ReferenceDescriptor reference,
+        CancellationToken cancellationToken)
+    {
+        var read = await reference.ReadAsync(cancellationToken);
+        return read.IsSuccess
+            ? InteractionResult.Success<object?>(read.Value)
+            : InteractionResult.Failure<object?>(read.Error!);
+    }
+
+    private static InteractionResult<DomainIdentity?> _NormalizeIdentity(string? value)
+    {
+        if (value is null)
+        {
+            return InteractionResult.Success<DomainIdentity?>(null);
+        }
+
+        return string.IsNullOrWhiteSpace(value)
+            ? InteractionResult.Failure<DomainIdentity?>(
+                InteractionErrorCode.INVALID_INPUT,
+                "A domain identity cannot be empty or whitespace.")
+            : InteractionResult.Success<DomainIdentity?>(new DomainIdentity(value));
+    }
+
+    private async Task<InteractionResult<T>> _ExecuteCheckedAsync<T>(
+        Func<Task<InteractionResult<T>>> action,
+        CancellationToken cancellationToken)
+    {
+        if (IsDisposed)
+        {
+            return _DisposedFailure<T>();
+        }
+
+        cancellationToken.ThrowIfCancellationRequested();
+        return await action();
+    }
+
+    private void _InvocationCompleted(ActionInvocation invocation)
+    {
+        lock (_Gate)
+        {
+            _Invocations.Remove(invocation);
+        }
+
+        if (invocation.Fault is not null)
+        {
+            _ReportUnexpected("action invocation", invocation.Fault);
+        }
     }
 
     private void _UntrackSubscription(ObservationSubscription subscription)
@@ -770,371 +892,31 @@ public sealed class UIEngineHost : IDisposable, IAsyncDisposable
         }
     }
 
-    internal InteractionResult<ActionInvocation> CreateInvocation(
-        string actionId,
-        bool supportsCancellation)
-    {
-        if (IsDisposed)
-        {
-            return _DisposedFailure<ActionInvocation>();
-        }
-
-        var invocation = new ActionInvocation(
-            actionId,
-            supportsCancellation,
-            Configuration.InvocationProgressBufferCapacity,
-            _UntrackInvocation);
-        lock (_Gate)
-        {
-            if (IsDisposed)
-            {
-                invocation.CompleteHostDisposed();
-                return _DisposedFailure<ActionInvocation>();
-            }
-
-            _Invocations.Add(invocation);
-        }
-
-        return InteractionResult.Success(invocation);
-    }
-
-    internal void RecordBindingDiagnostic(BindingResolution resolution)
-    {
-        if (resolution.IsResolved)
-        {
-            _BINDING_RESOLVED(_Logger, resolution.State, null);
-            return;
-        }
-
-        _BINDING_BROKEN(
+    private void _ReportUnexpected(string operation, Exception exception) =>
+        RuntimeDiagnostics.UnexpectedFailure(
             _Logger,
-            resolution.State,
-            resolution.Error?.Code ?? InteractionErrorCode.TARGET_MISSING,
-            null);
-    }
-
-    internal void RecordMutationDiagnostic(string memberId, InteractionError? error)
-    {
-        if (error is null)
-        {
-            _MUTATION_COMPLETED(_Logger, memberId, null);
-            return;
-        }
-
-        if (error.Code == InteractionErrorCode.VALIDATION_FAILED)
-        {
-            _VALIDATION_FAILED(_Logger, memberId, error.Code, null);
-        }
-
-        _MUTATION_FAILED(_Logger, memberId, error.Code, null);
-    }
-
-    internal void RecordCollectionDiagnostic(string memberId, InteractionError error) =>
-        _COLLECTION_ACCESS_FAILED(_Logger, memberId, error.Code, null);
-
-    internal void RecordCapabilityMismatch(string memberId, string capability) =>
-        _CAPABILITY_MISMATCH(_Logger, memberId, capability, null);
-
-    internal void RecordInvocationFailure(string actionId, InteractionError error)
-    {
-        if (error.Code == InteractionErrorCode.VALIDATION_FAILED)
-        {
-            _VALIDATION_FAILED(_Logger, actionId, error.Code, null);
-        }
-
-        _INVOCATION_FAILED(_Logger, actionId, error.Code, null);
-    }
-
-    internal async Task TrackInvocationAsync(string actionId, IActionInvocation invocation)
-    {
-        _INVOCATION_STARTED(_Logger, actionId, null);
-        var completion = await invocation.Completion.ConfigureAwait(false);
-        if (completion.IsSuccess)
-        {
-            _INVOCATION_COMPLETED(_Logger, actionId, invocation.Status, null);
-            return;
-        }
-
-        _INVOCATION_FAILED(
-            _Logger,
-            actionId,
-            completion.Error!.Code,
-            Configuration.IncludeSensitiveDiagnosticData ? invocation.Fault?.Exception : null);
-    }
-
-    private void _UntrackInvocation(ActionInvocation invocation)
-    {
-        lock (_Gate)
-        {
-            _Invocations.Remove(invocation);
-        }
-    }
-
-    internal void RecordCanonicalPath(ObjectHandle handle, LogicalPath path)
-    {
-        lock (_Gate)
-        {
-            if (!IsDisposed)
-            {
-                _CanonicalPaths[handle.Identity] = path;
-            }
-        }
-    }
-
-    internal bool TryGetCanonicalPath(ObjectHandle handle, out LogicalPath? path)
-    {
-        lock (_Gate)
-        {
-            return _CanonicalPaths.TryGetValue(handle.Identity, out path);
-        }
-    }
-
-    private ObjectHandle _GetOrCreateHandleCore(object instance)
-    {
-        if (_Identities.TryGetValue(instance, out var existing))
-        {
-            return new ObjectHandle(existing.Identity);
-        }
-
-        var identity = new ObjectIdentity(Guid.NewGuid());
-        _Identities.Add(instance, new _IdentityHolder(identity));
-        _Objects.Add(identity, new WeakReference<object>(instance));
-        return new ObjectHandle(identity);
-    }
-
-    internal async ValueTask<InteractionResult<ObjectHandle>> EncounterAsync(
-        object instance,
-        CancellationToken cancellationToken = default)
-    {
-        ObjectHandle handle;
-        try
-        {
-            handle = GetOrCreateHandle(instance);
-        }
-        catch (ObjectDisposedException)
-        {
-            return _DisposedFailure<ObjectHandle>();
-        }
-
-        var identity = await GetDomainIdentityAsync(handle, cancellationToken).ConfigureAwait(false);
-        return identity.IsSuccess
-            ? InteractionResult.Success(handle)
-            : InteractionResult.Failure<ObjectHandle>(identity.Error!.Code, identity.Error.Message);
-    }
-
-    internal ValueTask<InteractionResult<T>> ExecuteInteractionAsync<T>(
-        InteractionDispatchOperation operation,
-        bool canExecuteDirectly,
-        Func<InteractionResult<T>> action,
-        CancellationToken cancellationToken = default)
-    {
-        ArgumentNullException.ThrowIfNull(action);
-        return ExecuteInteractionAsync(
             operation,
-            canExecuteDirectly,
-            () => ValueTask.FromResult(action()),
-            cancellationToken);
-    }
+            exception,
+            _Settings.IncludeSensitiveDiagnosticData);
 
-    internal async ValueTask<InteractionResult<T>> ExecuteInteractionAsync<T>(
-        InteractionDispatchOperation operation,
-        bool canExecuteDirectly,
-        Func<ValueTask<InteractionResult<T>>> action,
-        CancellationToken cancellationToken = default)
+    private InteractionResult<T> _UnexpectedFailure<T>(string operation, Exception exception)
     {
-        ArgumentNullException.ThrowIfNull(action);
-        if (IsDisposed)
-        {
-            return _DisposedFailure<T>();
-        }
-
-        if (cancellationToken.IsCancellationRequested)
-        {
-            return InteractionResult.Failure<T>(
-                InteractionErrorCode.CANCELLED,
-                $"The {operation} interaction was cancelled.");
-        }
-
-        try
-        {
-            if (canExecuteDirectly || Configuration.Dispatcher.CheckAccess())
-            {
-                return await _ExecuteCheckedAsync(action, cancellationToken).ConfigureAwait(false);
-            }
-
-            var pending = await Configuration.Dispatcher.InvokeAsync(
-                () => _ExecuteCheckedAsync(action, cancellationToken),
-                cancellationToken).ConfigureAwait(false);
-            return await pending.ConfigureAwait(false);
-        }
-        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
-        {
-            return InteractionResult.Failure<T>(
-                InteractionErrorCode.CANCELLED,
-                $"The {operation} interaction was cancelled.");
-        }
-        catch (ObjectDisposedException) when (IsDisposed)
-        {
-            return _DisposedFailure<T>();
-        }
-        catch (Exception exception)
-        {
-            _DISPATCH_FAILED(
-                _Logger,
-                operation,
-                Configuration.IncludeSensitiveDiagnosticData ? exception : null);
-            return InteractionResult.Failure<T>(
-                InteractionErrorCode.DISPATCH_FAILED,
-                $"The dispatcher failed while executing {operation}.");
-        }
-    }
-
-    private async ValueTask<InteractionResult<T>> _ExecuteCheckedAsync<T>(
-        Func<ValueTask<InteractionResult<T>>> action,
-        CancellationToken cancellationToken)
-    {
-        if (IsDisposed)
-        {
-            return _DisposedFailure<T>();
-        }
-
-        if (cancellationToken.IsCancellationRequested)
-        {
-            return InteractionResult.Failure<T>(
-                InteractionErrorCode.CANCELLED,
-                "The interaction was cancelled before it executed.");
-        }
-
-        return await action().ConfigureAwait(false);
-    }
-
-    private async ValueTask<InteractionResult<DomainIdentity?>> _DiscoverDomainIdentityAsync(
-        object instance,
-        CancellationToken cancellationToken)
-    {
-        try
-        {
-            if (Configuration.Exposure.TryGet(instance.GetType(), out var registration) &&
-                registration?.GetDomainIdentity is not null)
-            {
-                return _NormalizeDomainIdentity(registration.GetDomainIdentity(instance));
-            }
-
-            var configuredProvider = Configuration.DomainIdentityProviders.FirstOrDefault(
-                provider => provider.CanProvideIdentity(instance.GetType()));
-            if (configuredProvider is not null)
-            {
-                var provided = await configuredProvider
-                    .GetIdentityAsync(instance, cancellationToken)
-                    .ConfigureAwait(false);
-                return provided.IsSuccess
-                    ? _NormalizeDomainIdentity(provided.Value)
-                    : InteractionResult.Failure<DomainIdentity?>(
-                        provided.Error!.Code,
-                        provided.Error.Message);
-            }
-
-            return _DiscoverBuiltInDomainIdentity(instance);
-        }
-        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
-        {
-            return InteractionResult.Failure<DomainIdentity?>(
-                InteractionErrorCode.CANCELLED,
-                "Domain identity discovery was cancelled.");
-        }
-        catch (Exception exception)
-        {
-            return InteractionResult.Failure<DomainIdentity?>(
-                InteractionErrorCode.IDENTITY_PROVIDER_FAILED,
-                $"Domain identity discovery failed: {exception.Message}");
-        }
-    }
-
-    private static InteractionResult<DomainIdentity?> _DiscoverBuiltInDomainIdentity(object instance)
-    {
-        var attributedMembers = instance.GetType()
-            .GetMembers(BindingFlags.Instance | BindingFlags.Public)
-            .Where(static member => member.IsDefined(typeof(DomainIdentitySourceAttribute), inherit: true))
-            .ToArray();
-        if (attributedMembers.Length > 1)
-        {
-            return InteractionResult.Failure<DomainIdentity?>(
-                InteractionErrorCode.CONFLICTING_DOMAIN_IDENTITY,
-                $"Type '{instance.GetType().FullName}' has multiple attributed domain identity members.");
-        }
-
-        string? attributedValue = null;
-        if (attributedMembers.Length == 1)
-        {
-            var member = attributedMembers[0];
-            if (member is PropertyInfo { PropertyType: var propertyType } property &&
-                propertyType == typeof(string) &&
-                property.GetMethod is not null &&
-                property.GetIndexParameters().Length == 0)
-            {
-                attributedValue = (string?)property.GetValue(instance);
-            }
-            else if (member is FieldInfo { FieldType: var fieldType } field && fieldType == typeof(string))
-            {
-                attributedValue = (string?)field.GetValue(instance);
-            }
-            else
-            {
-                return InteractionResult.Failure<DomainIdentity?>(
-                    InteractionErrorCode.INVALID_DOMAIN_IDENTITY,
-                    $"Attributed domain identity member '{member.Name}' must be a readable string field or property.");
-            }
-        }
-
-        var interfaceValue = (instance as IStableDomainIdentity)?.DomainIdentity;
-        if ((interfaceValue is not null && string.IsNullOrWhiteSpace(interfaceValue)) ||
-            (attributedValue is not null && string.IsNullOrWhiteSpace(attributedValue)))
-        {
-            return InteractionResult.Failure<DomainIdentity?>(
-                InteractionErrorCode.INVALID_DOMAIN_IDENTITY,
-                "A supplied domain identity cannot be empty or whitespace.");
-        }
-
-        if (interfaceValue is not null &&
-            attributedValue is not null &&
-            !StringComparer.Ordinal.Equals(interfaceValue, attributedValue))
-        {
-            return InteractionResult.Failure<DomainIdentity?>(
-                InteractionErrorCode.CONFLICTING_DOMAIN_IDENTITY,
-                $"Type '{instance.GetType().FullName}' supplies conflicting interface and attributed domain identities.");
-        }
-
-        return _NormalizeDomainIdentity(interfaceValue ?? attributedValue);
-    }
-
-    private static InteractionResult<DomainIdentity?> _NormalizeDomainIdentity(string? value)
-    {
-        if (value is null)
-        {
-            return InteractionResult.Success<DomainIdentity?>(null);
-        }
-
-        if (string.IsNullOrWhiteSpace(value))
-        {
-            return InteractionResult.Failure<DomainIdentity?>(
-                InteractionErrorCode.INVALID_DOMAIN_IDENTITY,
-                "A supplied domain identity cannot be empty or whitespace.");
-        }
-
-        return InteractionResult.Success<DomainIdentity?>(new DomainIdentity(value));
+        _ReportUnexpected(operation, exception);
+        return InteractionResult.Failure<T>(
+            InteractionErrorCode.FAULT,
+            $"The {operation} operation failed unexpectedly.");
     }
 
     private static InteractionResult<ObjectHandle> _DomainIdentityNotFound(DomainIdentity identity) =>
         InteractionResult.Failure<ObjectHandle>(
-            InteractionErrorCode.DOMAIN_IDENTITY_NOT_FOUND,
-            $"No live encountered object has domain identity '{identity}'.");
+            InteractionErrorCode.NOT_FOUND,
+            $"No live object has domain identity '{identity}'.");
 
     private static InteractionResult<T> _DisposedFailure<T>() => InteractionResult.Failure<T>(
-        InteractionErrorCode.HOST_DISPOSED,
+        InteractionErrorCode.DISPOSED,
         "The UIEngine host has been disposed.");
 
-    private sealed record _IdentityHolder(ObjectIdentity Identity);
+    private sealed record _HandleHolder(ObjectHandle Handle);
 
-    private sealed record _RootEntry(RegisteredRoot Registration, object Instance);
-
+    private sealed record _RootEntry(RootRegistration Registration, object Instance);
 }

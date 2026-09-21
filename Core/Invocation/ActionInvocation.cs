@@ -1,0 +1,184 @@
+namespace UIEngine.Core;
+
+public enum InvocationStatus
+{
+    RUNNING,
+    SUCCEEDED,
+    FAILED,
+    CANCELLED,
+}
+
+public sealed record InvocationProgress(long OrderingToken, object? Value, Type ValueType);
+
+/// <summary>One running or completed domain action.</summary>
+public sealed class ActionInvocation
+{
+    private readonly object _Gate = new();
+    private readonly BoundedAsyncStream<InvocationProgress> _Progress;
+    private readonly TaskCompletionSource<InteractionResult<object?>> _Completion =
+        new(TaskCreationOptions.RunContinuationsAsynchronously);
+    private readonly CancellationTokenSource? _Cancellation;
+    private readonly Action<ActionInvocation> _OnCompleted;
+    private readonly string _ActionId;
+    private int _CancellationRequested;
+    private int _Terminal;
+    private long _OrderingToken;
+    private InvocationStatus _Status = InvocationStatus.RUNNING;
+    private Exception? _Fault;
+
+    internal ActionInvocation(
+        string actionId,
+        bool supportsCancellation,
+        int progressCapacity,
+        Action<ActionInvocation> onCompleted)
+    {
+        _ActionId = actionId;
+        SupportsCancellation = supportsCancellation;
+        _Progress = new BoundedAsyncStream<InvocationProgress>(progressCapacity);
+        _Cancellation = supportsCancellation ? new CancellationTokenSource() : null;
+        _OnCompleted = onCompleted;
+    }
+
+    public InvocationStatus Status
+    {
+        get
+        {
+            lock (_Gate)
+            {
+                return _Status;
+            }
+        }
+    }
+
+    public bool SupportsCancellation { get; }
+
+    public bool IsCancellationRequested => Volatile.Read(ref _CancellationRequested) != 0;
+
+    public Exception? Fault
+    {
+        get
+        {
+            lock (_Gate)
+            {
+                return _Fault;
+            }
+        }
+    }
+
+    public Task<InteractionResult<object?>> Completion => _Completion.Task;
+
+    internal CancellationToken CancellationToken => _Cancellation?.Token ?? CancellationToken.None;
+
+    internal object CreateProgressReporter(Type progressType) =>
+        Activator.CreateInstance(typeof(_ProgressReporter<>).MakeGenericType(progressType), this)!;
+
+    internal void CompleteSuccess(object? value) => _Complete(
+        InvocationStatus.SUCCEEDED,
+        InteractionResult.Success(value),
+        null);
+
+    internal void CompleteFailure(Exception exception)
+    {
+        if (exception is OperationCanceledException && SupportsCancellation && IsCancellationRequested)
+        {
+            _Complete(
+                InvocationStatus.CANCELLED,
+                InteractionResult.Failure<object?>(
+                    InteractionErrorCode.CANCELLED,
+                    "Action invocation was cancelled."),
+                null);
+            return;
+        }
+
+        _Complete(
+            InvocationStatus.FAILED,
+            InteractionResult.Failure<object?>(
+                exception is UnauthorizedAccessException
+                    ? InteractionErrorCode.PERMISSION_DENIED
+                    : InteractionErrorCode.FAULT,
+                exception.Message),
+            exception);
+    }
+
+    internal void CompleteHostDisposed()
+    {
+        Interlocked.Exchange(ref _CancellationRequested, 1);
+        _Complete(
+            InvocationStatus.CANCELLED,
+            InteractionResult.Failure<object?>(
+                InteractionErrorCode.DISPOSED,
+                "The UIEngine host was disposed during action invocation."),
+            null,
+            disposeCancellation: false);
+        try
+        {
+            _Cancellation?.Cancel();
+        }
+        catch (ObjectDisposedException)
+        {
+            // The invocation completed concurrently with host disposal.
+        }
+        finally
+        {
+            _Cancellation?.Dispose();
+        }
+    }
+
+    public bool Cancel()
+    {
+        if (!SupportsCancellation || Volatile.Read(ref _Terminal) != 0 ||
+            Interlocked.Exchange(ref _CancellationRequested, 1) != 0)
+        {
+            return false;
+        }
+
+        try
+        {
+            _Cancellation!.Cancel();
+            return true;
+        }
+        catch (ObjectDisposedException)
+        {
+            return false;
+        }
+    }
+
+    public IAsyncEnumerable<InvocationProgress> ReadProgressAsync(
+        CancellationToken cancellationToken = default) =>
+        _Progress.ReadAllAsync(cancellationToken);
+
+    internal void ReportProgress(object? value, Type valueType) => _Progress.Publish(
+        new InvocationProgress(Interlocked.Increment(ref _OrderingToken), value, valueType));
+
+    private void _Complete(
+        InvocationStatus status,
+        InteractionResult<object?> result,
+        Exception? fault,
+        bool disposeCancellation = true)
+    {
+        if (Interlocked.Exchange(ref _Terminal, 1) != 0)
+        {
+            return;
+        }
+
+        lock (_Gate)
+        {
+            _Status = status;
+            _Fault = fault;
+        }
+
+        _Progress.Complete();
+        _Completion.TrySetResult(result);
+        if (disposeCancellation)
+        {
+            _Cancellation?.Dispose();
+        }
+
+        _OnCompleted(this);
+    }
+
+    private sealed class _ProgressReporter<T>(ActionInvocation owner) : IProgress<T>
+    {
+        public void Report(T value) => owner.ReportProgress(value, typeof(T));
+    }
+}

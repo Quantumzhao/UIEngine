@@ -2,175 +2,206 @@ using System.Collections;
 using System.Collections.Concurrent;
 using System.ComponentModel.DataAnnotations;
 using System.Reflection;
+using System.Runtime.CompilerServices;
 using UIEngine.Core.Attributes;
 
-namespace UIEngine.Core.Reflection;
+namespace UIEngine.Core;
 
-/// <summary>Identifies the semantic descriptor role assigned to a reflected member.</summary>
-internal enum ReflectionMemberKind
-{
-    VALUE,
-    REFERENCE,
-    COLLECTION,
-    ACTION,
-}
-
-/// <summary>Stores immutable, type-level metadata for one descriptor member.</summary>
-internal sealed record ReflectionMemberMetadata(
+internal sealed record ReflectedMember(
     string Id,
-    string DisplayName,
-    Type MemberType,
-    ReflectionMemberKind Kind,
+    MemberKind Kind,
     MemberInfo Member,
+    Type ValueType,
     bool IsNullable,
     IReadOnlyList<SelectionOption> Options,
     ValueRange? Range,
-    IReadOnlyList<ValidationRuleDescriptor> ValidationRules,
-    IReadOnlyList<ValidationAttribute> ValidationAttributes,
-    string? Unit,
-    IReadOnlyList<string> Tags);
+    IReadOnlyList<ValidationAttribute> ValidationAttributes);
 
-/// <summary>Stores cached exposure and descriptor metadata for one reflected type.</summary>
-internal sealed record ReflectionTypeMetadata(
-    IReadOnlyList<MemberInfo> ExposedMembers,
-    IReadOnlyList<ReflectionMemberMetadata> DescriptorMembers,
-    MemberInfo? SummaryMember);
+internal sealed record ReflectedType(
+    IReadOnlyList<ReflectedMember> Members,
+    MemberInfo? SummaryMember,
+    MemberInfo? DomainIdentityMember);
 
-/// <summary>Builds reflection metadata once per runtime type and reuses it across instances.</summary>
-internal static class ReflectionTypeMetadataCache
+internal static class ReflectionMetadata
 {
-    private static readonly ConcurrentDictionary<Type, ReflectionTypeMetadata> _CACHE = new();
+    private static readonly ConcurrentDictionary<Type, ReflectedType> _CACHE = new();
+    private static readonly NullabilityInfoContext _NULLABILITY = new();
 
-    public static ReflectionTypeMetadata GetOrCreate(Type objectType)
+    public static ReflectedType Get(Type type) => _CACHE.GetOrAdd(type, _Build);
+
+    public static bool CanRead(MemberInfo member) => member switch
     {
-        ArgumentNullException.ThrowIfNull(objectType);
-        return _CACHE.GetOrAdd(objectType, _Build);
+        PropertyInfo property => property.GetMethod?.IsPublic == true &&
+            property.GetIndexParameters().Length == 0,
+        FieldInfo => true,
+        _ => false,
+    };
+
+    public static bool CanWrite(MemberInfo member) => member switch
+    {
+        PropertyInfo property => property.SetMethod?.IsPublic == true &&
+            property.GetIndexParameters().Length == 0 &&
+            !property.SetMethod.ReturnParameter
+                .GetRequiredCustomModifiers()
+                .Contains(typeof(IsExternalInit)),
+        FieldInfo field => !field.IsInitOnly && !field.IsLiteral,
+        _ => false,
+    };
+
+    public static object? Read(MemberInfo member, object instance) => member switch
+    {
+        PropertyInfo property when property.GetIndexParameters().Length == 0 =>
+            property.GetValue(instance),
+        FieldInfo field => field.GetValue(instance),
+        MethodInfo method when method.GetParameters().Length == 0 => method.Invoke(instance, null),
+        _ => throw new InvalidOperationException(
+            $"Member '{member.Name}' cannot be read without arguments."),
+    };
+
+    public static void Write(MemberInfo member, object instance, object? value)
+    {
+        switch (member)
+        {
+            case PropertyInfo property when CanWrite(property):
+                property.SetValue(instance, value);
+                break;
+            case FieldInfo field when CanWrite(field):
+                field.SetValue(instance, value);
+                break;
+            default:
+                throw new InvalidOperationException($"Member '{member.Name}' is read-only.");
+        }
     }
 
-    private static ReflectionTypeMetadata _Build(Type objectType)
+    public static bool IsNullable(ParameterInfo parameter)
+    {
+        if (Nullable.GetUnderlyingType(parameter.ParameterType) is not null)
+        {
+            return true;
+        }
+
+        return !parameter.ParameterType.IsValueType &&
+            _NULLABILITY.Create(parameter).WriteState != NullabilityState.NotNull;
+    }
+
+    public static ValidationAttribute[] GetValidationAttributes(ICustomAttributeProvider provider) =>
+        provider.GetCustomAttributes(typeof(ValidationAttribute), inherit: true)
+            .Cast<ValidationAttribute>()
+            .ToArray();
+
+    private static ReflectedType _Build(Type type)
     {
         const BindingFlags FLAGS = BindingFlags.Instance | BindingFlags.Public;
-
-        var exposedMembers = objectType
-            .GetMembers(FLAGS)
-            .Where(_IsExplicitlyExposed)
+        var candidates = type.GetMembers(FLAGS)
+            .Where(static member =>
+                member.IsDefined(typeof(ExposeAttribute), inherit: true) ||
+                member.IsDefined(typeof(ChildrenAttribute), inherit: true) ||
+                member.IsDefined(typeof(ActionAttribute), inherit: true))
             .OrderBy(static member => member.Name, StringComparer.Ordinal)
-            .ThenBy(static member => member.MemberType)
-            .ThenBy(_GetStableSignature, StringComparer.Ordinal)
+            .ThenBy(_Signature, StringComparer.Ordinal)
             .ToArray();
-
-        var candidates = exposedMembers
-            .Select(_CreateCandidate)
-            .OfType<_MemberCandidate>()
-            .ToArray();
-        var usedIdentifiers = new HashSet<string>(StringComparer.Ordinal);
-        var descriptorMembers = new List<ReflectionMemberMetadata>(candidates.Length);
-
-        foreach (var candidate in candidates)
+        var usedIds = new HashSet<string>(StringComparer.Ordinal);
+        var members = new List<ReflectedMember>();
+        foreach (var member in candidates)
         {
-            var identifier = candidate.Member.Name;
-            var suffix = 2;
-            while (!usedIdentifiers.Add(identifier))
+            var memberType = member switch
             {
-                identifier = $"{candidate.Member.Name}#{suffix}";
-                suffix++;
+                PropertyInfo property => property.PropertyType,
+                FieldInfo field => field.FieldType,
+                MethodInfo method when method.IsDefined(typeof(ActionAttribute), inherit: true) =>
+                    method.ReturnType,
+                _ => null,
+            };
+            if (memberType is null)
+            {
+                continue;
             }
 
-            var validationAttributes = ReflectionValidationMetadata.GetAttributes(candidate.Member);
-            var options = ValueValidation.GetEnumOptions(candidate.MemberType);
-            var interactionMetadata = candidate.Member.GetCustomAttribute<InteractionMetadataAttribute>(
-                inherit: true);
-            descriptorMembers.Add(new ReflectionMemberMetadata(
-                identifier,
-                candidate.Member.Name,
-                candidate.MemberType,
-                candidate.Kind,
-                candidate.Member,
-                ReflectionValidationMetadata.IsNullable(candidate.Member, candidate.MemberType) &&
-                    validationAttributes.All(static attribute => attribute is not RequiredAttribute),
+            var id = member.Name;
+            for (var suffix = 2; !usedIds.Add(id); suffix++)
+            {
+                id = $"{member.Name}#{suffix}";
+            }
+
+            var kind = member is MethodInfo
+                ? MemberKind.ACTION
+                : _IsCollection(memberType)
+                    ? MemberKind.COLLECTION
+                    : _IsScalar(memberType)
+                        ? MemberKind.VALUE
+                        : MemberKind.REFERENCE;
+            var validation = GetValidationAttributes(member);
+            var options = ValueConversion.GetEnumOptions(memberType);
+            var range = validation.OfType<RangeAttribute>()
+                .Select(static attribute => new ValueRange(attribute.Minimum, attribute.Maximum))
+                .FirstOrDefault();
+            members.Add(new ReflectedMember(
+                id,
+                kind,
+                member,
+                memberType,
+                _IsNullable(member, memberType) &&
+                    validation.All(static attribute => attribute is not RequiredAttribute),
                 options,
-                ReflectionValidationMetadata.GetRange(validationAttributes),
-                ReflectionValidationMetadata.GetRules(validationAttributes, options.Count > 0),
-                validationAttributes,
-                interactionMetadata?.Unit,
-                interactionMetadata?.Tags.ToArray() ?? []));
+                range,
+                validation));
         }
 
-        var summaryMember = exposedMembers.FirstOrDefault(
+        var allMembers = type.GetMembers(FLAGS);
+        var summary = allMembers.FirstOrDefault(
             static member => member.IsDefined(typeof(SummaryAttribute), inherit: true));
+        var identities = allMembers
+            .Where(static member => member.IsDefined(
+                typeof(DomainIdentitySourceAttribute),
+                inherit: true))
+            .ToArray();
+        if (identities.Length > 1)
+        {
+            throw new InvalidOperationException(
+                $"Type '{type.FullName}' has multiple domain identity members.");
+        }
 
-        return new ReflectionTypeMetadata(exposedMembers, descriptorMembers, summaryMember);
+        return new ReflectedType(members, summary, identities.SingleOrDefault());
     }
 
-    private static _MemberCandidate? _CreateCandidate(MemberInfo member)
+    private static bool _IsNullable(MemberInfo member, Type memberType)
     {
-        if (member is MethodInfo method && method.IsDefined(typeof(ActionAttribute), inherit: true))
+        if (Nullable.GetUnderlyingType(memberType) is not null)
         {
-            return new _MemberCandidate(member, method.ReturnType, ReflectionMemberKind.ACTION);
+            return true;
         }
 
-        var isDescriptorMember =
-            member.IsDefined(typeof(ExposeAttribute), inherit: true) ||
-            member.IsDefined(typeof(ChildrenAttribute), inherit: true);
-        if (!isDescriptorMember)
+        if (memberType.IsValueType)
         {
-            return null;
+            return false;
         }
 
-        var memberType = member switch
+        return member switch
         {
-            PropertyInfo property => property.PropertyType,
-            FieldInfo field => field.FieldType,
-            _ => null,
+            PropertyInfo property => property.SetMethod is null
+                ? _NULLABILITY.Create(property).ReadState != NullabilityState.NotNull
+                : _NULLABILITY.Create(property).WriteState != NullabilityState.NotNull,
+            FieldInfo field => _NULLABILITY.Create(field).WriteState != NullabilityState.NotNull,
+            _ => true,
         };
-        if (memberType is null)
-        {
-            return null;
-        }
-
-        var kind = _IsScalar(memberType)
-            ? ReflectionMemberKind.VALUE
-            : _IsCollection(memberType)
-                ? ReflectionMemberKind.COLLECTION
-                : ReflectionMemberKind.REFERENCE;
-
-        return new _MemberCandidate(member, memberType, kind);
     }
 
-    private static bool _IsExplicitlyExposed(MemberInfo member) =>
-        member.IsDefined(typeof(ExposeAttribute), inherit: true) ||
-        member.IsDefined(typeof(ActionAttribute), inherit: true) ||
-        member.IsDefined(typeof(ChildrenAttribute), inherit: true) ||
-        member.IsDefined(typeof(SummaryAttribute), inherit: true);
-
-    private static bool _IsScalar(Type memberType)
+    private static bool _IsScalar(Type type)
     {
-        var underlyingType = Nullable.GetUnderlyingType(memberType) ?? memberType;
-        return underlyingType.IsValueType || underlyingType == typeof(string);
+        var underlying = Nullable.GetUnderlyingType(type) ?? type;
+        return underlying.IsValueType || underlying == typeof(string);
     }
 
-    private static bool _IsCollection(Type memberType) =>
-        memberType != typeof(string) && typeof(IEnumerable).IsAssignableFrom(memberType);
+    private static bool _IsCollection(Type type) =>
+        type != typeof(string) && typeof(IEnumerable).IsAssignableFrom(type);
 
-    private static string _GetStableSignature(MemberInfo member)
+    private static string _Signature(MemberInfo member) => member switch
     {
-        var declaringType = member.DeclaringType?.FullName ?? string.Empty;
-        var memberSignature = member switch
-        {
-            MethodInfo method => $"{method.GetGenericArguments().Length}:" + string.Join(
-                ",",
-                method.GetParameters().Select(static parameter =>
-                    parameter.ParameterType.FullName ?? parameter.ParameterType.Name)),
-            PropertyInfo property => property.PropertyType.FullName ?? property.PropertyType.Name,
-            FieldInfo field => field.FieldType.FullName ?? field.FieldType.Name,
-            _ => string.Empty,
-        };
-        return $"{declaringType}:{memberSignature}";
-    }
-
-    /// <summary>Holds a classified member before its unique identifier is assigned.</summary>
-    private sealed record _MemberCandidate(
-        MemberInfo Member,
-        Type MemberType,
-        ReflectionMemberKind Kind);
+        MethodInfo method => string.Join(
+            ",",
+            method.GetParameters().Select(static parameter => parameter.ParameterType.FullName)),
+        PropertyInfo property => property.PropertyType.FullName ?? property.PropertyType.Name,
+        FieldInfo field => field.FieldType.FullName ?? field.FieldType.Name,
+        _ => string.Empty,
+    };
 }

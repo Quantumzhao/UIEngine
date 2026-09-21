@@ -3,22 +3,11 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 16
 VisualStudioVersion = 16.0.29230.47
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "UIEngine", "UIEngine\UIEngine.csproj", "{D55A802C-0976-42E0-A1F7-CAE96C1330E9}"
-EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{1AA45197-8FBB-4B47-B4C9-47FD07E9765B}"
 	ProjectSection(SolutionItems) = preProject
-		docs\milestones\01-architecture-runway-cli-walking-skeleton.md = docs\milestones\01-architecture-runway-cli-walking-skeleton.md
-		docs\milestones\02-framework-mvp-interaction-hardening.md = docs\milestones\02-framework-mvp-interaction-hardening.md
-		docs\milestones\README.md = docs\milestones\README.md
 		PROJECT_CONTEXT.md = PROJECT_CONTEXT.md
 		README.MD = README.MD
-		REBOOT_PLAN.md = REBOOT_PLAN.md
-		TODO.MD = TODO.MD
 	EndProjectSection
-EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "UIEngine.Legacy.Characterization.Tests", "Tests\UIEngine.Legacy.Characterization.Tests\UIEngine.Legacy.Characterization.Tests.csproj", "{7AE4D731-C193-4B6D-AEE4-8E76C736177B}"
-EndProject
-Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Legacy", "Legacy", "{047D230A-820A-4998-92D6-C5070228ED73}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Core", "Core", "{7B29D791-D6ED-4B16-B869-E6D148908A74}"
 EndProject
@@ -44,14 +33,6 @@ Global
 		Release|Any CPU = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
-		{D55A802C-0976-42E0-A1F7-CAE96C1330E9}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{D55A802C-0976-42E0-A1F7-CAE96C1330E9}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{D55A802C-0976-42E0-A1F7-CAE96C1330E9}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{D55A802C-0976-42E0-A1F7-CAE96C1330E9}.Release|Any CPU.Build.0 = Release|Any CPU
-		{7AE4D731-C193-4B6D-AEE4-8E76C736177B}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{7AE4D731-C193-4B6D-AEE4-8E76C736177B}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{7AE4D731-C193-4B6D-AEE4-8E76C736177B}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{7AE4D731-C193-4B6D-AEE4-8E76C736177B}.Release|Any CPU.Build.0 = Release|Any CPU
 		{5DA214BF-A217-456A-AE65-571024FFD439}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{5DA214BF-A217-456A-AE65-571024FFD439}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{5DA214BF-A217-456A-AE65-571024FFD439}.Release|Any CPU.ActiveCfg = Release|Any CPU
@@ -74,11 +55,9 @@ Global
 		{E5E8D5E1-346E-4860-A932-4EA9C18DAE23}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(NestedProjects) = preSolution
-		{D55A802C-0976-42E0-A1F7-CAE96C1330E9} = {047D230A-820A-4998-92D6-C5070228ED73}
 		{5DA214BF-A217-456A-AE65-571024FFD439} = {7B29D791-D6ED-4B16-B869-E6D148908A74}
 		{EAC7A310-E711-4503-A095-C0F5C9ACE30E} = {A14610D6-0746-4FB1-9548-0F21E8CB2E17}
 		{34B37633-1EEB-472A-B932-0582945491D6} = {93F14414-36BA-4AF7-A513-4B474F4A8839}
-		{7AE4D731-C193-4B6D-AEE4-8E76C736177B} = {29E944E2-1678-45BA-B59A-748A333AB9D2}
 		{C1A65C07-E00E-431A-8ABF-656AB9E82B78} = {29E944E2-1678-45BA-B59A-748A333AB9D2}
 		{E5E8D5E1-346E-4860-A932-4EA9C18DAE23} = {29E944E2-1678-45BA-B59A-748A333AB9D2}
 	EndGlobalSection

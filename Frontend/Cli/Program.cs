@@ -1,5 +1,4 @@
 using UIEngine.Core;
-using UIEngine.Core.Reflection;
 using UIEngine.Examples.CyclicDomain;
 
 namespace UIEngine.Frontend.Cli;
@@ -11,18 +10,17 @@ internal static class Program
     {
         var host = new UIEngineHost(new UIEngineHostOptions
         {
-            Exposure = CyclicWorldFactory.CreateExposureRegistry(),
-            DescriptorProviders = [new ReflectionObjectDescriptorProvider()],
+            Exposures = CyclicWorldFactory.CreateExposures(),
         });
-        host.RegisterRoot("world", CyclicWorldFactory.Create());
-        await using var session = new CliSession(host, Console.Out);
+        host.SetRoot("world", CyclicWorldFactory.Create());
+        using var session = new CliSession(host, Console.Out);
 
         if (Console.IsInputRedirected || Console.IsOutputRedirected)
         {
-            await new CliTextReaderRunner(session, Console.In).RunAsync().ConfigureAwait(false);
+            await new CliTextReaderRunner(session, Console.In).RunAsync();
             return;
         }
 
-        await new CliPromptRunner(session).RunAsync().ConfigureAwait(false);
+        await new CliPromptRunner(session).RunAsync();
     }
 }

@@ -5,7 +5,11 @@ public readonly record struct DomainIdentity
 {
     public DomainIdentity(string value)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(value);
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            throw new ArgumentException("A domain identity cannot be empty or whitespace.", nameof(value));
+        }
+
         Value = value;
     }
 

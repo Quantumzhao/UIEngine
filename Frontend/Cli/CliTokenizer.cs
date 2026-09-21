@@ -8,8 +8,6 @@ internal static class CliTokenizer
 {
     public static InteractionResult<IReadOnlyList<string>> Tokenize(string line)
     {
-        ArgumentNullException.ThrowIfNull(line);
-
         var tokens = new List<string>();
         var current = new StringBuilder();
         var inQuotes = false;

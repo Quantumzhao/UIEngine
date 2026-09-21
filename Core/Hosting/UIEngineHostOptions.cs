@@ -1,35 +1,18 @@
-using System.Collections.ObjectModel;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
-using UIEngine.Core.Exposure;
-using UIEngine.Core.Reflection;
 
 namespace UIEngine.Core;
 
-/// <summary>Configures the host-scoped services and safety limits used by one runtime.</summary>
-public sealed class UIEngineHostOptions
+public sealed record UIEngineHostOptions
 {
-    /// <summary>Gets programmatic exposure copied into this host when it is constructed.</summary>
-    public ExposureRegistry Exposure { get; init; } = new();
-
-    public IEnumerable<IObjectDescriptorProvider> DescriptorProviders { get; init; } = [];
+    public IEnumerable<TypeExposure> Exposures { get; init; } = [];
 
     public IInteractionDispatcher Dispatcher { get; init; } = InlineInteractionDispatcher.Instance;
 
-    /// <summary>
-    /// Gets providers checked in order after an exposure-registry callback and before built-in
-    /// interface and attributed-member discovery.
-    /// </summary>
-    public IEnumerable<IDomainIdentityProvider> DomainIdentityProviders { get; init; } = [];
+    public int MaxCollectionItems { get; init; } = 1_000;
 
-    public IEnumerable<IObservationAdapter> ObservationAdapters { get; init; } = [];
+    public int ObservationBufferCapacity { get; init; } = 256;
 
-    /// <summary>Gets the default interval used by explicitly requested polling subscriptions.</summary>
-    public TimeSpan ObservationPollingInterval { get; init; } = TimeSpan.FromSeconds(1);
-
-    public CollectionAccessLimits CollectionLimits { get; init; } = new();
-
-    /// <summary>Gets the maximum number of pending progress records retained per invocation.</summary>
     public int InvocationProgressBufferCapacity { get; init; } = 256;
 
     public ILoggerFactory LoggerFactory { get; init; } = NullLoggerFactory.Instance;
@@ -37,115 +20,45 @@ public sealed class UIEngineHostOptions
     public bool IncludeSensitiveDiagnosticData { get; init; }
 }
 
-/// <summary>An immutable snapshot of the options supplied when a host is created.</summary>
-public sealed class UIEngineHostConfiguration
+internal sealed class HostSettings
 {
-    internal UIEngineHostConfiguration(UIEngineHostOptions options)
+    public HostSettings(UIEngineHostOptions options)
     {
-        ArgumentNullException.ThrowIfNull(options);
-        ArgumentNullException.ThrowIfNull(options.Exposure);
-        ArgumentNullException.ThrowIfNull(options.DescriptorProviders);
-        ArgumentNullException.ThrowIfNull(options.Dispatcher);
-        ArgumentNullException.ThrowIfNull(options.DomainIdentityProviders);
-        ArgumentNullException.ThrowIfNull(options.ObservationAdapters);
-        ArgumentNullException.ThrowIfNull(options.CollectionLimits);
-        ArgumentNullException.ThrowIfNull(options.LoggerFactory);
-
-        options.CollectionLimits.Validate();
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(options.MaxCollectionItems);
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(options.ObservationBufferCapacity);
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(options.InvocationProgressBufferCapacity);
-        Exposure = options.Exposure.CreateSnapshot();
-        DescriptorProviders = _Snapshot(options.DescriptorProviders, nameof(options.DescriptorProviders));
-        var reflectionProviders = DescriptorProviders.OfType<ReflectionObjectDescriptorProvider>().ToArray();
-        if (reflectionProviders.Length > 1)
+
+        var exposures = options.Exposures.ToArray();
+        var duplicate = exposures
+            .GroupBy(static exposure => exposure.ObjectType)
+            .FirstOrDefault(static group => group.Count() > 1)?.Key;
+        if (duplicate is not null)
         {
             throw new ArgumentException(
-                "Only one reflection descriptor provider can be configured.",
+                $"Type '{duplicate.FullName}' has more than one programmatic exposure.",
                 nameof(options));
         }
 
-        ReflectionProvider = reflectionProviders.SingleOrDefault();
-        CustomDescriptorProviders = new ReadOnlyCollection<IObjectDescriptorProvider>(
-            DescriptorProviders.Where(static provider => provider is not ReflectionObjectDescriptorProvider).ToArray());
+        Exposures = exposures.ToDictionary(static exposure => exposure.ObjectType);
         Dispatcher = options.Dispatcher;
-        DomainIdentityProviders = _Snapshot(
-            options.DomainIdentityProviders,
-            nameof(options.DomainIdentityProviders));
-        ObservationAdapters = _Snapshot(
-            options.ObservationAdapters,
-            nameof(options.ObservationAdapters));
-        if (options.ObservationPollingInterval <= TimeSpan.Zero)
-        {
-            throw new ArgumentOutOfRangeException(
-                nameof(options),
-                "The observation polling interval must be positive.");
-        }
-
-        ObservationPollingInterval = options.ObservationPollingInterval;
-        CollectionLimits = options.CollectionLimits with { };
+        MaxCollectionItems = options.MaxCollectionItems;
+        ObservationBufferCapacity = options.ObservationBufferCapacity;
         InvocationProgressBufferCapacity = options.InvocationProgressBufferCapacity;
         LoggerFactory = options.LoggerFactory;
         IncludeSensitiveDiagnosticData = options.IncludeSensitiveDiagnosticData;
     }
 
-    /// <summary>
-    /// Gets the configured providers. Programmatic exposure always has first precedence, custom
-    /// providers are considered in this order, and reflection is always the final fallback.
-    /// </summary>
-    public IReadOnlyList<IObjectDescriptorProvider> DescriptorProviders { get; }
-
-    /// <summary>Gets the exact runtime types with host-scoped programmatic exposure.</summary>
-    public IReadOnlyList<Type> ProgrammaticallyExposedTypes => Exposure.RegisteredTypes;
+    public IReadOnlyDictionary<Type, TypeExposure> Exposures { get; }
 
     public IInteractionDispatcher Dispatcher { get; }
 
-    /// <summary>Gets domain identity providers in descending precedence order.</summary>
-    public IReadOnlyList<IDomainIdentityProvider> DomainIdentityProviders { get; }
+    public int MaxCollectionItems { get; }
 
-    /// <summary>Gets observation adapters in descending precedence order.</summary>
-    public IReadOnlyList<IObservationAdapter> ObservationAdapters { get; }
-
-    public TimeSpan ObservationPollingInterval { get; }
-
-    public CollectionAccessLimits CollectionLimits { get; }
+    public int ObservationBufferCapacity { get; }
 
     public int InvocationProgressBufferCapacity { get; }
 
     public ILoggerFactory LoggerFactory { get; }
 
     public bool IncludeSensitiveDiagnosticData { get; }
-
-    internal ExposureRegistrySnapshot Exposure { get; }
-
-    internal IReadOnlyList<IObjectDescriptorProvider> CustomDescriptorProviders { get; }
-
-    internal ReflectionObjectDescriptorProvider? ReflectionProvider { get; }
-
-    private static ReadOnlyCollection<T> _Snapshot<T>(IEnumerable<T> source, string parameterName)
-        where T : class
-    {
-        var items = source.ToArray();
-        if (items.Any(static item => item is null))
-        {
-            throw new ArgumentException("Configured service collections cannot contain null entries.", parameterName);
-        }
-
-        return new ReadOnlyCollection<T>(items);
-    }
-}
-
-/// <summary>Bounds collection work and observation buffering performed by a host.</summary>
-public sealed record CollectionAccessLimits
-{
-    public int MaxPageSize { get; init; } = 100;
-
-    public int MaxSnapshotSize { get; init; } = 1_000;
-
-    public int ObservationBufferCapacity { get; init; } = 256;
-
-    internal void Validate()
-    {
-        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(MaxPageSize);
-        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(MaxSnapshotSize);
-        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(ObservationBufferCapacity);
-    }
 }

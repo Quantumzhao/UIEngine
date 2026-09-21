@@ -13,7 +13,6 @@ internal sealed class CliPromptRunner
 
     public CliPromptRunner(CliSession session)
     {
-        ArgumentNullException.ThrowIfNull(session);
         _Session = session;
     }
 
@@ -27,7 +26,7 @@ internal sealed class CliPromptRunner
         while (!cancellationToken.IsCancellationRequested)
         {
             configuration.Prompt = $"{_Session.CurrentPath}> ";
-            var response = await prompt.ReadLineAsync().ConfigureAwait(false);
+            var response = await prompt.ReadLineAsync();
             if (!response.IsSuccess)
             {
                 continue;
@@ -36,8 +35,7 @@ internal sealed class CliPromptRunner
             using var commandCancellation = CancellationTokenSource.CreateLinkedTokenSource(
                 cancellationToken,
                 response.CancellationToken);
-            if (!await _Session.ExecuteAsync(response.Text, commandCancellation.Token)
-                    .ConfigureAwait(false))
+            if (!await _Session.ExecuteAsync(response.Text, commandCancellation.Token))
             {
                 return;
             }

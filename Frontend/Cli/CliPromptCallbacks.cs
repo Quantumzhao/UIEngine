@@ -11,7 +11,6 @@ internal sealed class CliPromptCallbacks : PromptCallbacks
 
     public CliPromptCallbacks(CliSession session)
     {
-        ArgumentNullException.ThrowIfNull(session);
         _Session = session;
     }
 
@@ -41,8 +40,7 @@ internal sealed class CliPromptCallbacks : PromptCallbacks
         TextSpan spanToBeReplaced,
         CancellationToken cancellationToken)
     {
-        var completions = await _Session.GetCompletionsAsync(text, caret, cancellationToken)
-            .ConfigureAwait(false);
+        var completions = await _Session.GetCompletionsAsync(text, caret, cancellationToken);
         return completions.Select(static completion => new CompletionItem(completion)).ToArray();
     }
 }

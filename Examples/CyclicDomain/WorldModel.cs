@@ -6,33 +6,29 @@ using System.Globalization;
 using System.Runtime.CompilerServices;
 using UIEngine.Core;
 using UIEngine.Core.Attributes;
-using UIEngine.Core.Exposure;
 
 namespace UIEngine.Examples.CyclicDomain;
 
 /// <summary>Creates the deterministic cyclic graph used by the CLI and integration tests.</summary>
 public static class CyclicWorldFactory
 {
-    /// <summary>Creates the host-scoped registrations needed by the unannotated sample types.</summary>
-    public static ExposureRegistry CreateExposureRegistry()
-    {
-        var registry = new ExposureRegistry();
-        registry.For<EconomicProfile>()
-            .Identity(static profile => $"economy/{profile.RegionCode}")
-            .Value(
-                nameof(EconomicProfile.GrossDomesticProduct),
-                static profile => profile.GrossDomesticProduct,
-                static (profile, value) => profile.GrossDomesticProduct = value)
-            .Range(nameof(EconomicProfile.GrossDomesticProduct), 0m, 10_000_000m)
-            .Metadata(
-                nameof(EconomicProfile.GrossDomesticProduct),
-                "million credits",
-                "economy")
-            .Summary(static profile =>
+    /// <summary>Creates the immutable exposure for the unannotated sample type.</summary>
+    public static IReadOnlyList<TypeExposure> CreateExposures() =>
+    [
+        new TypeExposure<EconomicProfile>(
+            values:
+            [
+                new ValueExposure<EconomicProfile, decimal>(
+                    nameof(EconomicProfile.GrossDomesticProduct),
+                    static profile => profile.GrossDomesticProduct,
+                    static (profile, value) => profile.GrossDomesticProduct = value,
+                    new ValueRange(0m, 10_000_000m)),
+            ],
+            identity: static profile => $"economy/{profile.RegionCode}",
+            summary: static profile =>
                 $"{profile.RegionCode}: " +
-                $"{profile.GrossDomesticProduct.ToString(CultureInfo.InvariantCulture)} million credits");
-        return registry;
-    }
+                $"{profile.GrossDomesticProduct.ToString(CultureInfo.InvariantCulture)} million credits"),
+    ];
 
     public static World Create()
     {
@@ -98,7 +94,6 @@ public sealed class Nation : INotifyPropertyChanged, IStableDomainIdentity
 
     [Expose]
     [Range(0, 1_000_000)]
-    [InteractionMetadata(Unit = "residents", Tags = ["demographics"])]
     public int Population
     {
         get => _Population;

@@ -3,7 +3,6 @@ using System.Text;
 
 namespace UIEngine.Core;
 
-/// <summary>Identifies the selector attached to one collection member in a logical path.</summary>
 public enum CollectionSelectorKind
 {
     INDEX,
@@ -11,20 +10,23 @@ public enum CollectionSelectorKind
     DOMAIN_IDENTITY,
 }
 
-/// <summary>Contains one decoded collection selector value.</summary>
 public sealed record CollectionSelector
 {
     public CollectionSelector(CollectionSelectorKind kind, string value)
     {
         if (!Enum.IsDefined(kind))
         {
-            throw new ArgumentOutOfRangeException(nameof(kind), kind, "Unknown collection selector kind.");
+            throw new ArgumentOutOfRangeException(nameof(kind));
         }
 
-        ArgumentException.ThrowIfNullOrEmpty(value);
+        if (string.IsNullOrEmpty(value))
+        {
+            throw new ArgumentException("A selector value cannot be empty.", nameof(value));
+        }
+
         if (kind == CollectionSelectorKind.INDEX)
         {
-            if (!int.TryParse(value, NumberStyles.None, CultureInfo.InvariantCulture, out var index))
+            if (!long.TryParse(value, NumberStyles.None, CultureInfo.InvariantCulture, out var index))
             {
                 throw new ArgumentException("An index selector requires a non-negative integer.", nameof(value));
             }
@@ -40,7 +42,7 @@ public sealed record CollectionSelector
 
     public string Value { get; }
 
-    public static CollectionSelector AtIndex(int index)
+    public static CollectionSelector AtIndex(long index)
     {
         ArgumentOutOfRangeException.ThrowIfNegative(index);
         return new CollectionSelector(
@@ -49,10 +51,8 @@ public sealed record CollectionSelector
     }
 }
 
-/// <summary>Contains one decoded semantic member segment and its optional collection selector.</summary>
 public sealed record LogicalPathSegment(string Identifier, CollectionSelector? Selector = null);
 
-/// <summary>Represents a canonical absolute path over exposed UIEngine semantics.</summary>
 public sealed class LogicalPath : IEquatable<LogicalPath>
 {
     private readonly LogicalPathSegment[] _Segments;
@@ -68,10 +68,14 @@ public sealed class LogicalPath : IEquatable<LogicalPath>
 
     public LogicalPath Append(string identifier, CollectionSelector? selector = null)
     {
-        ArgumentException.ThrowIfNullOrEmpty(identifier);
+        if (string.IsNullOrEmpty(identifier))
+        {
+            throw new ArgumentException("A path identifier cannot be empty.", nameof(identifier));
+        }
+
         if (_Segments.Length == 0 && selector is not null)
         {
-            throw new ArgumentException("A root alias cannot have a collection selector.", nameof(selector));
+            throw new ArgumentException("A root cannot have a selector.", nameof(selector));
         }
 
         return new LogicalPath(_Segments.Append(new LogicalPathSegment(identifier, selector)));
@@ -92,7 +96,7 @@ public sealed class LogicalPath : IEquatable<LogicalPath>
         var encodedSegments = path[1..].Split('/', StringSplitOptions.None);
         if (encodedSegments.Any(static segment => segment.Length == 0))
         {
-            return _Invalid($"Logical path '{path}' contains an empty segment.");
+            return _Invalid("A logical path cannot contain an empty segment.");
         }
 
         var segments = new List<LogicalPathSegment>(encodedSegments.Length);
@@ -101,14 +105,12 @@ public sealed class LogicalPath : IEquatable<LogicalPath>
             var parsed = _ParseSegment(encodedSegments[index]);
             if (!parsed.IsSuccess)
             {
-                return InteractionResult.Failure<LogicalPath>(
-                    parsed.Error!.Code,
-                    parsed.Error.Message);
+                return InteractionResult.Failure<LogicalPath>(parsed.Error!);
             }
 
             if (index == 0 && parsed.Value.Selector is not null)
             {
-                return _Invalid("A root alias cannot have a collection selector.");
+                return _Invalid("A root cannot have a selector.");
             }
 
             segments.Add(parsed.Value);
@@ -117,15 +119,9 @@ public sealed class LogicalPath : IEquatable<LogicalPath>
         return InteractionResult.Success(new LogicalPath(segments));
     }
 
-    public override string ToString()
-    {
-        if (_Segments.Length == 0)
-        {
-            return "/";
-        }
-
-        return "/" + string.Join('/', _Segments.Select(_FormatSegment));
-    }
+    public override string ToString() => _Segments.Length == 0
+        ? "/"
+        : "/" + string.Join('/', _Segments.Select(_FormatSegment));
 
     public bool Equals(LogicalPath? other) =>
         other is not null && _Segments.SequenceEqual(other._Segments);
@@ -152,39 +148,37 @@ public sealed class LogicalPath : IEquatable<LogicalPath>
         {
             if (encoded.IndexOfAny([']', '=']) >= 0)
             {
-                return _InvalidSegment($"Logical path segment '{encoded}' contains an unescaped delimiter.");
+                return _InvalidSegment("A path segment contains an unescaped delimiter.");
             }
 
-            var decoded = _Decode(encoded);
-            return decoded.IsSuccess
-                ? InteractionResult.Success(new LogicalPathSegment(decoded.Value))
-                : InteractionResult.Failure<LogicalPathSegment>(decoded.Error!.Code, decoded.Error.Message);
+            var identifier = _Decode(encoded);
+            return identifier.IsSuccess
+                ? InteractionResult.Success(new LogicalPathSegment(identifier.Value))
+                : InteractionResult.Failure<LogicalPathSegment>(identifier.Error!);
         }
 
-        if (selectorStart == 0 ||
-            encoded[^1] != ']' ||
+        if (selectorStart == 0 || encoded[^1] != ']' ||
             encoded.IndexOf('[', selectorStart + 1) >= 0 ||
             encoded.IndexOf(']', selectorStart) != encoded.Length - 1)
         {
-            return _InvalidSegment($"Logical path segment '{encoded}' has malformed selector syntax.");
+            return _InvalidSegment("A path selector is malformed.");
         }
 
-        var identifier = _Decode(encoded[..selectorStart]);
-        if (!identifier.IsSuccess)
+        var identifierResult = _Decode(encoded[..selectorStart]);
+        if (!identifierResult.IsSuccess)
         {
-            return InteractionResult.Failure<LogicalPathSegment>(identifier.Error!.Code, identifier.Error.Message);
+            return InteractionResult.Failure<LogicalPathSegment>(identifierResult.Error!);
         }
 
         var selectorText = encoded[(selectorStart + 1)..^1];
-        var equalsIndex = selectorText.IndexOf('=');
-        if (equalsIndex <= 0 ||
-            equalsIndex == selectorText.Length - 1 ||
-            selectorText.IndexOf('=', equalsIndex + 1) >= 0)
+        var equals = selectorText.IndexOf('=');
+        if (equals <= 0 || equals == selectorText.Length - 1 ||
+            selectorText.IndexOf('=', equals + 1) >= 0)
         {
-            return _InvalidSegment($"Logical path segment '{encoded}' has malformed selector syntax.");
+            return _InvalidSegment("A path selector is malformed.");
         }
 
-        var kind = selectorText[..equalsIndex] switch
+        var kind = selectorText[..equals] switch
         {
             "index" => CollectionSelectorKind.INDEX,
             "key" => CollectionSelectorKind.KEY,
@@ -193,28 +187,25 @@ public sealed class LogicalPath : IEquatable<LogicalPath>
         };
         if (kind is null)
         {
-            return _InvalidSegment($"Logical path segment '{encoded}' uses an unknown selector.");
+            return _InvalidSegment("A path selector kind is unknown.");
         }
 
-        var value = _Decode(selectorText[(equalsIndex + 1)..]);
+        var value = _Decode(selectorText[(equals + 1)..]);
         if (!value.IsSuccess)
         {
-            return InteractionResult.Failure<LogicalPathSegment>(value.Error!.Code, value.Error.Message);
+            return InteractionResult.Failure<LogicalPathSegment>(value.Error!);
         }
 
-        if (kind == CollectionSelectorKind.INDEX)
+        try
         {
-            if (!int.TryParse(value.Value, NumberStyles.None, CultureInfo.InvariantCulture, out var numericIndex))
-            {
-                return _InvalidSegment($"Collection index '{value.Value}' is not a non-negative integer.");
-            }
-
-            value = InteractionResult.Success(numericIndex.ToString(CultureInfo.InvariantCulture));
+            return InteractionResult.Success(new LogicalPathSegment(
+                identifierResult.Value,
+                new CollectionSelector(kind.Value, value.Value)));
         }
-
-        return InteractionResult.Success(new LogicalPathSegment(
-            identifier.Value,
-            new CollectionSelector(kind.Value, value.Value)));
+        catch (ArgumentException exception)
+        {
+            return _InvalidSegment(exception.Message);
+        }
     }
 
     private static string _FormatSegment(LogicalPathSegment segment)
@@ -225,14 +216,14 @@ public sealed class LogicalPath : IEquatable<LogicalPath>
             return identifier;
         }
 
-        var selectorName = segment.Selector.Kind switch
+        var selector = segment.Selector.Kind switch
         {
             CollectionSelectorKind.INDEX => "index",
             CollectionSelectorKind.KEY => "key",
             CollectionSelectorKind.DOMAIN_IDENTITY => "identity",
             _ => throw new InvalidOperationException("Unknown collection selector kind."),
         };
-        return $"{identifier}[{selectorName}={Escape(segment.Selector.Value)}]";
+        return $"{identifier}[{selector}={Escape(segment.Selector.Value)}]";
     }
 
     private static InteractionResult<string> _Decode(string encoded)
@@ -249,14 +240,13 @@ public sealed class LogicalPath : IEquatable<LogicalPath>
                 !Uri.IsHexDigit(encoded[index + 2]))
             {
                 return InteractionResult.Failure<string>(
-                    InteractionErrorCode.INVALID_PATH,
-                    $"Encoded path component '{encoded}' contains an invalid percent escape.");
+                    InteractionErrorCode.INVALID_INPUT,
+                    "A path component contains an invalid percent escape.");
             }
 
             index += 2;
         }
 
-        string decoded;
         try
         {
             var builder = new StringBuilder(encoded.Length);
@@ -282,25 +272,23 @@ public sealed class LogicalPath : IEquatable<LogicalPath>
                 builder.Append(new UTF8Encoding(false, true).GetString(bytes.ToArray()));
             }
 
-            decoded = builder.ToString();
+            return builder.Length == 0
+                ? InteractionResult.Failure<string>(
+                    InteractionErrorCode.INVALID_INPUT,
+                    "Path identifiers and selector values cannot be empty.")
+                : InteractionResult.Success(builder.ToString());
         }
         catch (DecoderFallbackException)
         {
             return InteractionResult.Failure<string>(
-                InteractionErrorCode.INVALID_PATH,
-                $"Encoded path component '{encoded}' is not valid UTF-8.");
+                InteractionErrorCode.INVALID_INPUT,
+                "A path component is not valid UTF-8.");
         }
-
-        return decoded.Length == 0
-            ? InteractionResult.Failure<string>(
-                InteractionErrorCode.INVALID_PATH,
-                "Logical path identifiers and selector values cannot be empty.")
-            : InteractionResult.Success(decoded);
     }
 
     private static InteractionResult<LogicalPath> _Invalid(string message) =>
-        InteractionResult.Failure<LogicalPath>(InteractionErrorCode.INVALID_PATH, message);
+        InteractionResult.Failure<LogicalPath>(InteractionErrorCode.INVALID_INPUT, message);
 
     private static InteractionResult<LogicalPathSegment> _InvalidSegment(string message) =>
-        InteractionResult.Failure<LogicalPathSegment>(InteractionErrorCode.INVALID_PATH, message);
+        InteractionResult.Failure<LogicalPathSegment>(InteractionErrorCode.INVALID_INPUT, message);
 }

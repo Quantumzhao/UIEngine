@@ -8,8 +8,6 @@ internal sealed class CliTextReaderRunner
 
     public CliTextReaderRunner(CliSession session, TextReader input)
     {
-        ArgumentNullException.ThrowIfNull(session);
-        ArgumentNullException.ThrowIfNull(input);
         _Session = session;
         _Input = input;
     }
@@ -18,9 +16,9 @@ internal sealed class CliTextReaderRunner
     {
         while (!cancellationToken.IsCancellationRequested)
         {
-            var line = await _Input.ReadLineAsync(cancellationToken).ConfigureAwait(false);
+            var line = await _Input.ReadLineAsync(cancellationToken);
             if (line is null ||
-                !await _Session.ExecuteAsync(line, cancellationToken).ConfigureAwait(false))
+                !await _Session.ExecuteAsync(line, cancellationToken))
             {
                 return;
             }
