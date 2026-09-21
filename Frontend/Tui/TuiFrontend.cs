@@ -40,11 +40,19 @@ public static class TuiFrontend
         TuiFrontendOptions? options = null,
         CancellationToken cancellationToken = default)
     {
-        using var workspace = CreateWorkspace(host, options);
+        var workspace = CreateWorkspace(host, options);
         await using var app = new TerminalApp(
             workspace.Visual,
             Terminal.Instance,
             new TerminalAppOptions { HostKind = TerminalHostKind.Fullscreen });
-        await app.RunAsync(cancellationToken);
+        try
+        {
+            await app.RunAsync(cancellationToken);
+        }
+        finally
+        {
+            // Join session work while the toolkit dispatcher still belongs to this application.
+            workspace.Dispose();
+        }
     }
 }

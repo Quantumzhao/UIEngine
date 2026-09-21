@@ -57,6 +57,8 @@ the future roadmap. Completed milestone records remain under [docs/milestones](d
 - [x] Establish the reusable TUI library, test, dependency, ownership, hosting, and thin consumer
   boundaries.
 - [x] Keep toolkit capability handling frontend-local; no Core negotiation contract was required.
+- [x] Add the cancellable typed-intent pump, stale-operation guards, UI dispatch marshalling, and
+  deterministic session-owned reader/subscription disposal.
 - [ ] Build graph browsing with navigation history or breadcrumbs.
 - [ ] Generate value editors and action forms from the concrete descriptors.
 - [ ] Add bounded collection browsing.

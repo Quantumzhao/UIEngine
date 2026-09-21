@@ -15,6 +15,11 @@ library, dependency tests, caller-owned host contracts, shared fullscreen/embedd
 construction, and a thin cyclic-world composition executable. Interactive session behavior starts
 in Step 3.
 
+**Async bridge:** Implementation Step 3 completed on 2026-09-21 with a typed intent pump,
+session/generation cancellation, stale-presentation guards, toolkit dispatcher marshalling, and
+deterministic cleanup of reads, observation subscriptions, and invocation progress readers while
+preserving caller ownership of the Core host.
+
 **Prerequisite:** The streamlined Framework MVP capabilities described by
 [Project context](../../PROJECT_CONTEXT.md) and [the current architecture](../architecture.md) are
 the starting contract. Milestone 02's capability outcomes are retained even though its original

@@ -8,6 +8,7 @@ using Xunit;
 
 namespace UIEngine.Frontend.Tui.Tests;
 
+[Collection("Terminal application")]
 public sealed class TuiBoundaryTests
 {
     [Fact]

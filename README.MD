@@ -18,8 +18,9 @@ The CLI demonstrates graph navigation, reflection and third-party scalar exposur
 bounded collection reads, replacement-safe bindings, dispatch, observation, and synchronous or
 asynchronous actions with progress and cancellation.
 
-The TUI executable currently proves the reusable library, ownership, and hosting boundaries. Its
-interactive graph workspace is implemented in the later Product MVP steps.
+The TUI executable currently proves the reusable library, ownership, hosting, and cancellable
+session/dispatcher boundaries. Its interactive graph workspace is implemented in the later
+Product MVP steps.
 
 ## Minimal Host
 
@@ -67,7 +68,7 @@ its `Visual` into an existing XenoAtom visual tree.
 - `Frontend/Tui/` — reusable XenoAtom-based TUI library.
 - `Examples/CyclicDomain/` — deterministic cyclic example.
 - `Examples/CyclicWorld.Tui/` — thin TUI composition executable.
-- `Tests/` — framework, CLI, and TUI boundary tests.
+- `Tests/` — framework, CLI, and TUI boundary/session tests.
 
 Package publication remains disabled until compatibility, licensing, release policy, and support
 expectations are established.
