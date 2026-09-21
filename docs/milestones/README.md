@@ -1,6 +1,8 @@
 # UIEngine Milestone Outlines
 
-This directory contains bounded, implementation-ready plans for UIEngine milestones. An outline records the decisions, dependencies, exclusions, verification, and exit criteria needed to execute one milestone without redefining the wider product.
+This directory contains bounded milestone plans and their historical acceptance records. Completed
+and superseded outlines remain here because they explain why current capabilities exist, even when
+their provisional API shapes were later consolidated.
 
 Milestone outlines are derived from the repository's governing documents:
 
@@ -20,11 +22,16 @@ Use `NN-short-descriptive-name.md`, with two-digit chronological numbers allocat
 - **Planned:** decision-complete, but not authorized or started.
 - **Active:** explicitly selected for implementation.
 - **Complete:** implemented and verified against its exit criteria.
-- **Superseded:** retained as history but replaced by a linked outline or decision.
+- **Superseded:** capability goals were retained, but the implementation shape was replaced by a
+  linked decision or later consolidation.
 
 ## Index
 
 | Milestone | Status | Summary |
 |---|---|---|
 | [01 — Architecture Runway and CLI Walking Skeleton](01-architecture-runway-cli-walking-skeleton.md) | Complete | Establish the safety baseline and prove a minimal graph-aware runtime through the CLI. |
-| [02 — Framework MVP Interaction Hardening](02-framework-mvp-interaction-hardening.md) | Active | Implementation and local acceptance are complete; GitHub Actions confirmation awaits publication. |
+| [02 — Framework MVP Interaction Hardening](02-framework-mvp-interaction-hardening.md) | Superseded | Its capability outcomes remain, while the provider/interface-heavy implementation was replaced by the streamlined concrete Core. |
+
+The post-Milestone-02 streamlining is recorded in
+[REBOOT_PLAN.md](../../REBOOT_PLAN.md), while [architecture.md](../architecture.md) is authoritative
+for the current runtime API.

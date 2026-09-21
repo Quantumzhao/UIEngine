@@ -1,13 +1,28 @@
 # Milestone 02 — Framework MVP Interaction Hardening
 
-**Status:** Active — implementation and local acceptance complete; GitHub Actions confirmation pending publication
+**Status:** Superseded — capability outcomes retained by the streamlined Core
 
-**Acceptance:** Local and artifact-free CI build/test/package-equivalent checks passed on 2026-09-21: Debug and Release builds completed with zero warnings/errors, all 134 tests passed, packaging remained disabled, and the clean output contained no package. The configured GitHub Actions run, including its secret scan, remains pending until these changes are published.
+**Historical acceptance:** Local and artifact-free CI build/test/package-equivalent checks passed
+on 2026-09-21: Debug and Release builds completed with zero warnings/errors, all 134 tests passed,
+packaging remained disabled, and the clean output contained no package. The configured GitHub
+Actions run, including its secret scan, was pending when this milestone record was written.
+
+**Current acceptance:** After streamlining, Debug and Release builds complete with zero warnings
+or errors and all 22 black-box tests pass. The smaller suite replaces tests of provider precedence,
+configuration snapshots, decorators, paging modes, and other removed implementation choices.
 
 **Prerequisite:** [Milestone 01 — Architecture Runway and CLI Walking Skeleton](01-architecture-runway-cli-walking-skeleton.md) is complete, and its post-acceptance repository baseline has been reconciled as described below.  
 **Governing documents:** [Project context](../../PROJECT_CONTEXT.md) and [architecture and reboot plan](../../REBOOT_PLAN.md)
 
 This outline does not authorize implementation. Work begins only when the milestone is explicitly selected for implementation.
+
+> **Historical record:** The requirements below explain why identity, replacement-safe binding,
+> dispatch, observation, bounded collections, and normalized invocation exist. Provider registries,
+> adapters, policy interfaces, paging modes, `ValueTask` actions, and presentation metadata named in
+> the original outline were later judged speculative and removed. Consult
+> [the current architecture](../architecture.md) for implemented API shapes.
+> The original checklist is intentionally frozen at its last milestone state; unchecked entries in
+> that checklist are historical, not current work. [TODO.MD](../../TODO.MD) is the current tracker.
 
 ## Summary
 
@@ -21,9 +36,44 @@ The Milestone 01 public contracts are an implementation runway rather than a com
 
 This milestone excludes the product TUI, frontend capability negotiation, layouts and layout serialization, batch operations, direct collection mutation commands, packaging, legacy retirement, source generation, search/indexing, remote access, and additional frontends.
 
-## Repository Baseline and Entry Gate
+## Streamlining Reconciliation
 
-The current implementation provides:
+All user-visible Framework MVP workflows survived the consolidation:
+
+- runtime and domain identity, cycles, shared references, and compatible replacement;
+- canonical paths with index, key, and identity selectors;
+- replacement-safe bindings that refuse conflicting identities;
+- nullable metadata, conversion, enum/range/DataAnnotations validation, and read-only values;
+- dispatcher routing, reentrancy, queued cancellation, and host disposal;
+- property and collection notifications, source replacement, explicit polling, and visible overflow;
+- bounded arrays, lists, dictionaries, lazy enumerables, and null/scalar/reference entries;
+- synchronous and `Task` actions with defaults, progress, cancellation, and fault capture; and
+- the complete CLI command, completion, observation, and cyclic-world workflow.
+
+The following original mechanisms were superseded:
+
+| Original Milestone 02 mechanism | Current mechanism |
+|---|---|
+| Mutable `ExposureRegistry` with role builders and factories | Immutable scalar `TypeExposure<T>` definitions |
+| Provider precedence and descriptor factories | Built-in reflection plus exact-type scalar exposure |
+| Sixteen public interfaces | Concrete descriptors; two intentional public interfaces |
+| `ObjectIdentity` wrapped by `ObjectHandle` | One `ObjectHandle(Guid Id)` |
+| Resolver services, state objects, and fallback policies | Host methods returning resolved records directly |
+| Capability flags, snapshots, pages, ranges, and continuations | One bounded collection-slice operation |
+| Observation adapters and multiple mode/disposal interfaces | Built-in notifications or explicit polling |
+| Invocation interfaces, fault wrappers, timestamps, and `CREATED` | Concrete four-state `ActionInvocation` |
+| `ValueTask` action support | Sync and `Task`/`Task<T>` actions |
+| Units, tags, risk, confirmation, and validation summaries | Editing metadata with demonstrated consumers only |
+| Broad lifecycle/event diagnostics | Logging only unexpected runtime faults |
+| 134 implementation-preserving tests | 22 black-box framework and CLI behavior tests |
+
+The legacy project was retired after its useful concepts had been preserved in the cyclic fixture
+and public behavior tests. This is a later repository state, not a revision of the historical
+acceptance result.
+
+## Historical Repository Baseline and Entry Gate
+
+At the Phase 2 entry gate, the implementation provided:
 
 - a single `Core` assembly with host-scoped replaceable roots, reference-based runtime identity, lazy domain-identity indexing, reflection discovery, semantic descriptor interfaces, structured results, scalar conversion, finite collection snapshots, and synchronous actions;
 - a separate CLI with descriptor-aware completion and `ls`, `cd`, `inspect`, `get`, `set`, `call`, and `exit`;
@@ -34,7 +84,7 @@ The Phase 2 entry gate was reconciled on 2026-09-19:
 
 - the post-acceptance removal of `Dataset` and `CLITestProject` is accepted as intentional cleanup because their useful fixture role is retained by `Examples/CyclicDomain`;
 - the five behavior-level CLI integration tests were restored against the reorganized project paths and namespaces;
-- current-state documents now describe the remaining legacy project consistently; and
+- the then-current documents described the remaining legacy project consistently; and
 - `dotnet build UIEngine.sln` completed with zero warnings and errors, and `dotnet test UIEngine.sln --no-build` passed all 29 tests (18 framework, 6 CLI, and 5 legacy-characterization tests).
 
 This is the Phase 2 starting baseline. The historical Milestone 01 acceptance record remains unchanged.

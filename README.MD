@@ -34,8 +34,13 @@ optional replacement-stable identity. Unannotated third-party scalar types can u
 ## Repository Guide
 
 - [Project context](PROJECT_CONTEXT.md) — settled scope, decisions, and invariants.
+- [Architecture, reboot audit, and plan](REBOOT_PLAN.md) — migration rationale, streamlining
+  decisions, current design, risks, and roadmap.
+- [Progress tracker](TODO.MD) — completed work and remaining product milestones.
 - [Architecture](docs/architecture.md) — runtime flow and concrete public model.
 - [CLI command reference](docs/cli-command-reference.md) — commands, paths, and output.
+- [Milestone records](docs/milestones/README.md) — historical plans and acceptance records for the
+  architecture runway and Framework MVP hardening.
 - `Core/` — runtime implementation and public API.
 - `Frontend/Cli/` — proving frontend.
 - `Examples/CyclicDomain/` — deterministic cyclic example.

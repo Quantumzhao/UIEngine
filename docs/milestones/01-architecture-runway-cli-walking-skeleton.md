@@ -9,6 +9,12 @@
 
 This outline does not authorize implementation. Work begins only when the milestone is explicitly selected for implementation.
 
+> **Historical record:** This document preserves the constraints and acceptance record for the
+> first reboot milestone. Its interface names, `ValueTask` operation shape, numeric collection-path
+> alias, and legacy coexistence strategy describe the runway that existed at that time. They are not
+> the current public API. See [the current architecture](../architecture.md) and the
+> [reboot reconciliation](../../REBOOT_PLAN.md) for the streamlined design.
+
 ## Summary
 
 Establish the remaining safety baseline and implement the smallest end-to-end replacement slice:
@@ -18,6 +24,32 @@ Establish the remaining safety baseline and implement the smallest end-to-end re
 The legacy projects remain frozen in place except for characterization tests and explicit baseline fixes. New projects must not depend on legacy `Dashboard` or `Node` APIs.
 
 This milestone excludes asynchronous invocation, observation, paging and virtualization, durable binding recovery, the product TUI, layouts, batch operations, packaging, and legacy removal.
+
+## Current Reconciliation
+
+The milestone's durable outcomes remain in the current runtime:
+
+- host-scoped roots and runtime identity;
+- opt-in reflection over a cyclic/shared-reference graph;
+- frontend-neutral value, reference, collection, and action roles;
+- structured interaction results;
+- live value mutation and synchronous action invocation; and
+- a CLI exercising the cyclic-world fixture.
+
+The provisional contract shapes were intentionally replaced during later hardening and
+streamlining:
+
+| Milestone 01 runway | Current runtime |
+|---|---|
+| `ObjectIdentity` plus `ObjectHandle` | `ObjectHandle(Guid Id)` |
+| Descriptor/provider interfaces | Concrete `ObjectDescriptor` and `MemberDescriptor` hierarchy |
+| Application-created reflection provider | Reflection built into `UIEngineHost` |
+| `ValueTask` operations | `Task` operations |
+| `/Collection/0` path form | Canonical `/Collection[index=0]` only |
+| Finite snapshot contract | Bounded `ReadAsync(offset, limit)` returning `CollectionSlice` |
+| Legacy project retained beside the reboot | Legacy project retired; Git history preserves it |
+
+These changes do not alter the milestone's historical acceptance record below.
 
 ## Baseline and Repository Structure
 

@@ -64,8 +64,12 @@ prototypes whose domain model remains the source of truth.
 - `Examples/CyclicDomain/CyclicDomain.csproj` — deterministic cyclic acceptance model.
 - `Tests/UIEngine.Framework.Tests` — public runtime behavior tests.
 - `Tests/UIEngine.Frontend.Cli.Tests` — CLI behavior and workflow tests.
+- `REBOOT_PLAN.md` — architectural rationale, migration reconciliation, and roadmap.
+- `TODO.MD` — current completion and future-work tracker.
 - `docs/architecture.md` — implementation guide.
 - `docs/cli-command-reference.md` — CLI grammar and examples.
+- `docs/milestones/` — historical milestone plans and acceptance records; their provisional API
+  shapes are not current contracts.
 
 ## Scope
 
