@@ -10,6 +10,11 @@ Phase 1 compatibility spike passes. Pin the accepted package version; do not use
 **Qualified version:** `XenoAtom.Terminal.UI` 3.9.0, accepted on 2026-09-21. See the
 [qualification record](../spikes/xenoatom-terminal-ui-3.9.0.md).
 
+**Boundary scaffold:** Implementation Step 2 completed on 2026-09-21 with a reusable class
+library, dependency tests, caller-owned host contracts, shared fullscreen/embedded workspace
+construction, and a thin cyclic-world composition executable. Interactive session behavior starts
+in Step 3.
+
 **Prerequisite:** The streamlined Framework MVP capabilities described by
 [Project context](../../PROJECT_CONTEXT.md) and [the current architecture](../architecture.md) are
 the starting contract. Milestone 02's capability outcomes are retained even though its original

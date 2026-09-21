@@ -20,6 +20,8 @@ prototypes whose domain model remains the source of truth.
   progress, cancellation, notification observation, and explicit polling.
 - Dispatch: one optional `IInteractionDispatcher` controls domain thread affinity.
 - CLI: navigation, inspection, mutation, collection reading, invocation, watching, and completion.
+- TUI: pinned toolkit plus initial reusable library, ownership, fullscreen, embedding, and thin
+  cyclic-world composition boundaries; interactive session behavior remains in progress.
 - Tests: black-box framework and CLI behavior suites.
 - Packaging: disabled until release policy, compatibility, licensing, and support are defined.
 
@@ -61,7 +63,9 @@ prototypes whose domain model remains the source of truth.
 
 - `Core/Core.csproj` — runtime, attributes, descriptors, reflection, binding, and observation.
 - `Frontend/Cli/Cli.csproj` — proving executable and presentation logic.
+- `Frontend/Tui/Tui.csproj` — reusable TUI library over Core and XenoAtom.Terminal.UI.
 - `Examples/CyclicDomain/CyclicDomain.csproj` — deterministic cyclic acceptance model.
+- `Examples/CyclicWorld.Tui/CyclicWorld.Tui.csproj` — thin TUI composition executable.
 - `Tests/UIEngine.Framework.Tests` — public runtime behavior tests.
 - `Tests/UIEngine.Frontend.Cli.Tests` — CLI behavior and workflow tests.
 - `REBOOT_PLAN.md` — architectural rationale, migration reconciliation, and roadmap.
@@ -73,9 +77,10 @@ prototypes whose domain model remains the source of truth.
 
 ## Scope
 
-The current framework includes the Core and CLI workflows demonstrated by the cyclic model. A
-product TUI, persistent layouts, batch mutation, remote transport, scripting, source generation,
-automatic undo, and a supported package are deferred until backed by concrete requirements.
+The current framework includes the Core and CLI workflows demonstrated by the cyclic model and the
+initial reusable Product MVP TUI boundary. The interactive TUI is in progress. Persistent layouts,
+batch mutation, remote transport, scripting, source generation, automatic undo, and a supported
+package remain deferred until backed by concrete requirements.
 
 ## Verification
 
