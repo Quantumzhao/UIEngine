@@ -40,17 +40,17 @@ observe changes, and save or restore navigator layouts without domain-specific s
 - Read-only and nullable state is explicit.
 - Writes use Core conversion and validation, then re-read authoritative state.
 - Collections use bounded windows with position, key, null, scalar, and reference entries.
-- Method nodes generate parameter forms and present result, progress, and structured failure.
+- Method nodes generate parameter forms and present result, completion, and structured failure.
 - Observation refreshes only affected controls and preserves dirty drafts.
 - Every structured target state has a distinct presentation and valid recovery commands.
 
 ## Lifetime Requirements
 
-- Each navigator and current control has an independent operation scope.
-- Going back or removing a navigator disposes the affected controls, readers, and subscriptions.
+- Each navigator and current control has independent presentation state.
+- Going back or removing a navigator removes the affected controls.
 - No disposed control receives later updates.
 - Removing one navigator does not interfere with another navigator's work.
-- Removing a method control prevents later progress from updating that control without stopping
+- Removing a method control prevents later completion from updating that control without stopping
   its started invocation.
 - Closing the TUI leaves the caller-owned host usable.
 
@@ -120,8 +120,6 @@ the default sequence below assumes a clean migration to nodes.
 - [x] Qualify and pin XenoAtom.Terminal.UI 3.9.0 through the toolkit spike.
 - [x] Establish reusable fullscreen and embedded hosting with the same root visual.
 - [x] Establish the Core/TUI/domain dependency boundaries and thin example executable.
-- [x] Add independent hierarchical `TuiOperationScope`s with deterministic resource cleanup.
-- [x] Prove that removing a frontend scope does not stop its host-owned invocation.
 - [x] Prove that closing the current TUI boundary leaves the caller-owned host usable.
 
 ### 1. Specify the node and navigation contracts
@@ -312,28 +310,26 @@ Verification:
 
 ### 7. Rebase the TUI hosting boundary on the Core workspace
 
-Preserve the completed XenoAtom hosting and operation-scope work while changing its model source.
+Preserve the completed XenoAtom hosting boundary while changing its model source.
 
 1. Let `TuiFrontend` either:
    - create and own a `UIEngineWorkspace` from a caller-owned host; or
    - present a caller-supplied `UIEngineWorkspace` without taking ownership.
-2. Update `TuiWorkspace` to own only its visual tree, TUI state, frontend operation scopes, and an
-   internally created Core workspace when applicable. It never owns a caller-supplied host or
-   workspace.
+2. Update `TuiWorkspace` to own only its visual tree, TUI state, and an internally created Core
+   workspace when applicable. It never owns a caller-supplied host or workspace.
 3. Replace `InitialPath` with startup configuration that can create the initial navigator or load a
    supplied layout. Define the empty-workspace behavior without treating `/` as an object node.
 4. Maintain a TUI presentation record keyed by navigator identifier. Each record owns the current
-   control and its child `TuiOperationScope`.
+   control.
 5. React to Core navigation notifications by creating one replacement control for a pushed/revealed
-   entry and disposing the departed control and scope exactly once.
+   entry and removing the departed control exactly once.
 6. Marshal visual state changes with the XenoAtom dispatcher while leaving all domain access under
    the host's `IInteractionDispatcher`.
 
 Verification:
 
 - Extend boundary tests for both ownership paths, empty startup, restored startup, and disposal.
-- Retain the existing in-flight read, observation cleanup, progress-reader, and caller-owned host
-  tests against the Core workspace-backed implementation.
+- Retain the existing caller-owned host tests against the Core workspace-backed implementation.
 
 ### 8. Build multi-navigator workspace chrome
 
@@ -413,9 +409,8 @@ Verification:
 
 1. Subscribe only for the current control state that benefits from observation; retain manual
    refresh where observation is unsupported.
-2. Own each subscription and reader in that control's `TuiOperationScope`. Dispose and reattach
-   exactly once when an entry departs, a navigator is removed, a source is replaced, or the TUI
-   closes.
+2. Consume property changes surfaced by the current node and stop handling them when that node is
+   no longer current.
 3. Coalesce ordinary refreshes on the UI dispatcher, refresh only affected state, and keep buffer
    overflow visible until the user refreshes or acknowledges it.
 4. Never overwrite a dirty draft. Mark authoritative state as changed and let the user keep,
@@ -440,9 +435,9 @@ Verification:
    draft, focus, loaded-value, or running-work state.
 2. Expose save/load through caller-supplied callbacks or another explicit composition boundary so
    the reusable TUI library does not choose a filesystem location.
-3. Reconcile controls and operation scopes when a layout is loaded: retire removed presentations,
-   retain navigator identifiers from the snapshot, create fresh nodes and controls, and select the
-   restored navigator deterministically.
+3. Reconcile controls when a layout is loaded: retire removed presentations, retain navigator
+   identifiers from the snapshot, create fresh nodes and controls, and select the restored
+   navigator deterministically.
 4. Finish `Examples/CyclicWorld.Tui` as composition and manual-acceptance code only. Add no
    model-specific control or Core behavior to the executable.
 5. Automate the full acceptance workflow above with deterministic toolkit input where practical,

@@ -10,7 +10,7 @@ namespace UIEngine.Frontend.Tui;
 /// </remarks>
 public sealed class TuiWorkspace : IDisposable
 {
-    private readonly TuiOperationScope _Lifetime = new();
+    private int _Disposed;
 
     internal TuiWorkspace(
         UIEngineHost host,
@@ -26,15 +26,13 @@ public sealed class TuiWorkspace : IDisposable
     public TuiFrontendOptions Options { get; }
 
     /// <summary>Gets whether this workspace has been disposed.</summary>
-    public bool IsDisposed => _Lifetime.IsDisposed;
+    public bool IsDisposed => Volatile.Read(ref _Disposed) != 0;
 
     /// <summary>Gets the root visual to compose into a XenoAtom application.</summary>
     public Visual Visual { get; }
 
     internal UIEngineHost Host { get; }
 
-    internal TuiOperationScope CreateOperationScope() => _Lifetime.CreateChild();
-
     /// <summary>Disposes frontend resources without disposing the caller-owned Core host.</summary>
-    public void Dispose() => _Lifetime.Dispose();
+    public void Dispose() => Interlocked.Exchange(ref _Disposed, 1);
 }

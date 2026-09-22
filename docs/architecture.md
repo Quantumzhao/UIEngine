@@ -192,13 +192,13 @@ visible, and subscriptions detach deterministically.
 
 ## Frontend Lifetime
 
-For every active navigation entry, a frontend creates a control and an independent frontend
-operation scope. The scope owns disposable resources such as observation subscriptions; completed
-async work is applied only while that entry's generation remains current.
+For every active navigation entry, a frontend creates a control. Property-observation
+subscriptions belong to nodes and follow their lifetime; completed async work is applied only
+while that entry's generation remains current.
 
-When an entry is removed, the frontend disposes its control, subscriptions, and other owned
-resources. Already-started tasks may finish, but generation checks prevent them from updating a
-detached visual tree. Disposal does not stop the domain object or a started invocation.
+When an entry is removed, the frontend removes its control. Already-started tasks may finish, but
+generation checks prevent them from updating a detached visual tree. Removal does not stop the
+domain object or a started invocation.
 
 Removing one navigator cannot interfere with work owned by another navigator, even when both point
 to the same path.

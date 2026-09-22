@@ -106,7 +106,7 @@ facets, and frontends choose controls from those semantics.
 - Present the workspace's navigator collection.
 - Let users choose roots, add navigators, duplicate the current navigator, and remove navigators.
 - Map node semantics to controls without model-specific views.
-- Dispose controls and operation scopes with their navigation entries.
+- Remove controls with their navigation entries.
 - Support layout save and restore.
 
 ## Acceptance

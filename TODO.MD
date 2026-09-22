@@ -47,13 +47,12 @@
 
 - [x] Qualify and pin XenoAtom.Terminal.UI 3.9.0.
 - [x] Establish reusable fullscreen and embedded hosting.
-- [x] Add independent frontend operation scopes with deterministic cleanup.
 - [ ] Present several navigators in one workspace.
 - [ ] Add root selection, navigator duplication, removal, and destructive back navigation.
 - [ ] Generate controls from node language semantics.
 - [ ] Add scalar editors and method forms.
 - [ ] Add bounded collection browsing.
-- [ ] Present observation, progress, and structured failures.
+- [ ] Present node-provided property changes and structured failures.
 - [ ] Save and restore navigator layouts.
 - [ ] Show broken entries and allow back navigation to a valid node.
 - [ ] Verify keyboard-only operation and terminal resizing.

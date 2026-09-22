@@ -11,8 +11,7 @@ public static class TuiFrontend
 {
     /// <summary>Creates a workspace for composition into an existing XenoAtom application.</summary>
     /// <remarks>
-    /// The returned workspace owns its frontend resource scopes. The caller retains ownership of
-    /// <paramref name="host"/> and must dispose it separately.
+    /// The caller retains ownership of <paramref name="host"/> and must dispose it separately.
     /// </remarks>
     public static TuiWorkspace CreateWorkspace(
         UIEngineHost host,
@@ -49,7 +48,6 @@ public static class TuiFrontend
         }
         finally
         {
-            // Release frontend resources while the toolkit dispatcher belongs to this application.
             workspace.Dispose();
         }
     }

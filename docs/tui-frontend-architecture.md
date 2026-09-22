@@ -15,7 +15,7 @@ The TUI presents several independent navigators. Each navigator has:
 - a header with its current path and navigation commands;
 - one control for its current node;
 - concise loading, result, and failure state; and
-- an independent frontend operation scope.
+- independent presentation state.
 
 Users can choose a registered root, add a navigator, duplicate the current navigator, remove a
 navigator, navigate deeper, and go back. Duplication resolves a new node instance at the same path;
@@ -37,7 +37,7 @@ Controls are selected from language semantics exposed by the current `BaseNode`:
 | Writable number | Numeric editor with range metadata |
 | Enum | Enum editor using declared members |
 | Collection | Bounded window with entry navigation |
-| Method | Generated parameter form, result, and progress |
+| Method | Generated parameter form, result, and completion state |
 | Broken navigator entry | Structured failure and back/remove commands |
 
 An enum property remains an enum property; Core does not describe it as a choice control. Toolkit
@@ -55,20 +55,16 @@ dispatch, bounded reads, observation, and invocation.
 - Generate method fields from parameter semantics and preserve omitted, default, and explicit-null
   states.
 - Present structured failures without parsing messages.
-- Coalesce observation-driven refreshes and preserve overflow warnings.
+- Refresh from property changes surfaced by the current node.
 
 ## Lifetime
 
-Each current control owns a child `TuiOperationScope`. The scope owns frontend reads,
-subscriptions, and progress readers. It never owns the host or a started invocation.
+Property-observation subscriptions belong to nodes and follow their lifetime. 
 
-Going back disposes the departed control and scope. Removing a navigator disposes all controls and
-scopes belonging to it. Closing the TUI disposes frontend work but leaves the caller-owned host and
-domain objects alive.
+Going back removes the departed control. Removing a navigator removes all controls belonging to
+it. Closing the TUI leaves the caller-owned host and domain objects alive.
 
 A started `ActionInvocation` continues under host ownership after its method control is removed.
-The TUI stops reading its progress and completion unless another active control explicitly owns
-those readers.
 
 ## Layout Persistence
 
@@ -82,7 +78,7 @@ entry and can navigate back or be removed.
 ## Toolkit and Ownership
 
 - XenoAtom.Terminal.UI remains pinned to an accepted version.
-- `TuiWorkspace` owns its visual tree and frontend operation scopes.
+- `TuiWorkspace` owns its visual tree and TUI presentation state.
 - The caller owns `UIEngineHost` and, when supplied separately, `UIEngineWorkspace`.
 - UI changes run through the toolkit dispatcher; domain access runs through the host dispatcher.
 - Keyboard operation is complete without requiring mouse input.
@@ -100,7 +96,7 @@ Tests cover:
 - scalar editing, validation, and dirty drafts;
 - bounded collection windows;
 - method invocation and continued execution after control disposal;
-- observation cleanup and overflow;
+- node-provided property-change refresh;
 - independent navigator lifetimes;
 - layout round trips;
 - keyboard-only workflows and resize; and
