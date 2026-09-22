@@ -15,7 +15,7 @@ collections, and observable change.
 - Invariant conversion, nullability, enum, range, and DataAnnotations validation.
 - Bounded collection windows for indexed and lazy sources.
 - Structured entries for null, scalar, reference, and dictionary values.
-- Synchronous and asynchronous method invocation with bounded progress and cancellation.
+- Synchronous and asynchronous method invocation with bounded progress.
 - Notification and explicit polling observation with visible overflow.
 - `IInteractionDispatcher` for domain thread affinity and reentrant access.
 - Deterministic host, invocation, and subscription lifetime.

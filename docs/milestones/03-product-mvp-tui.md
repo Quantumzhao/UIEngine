@@ -49,8 +49,9 @@ observe changes, and save or restore navigator layouts without domain-specific s
 - Each navigator and current control has an independent operation scope.
 - Going back or removing a navigator disposes the affected controls, readers, and subscriptions.
 - No disposed control receives later updates.
-- Removing one navigator does not cancel another navigator's work.
-- Removing a method control stops its progress readers but not its started invocation.
+- Removing one navigator does not interfere with another navigator's work.
+- Removing a method control prevents later progress from updating that control without stopping
+  its started invocation.
 - Closing the TUI leaves the caller-owned host usable.
 
 ## Layout Requirements
@@ -119,9 +120,8 @@ the default sequence below assumes a clean migration to nodes.
 - [x] Qualify and pin XenoAtom.Terminal.UI 3.9.0 through the toolkit spike.
 - [x] Establish reusable fullscreen and embedded hosting with the same root visual.
 - [x] Establish the Core/TUI/domain dependency boundaries and thin example executable.
-- [x] Add independent hierarchical `TuiOperationScope`s with deterministic cancellation,
-  resource cleanup, and task joining.
-- [x] Prove that removing a frontend progress reader does not cancel its host-owned invocation.
+- [x] Add independent hierarchical `TuiOperationScope`s with deterministic resource cleanup.
+- [x] Prove that removing a frontend scope does not stop its host-owned invocation.
 - [x] Prove that closing the current TUI boundary leaves the caller-owned host usable.
 
 ### 1. Specify the node and navigation contracts
@@ -134,7 +134,7 @@ Before moving behavior, define and test the smallest public contracts needed by 
    - readable, writable, and nullable values;
    - string/character, boolean, number, and enum values;
    - collections and their bounded entry shapes; and
-   - method parameters, results, progress, and cancellation metadata.
+   - method parameters, results, and progress metadata.
 2. Record how reflected properties and fields combine with value/reference/collection facets. For
    example, a writable enum property must remain identifiable as a property, enum, readable value,
    and writable value without Core naming a control.
@@ -150,7 +150,7 @@ Before moving behavior, define and test the smallest public contracts needed by 
    retire exactly the control and scope associated with a removed entry without exposing toolkit
    types from Core.
 7. Decide and document mutation serialization: one navigator must not publish a stale resolution
-   after a later navigation, back, removal, or cancellation has won.
+   after a later navigation, back, or removal has won.
 
 Verification:
 
@@ -178,8 +178,7 @@ Move the current descriptor behavior behind nodes while preserving the live-doma
    - collection reads retain the host maximum and closed entry variants; and
    - method invocation returns the existing host-owned `ActionInvocation` lifetime.
 5. Preserve metadata needed by generated controls: runtime type, summary, read/write capability,
-   nullability, enum members, numeric range, method defaults, result type, progress type, and
-   cancellation support.
+   nullability, enum members, numeric range, method defaults, result type, and progress type.
 6. Update observation entry points to accept the applicable node occurrence or its internal target
    binding instead of requiring frontends to reconstruct owner handle/member identifiers.
 
@@ -254,7 +253,7 @@ Verification:
   forward history.
 - Prove two navigators at one path have distinct nodes and navigation stacks while writes remain
   visible through their shared domain object.
-- Prove cancellation or removal of one navigator cannot invalidate another navigator's operation.
+- Prove removal of one navigator cannot invalidate another navigator's operation.
 - Prove workspace disposal leaves its host and already-started invocation alive.
 
 ### 5. Add versioned layout snapshots and restore
@@ -307,7 +306,7 @@ TUI behavior.
 Verification:
 
 - Keep the existing redirected cyclic-world, validation, bounded collection, observation,
-  replacement, cancellation, and completion tests.
+  replacement and completion tests.
 - Add CLI cases for terminal current nodes, collection-selector parent traversal, destructive back,
   and a structured broken path where the command workflow can create one.
 
@@ -376,7 +375,7 @@ shape.
 4. Represent read-only, nullable, loading, empty, dirty, validation, unavailable, and successful
    states explicitly.
 5. Keep drafts in the control. Commit through the node, associate validation issues with the
-   editor, re-read authoritative state after success, and allow cancel/reload.
+   editor, re-read authoritative state after success, and allow discard/reload.
 6. Navigate to any selected child as a new current entry. Scalar and method controls expose no
    deeper-navigation command.
 
@@ -400,15 +399,15 @@ Verification:
    omitted, defaulted, explicit-null, and supplied values.
 5. Start a method once per submission, prevent accidental duplicate submission, and present
    synchronous/asynchronous completion, result, structured failure, and bounded ordered progress.
-6. On method-control disposal, stop only TUI progress/completion readers. Do not call invocation
-   cancellation unless the user explicitly invokes a supported cancel command.
+6. On method-control disposal, release its frontend-owned resources without stopping the
+   host-owned invocation.
 
 Verification:
 
 - Prove large and lazy collections remain bounded across several windows and selector navigation.
 - Test every collection entry shape and recovery after a source reset.
-- Test method parameter validation/default/null semantics, progress order, success/failure, explicit
-  cancellation, and continued invocation after control removal.
+- Test method parameter validation/default/null semantics, progress order, success/failure, and
+  continued invocation after control removal.
 
 ### 11. Integrate observation, replacement, and structured recovery
 
@@ -424,7 +423,7 @@ Verification:
 5. Re-resolve through the navigator after compatible replacement so the active entry receives a
    fresh node. Refuse conflicting identity instead of silently rebinding.
 6. Provide valid recovery commands for null, unavailable, not found, ambiguous, type mismatch,
-   permission, cancelled, disposed, fault, and broken-restored-path states without parsing error
+   permission, disposed, fault, and broken-restored-path states without parsing error
    messages.
 
 Verification:

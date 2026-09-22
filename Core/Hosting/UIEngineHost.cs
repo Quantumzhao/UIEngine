@@ -12,8 +12,9 @@ public sealed class UIEngineHost : IDisposable
     private readonly ConditionalWeakTable<object, _HandleHolder> _Handles = new();
     private readonly Dictionary<ObjectHandle, WeakReference<object>> _Objects = [];
     private readonly Dictionary<string, _RootEntry> _Roots = new(StringComparer.Ordinal);
-    private readonly Dictionary<ObjectHandle, DomainIdentity?> _DomainIdentities = [];
-    private readonly Dictionary<DomainIdentity, HashSet<ObjectHandle>> _DomainIdentityIndex = [];
+    private readonly Dictionary<ObjectHandle, string?> _DomainIdentities = [];
+    private readonly Dictionary<string, HashSet<ObjectHandle>> _DomainIdentityIndex =
+        new(StringComparer.Ordinal);
     private readonly Dictionary<ObjectHandle, LogicalPath> _CanonicalPaths = [];
     private readonly HashSet<ObservationSubscription> _Subscriptions = [];
     private readonly HashSet<ActionInvocation> _Invocations = [];
@@ -117,13 +118,11 @@ public sealed class UIEngineHost : IDisposable
         }
     }
 
-    public async Task<InteractionResult<DomainIdentity?>> GetDomainIdentityAsync(
-        ObjectHandle handle,
-        CancellationToken cancellationToken = default)
+    public async Task<InteractionResult<string?>> GetDomainIdentityAsync(ObjectHandle handle)
     {
         if (IsDisposed)
         {
-            return _DisposedFailure<DomainIdentity?>();
+            return _DisposedFailure<string?>();
         }
 
         lock (_Gate)
@@ -137,13 +136,12 @@ public sealed class UIEngineHost : IDisposable
         var target = ResolveTarget(handle);
         if (!target.IsSuccess)
         {
-            return InteractionResult.Failure<DomainIdentity?>(target.Error!);
+            return InteractionResult.Failure<string?>(target.Error!);
         }
 
         var discovered = await ExecuteAsync(
             "discover domain identity",
-            () => Task.FromResult(_DiscoverDomainIdentity(target.Value)),
-            cancellationToken);
+            () => Task.FromResult(_DiscoverDomainIdentity(target.Value)));
         if (!discovered.IsSuccess)
         {
             return discovered;
@@ -172,11 +170,18 @@ public sealed class UIEngineHost : IDisposable
         return discovered;
     }
 
-    public InteractionResult<ObjectHandle> ResolveDomainIdentity(DomainIdentity identity)
+    public InteractionResult<ObjectHandle> ResolveDomainIdentity(string identity)
     {
         if (IsDisposed)
         {
             return _DisposedFailure<ObjectHandle>();
+        }
+
+        if (string.IsNullOrWhiteSpace(identity))
+        {
+            return InteractionResult.Failure<ObjectHandle>(
+                InteractionErrorCode.INVALID_INPUT,
+                "A domain identity cannot be empty or whitespace.");
         }
 
         lock (_Gate)
@@ -202,9 +207,7 @@ public sealed class UIEngineHost : IDisposable
         }
     }
 
-    public async Task<InteractionResult<ObjectDescriptor>> DescribeAsync(
-        ObjectHandle handle,
-        CancellationToken cancellationToken = default)
+    public async Task<InteractionResult<ObjectDescriptor>> DescribeAsync(ObjectHandle handle)
     {
         var target = ResolveTarget(handle);
         if (!target.IsSuccess)
@@ -212,7 +215,7 @@ public sealed class UIEngineHost : IDisposable
             return InteractionResult.Failure<ObjectDescriptor>(target.Error!);
         }
 
-        var identity = await GetDomainIdentityAsync(handle, cancellationToken);
+        var identity = await GetDomainIdentityAsync(handle);
         if (!identity.IsSuccess)
         {
             return InteractionResult.Failure<ObjectDescriptor>(identity.Error!);
@@ -220,30 +223,69 @@ public sealed class UIEngineHost : IDisposable
 
         return await ExecuteAsync(
             "describe object",
-            () => Task.FromResult(_CreateDescriptor(target.Value, handle, identity.Value)),
-            cancellationToken);
+            () => Task.FromResult(_CreateDescriptor(target.Value, handle, identity.Value)));
     }
 
-    public Task<InteractionResult<ResolvedPath>> ResolvePathAsync(
-        string path,
-        CancellationToken cancellationToken = default)
+    public async Task<InteractionResult<ResolvedNode>> ResolveRootNodeAsync(string identifier)
+    {
+        if (string.IsNullOrWhiteSpace(identifier))
+        {
+            return InteractionResult.Failure<ResolvedNode>(
+                InteractionErrorCode.INVALID_INPUT,
+                "A root identifier cannot be empty or whitespace.");
+        }
+
+        _RootEntry root;
+        lock (_Gate)
+        {
+            if (IsDisposed)
+            {
+                return _DisposedFailure<ResolvedNode>();
+            }
+
+            if (!_Roots.TryGetValue(identifier, out root!))
+            {
+                return InteractionResult.Failure<ResolvedNode>(
+                    InteractionErrorCode.NOT_FOUND,
+                    $"Root '{identifier}' was not found.");
+            }
+        }
+
+        var described = await DescribeAsync(root.Registration.Handle);
+        if (!described.IsSuccess)
+        {
+            return InteractionResult.Failure<ResolvedNode>(described.Error!);
+        }
+
+        _Settings.Exposures.TryGetValue(root.Instance.GetType(), out var exposure);
+        var programmaticValueIds = exposure?.Values
+            .Select(static value => value.Id)
+            .ToHashSet(StringComparer.Ordinal) ?? [];
+        var node = new LiveObjectNode(
+            this,
+            identifier,
+            root.Instance.GetType(),
+            described.Value,
+            programmaticValueIds);
+        return InteractionResult.Success(new ResolvedNode(
+            LogicalPath.Root.Append(identifier),
+            node));
+    }
+
+    public Task<InteractionResult<ResolvedPath>> ResolvePathAsync(string path)
     {
         var parsed = LogicalPath.Parse(path);
         return parsed.IsSuccess
-            ? ResolvePathAsync(parsed.Value, cancellationToken)
+            ? ResolvePathAsync(parsed.Value)
             : Task.FromResult(InteractionResult.Failure<ResolvedPath>(parsed.Error!));
     }
 
-    public Task<InteractionResult<ResolvedPath>> ResolvePathAsync(
-        LogicalPath path,
-        CancellationToken cancellationToken = default) => ExecuteAsync(
+    public Task<InteractionResult<ResolvedPath>> ResolvePathAsync(LogicalPath path) => ExecuteAsync(
         "resolve path",
-        () => PathResolution.ResolveAsync(this, path, cancellationToken),
-        cancellationToken);
+        () => PathResolution.ResolveAsync(this, path));
 
     public async Task<InteractionResult<ResolvedBinding>> ResolveBindingAsync(
-        BindingReference binding,
-        CancellationToken cancellationToken = default)
+        BindingReference binding)
     {
         if (string.IsNullOrWhiteSpace(binding.Path) ||
             string.IsNullOrWhiteSpace(binding.MemberId))
@@ -264,23 +306,11 @@ public sealed class UIEngineHost : IDisposable
         LogicalPath? identityPath = null;
         if (binding.DomainIdentity is not null)
         {
-            DomainIdentity identity;
-            try
-            {
-                identity = new DomainIdentity(binding.DomainIdentity);
-            }
-            catch (ArgumentException exception)
-            {
-                return InteractionResult.Failure<ResolvedBinding>(
-                    InteractionErrorCode.INVALID_INPUT,
-                    exception.Message);
-            }
-
-            var resolvedIdentity = ResolveDomainIdentity(identity);
+            var resolvedIdentity = ResolveDomainIdentity(binding.DomainIdentity);
             if (resolvedIdentity.IsSuccess)
             {
                 identityHandle = resolvedIdentity.Value;
-                var described = await DescribeAsync(resolvedIdentity.Value, cancellationToken);
+                var described = await DescribeAsync(resolvedIdentity.Value);
                 if (!described.IsSuccess)
                 {
                     return InteractionResult.Failure<ResolvedBinding>(described.Error!);
@@ -296,14 +326,14 @@ public sealed class UIEngineHost : IDisposable
             }
         }
 
-        var resolvedPath = await ResolvePathAsync(parsed.Value, cancellationToken);
+        var resolvedPath = await ResolvePathAsync(parsed.Value);
         ObjectHandle owner;
         ObjectDescriptor descriptor;
         LogicalPath canonical;
         if (resolvedPath.IsSuccess && resolvedPath.Value.IsObject)
         {
             if (binding.DomainIdentity is not null && !StringComparer.Ordinal.Equals(
-                    resolvedPath.Value.OwnerDescriptor.DomainIdentity?.Value,
+                    resolvedPath.Value.OwnerDescriptor.DomainIdentity,
                     binding.DomainIdentity))
             {
                 return InteractionResult.Failure<ResolvedBinding>(
@@ -366,8 +396,7 @@ public sealed class UIEngineHost : IDisposable
     public async Task<InteractionResult<ObservationSubscription>> ObserveAsync(
         ObjectHandle handle,
         string? memberId = null,
-        TimeSpan? pollingInterval = null,
-        CancellationToken cancellationToken = default)
+        TimeSpan? pollingInterval = null)
     {
         if (pollingInterval is { } interval && interval <= TimeSpan.Zero)
         {
@@ -382,7 +411,7 @@ public sealed class UIEngineHost : IDisposable
             return InteractionResult.Failure<ObservationSubscription>(target.Error!);
         }
 
-        var described = await DescribeAsync(handle, cancellationToken);
+        var described = await DescribeAsync(handle);
         if (!described.IsSuccess)
         {
             return InteractionResult.Failure<ObservationSubscription>(described.Error!);
@@ -453,7 +482,7 @@ public sealed class UIEngineHost : IDisposable
         IDisposable sourceSubscription;
         if (pollingInterval is { } polling)
         {
-            var initial = await _ReadObservableAsync(member!, cancellationToken);
+            var initial = await _ReadObservableAsync(member!);
             if (!initial.IsSuccess)
             {
                 subscription.Dispose();
@@ -463,7 +492,7 @@ public sealed class UIEngineHost : IDisposable
             sourceSubscription = new PollingObserver(
                 initial.Value,
                 polling,
-                token => _ReadObservableAsync(member!, token),
+                () => _ReadObservableAsync(member!),
                 (oldValue, newValue) => subscription.Publish(CreateChange(
                     memberId,
                     ChangeKind.MEMBER_CHANGED,
@@ -488,8 +517,7 @@ public sealed class UIEngineHost : IDisposable
                         newValue,
                         oldIndex,
                         newIndex)),
-                exception => _ReportUnexpected("observation notification", exception),
-                cancellationToken);
+                exception => _ReportUnexpected("observation notification", exception));
             if (!source.IsSuccess)
             {
                 subscription.Dispose();
@@ -512,6 +540,29 @@ public sealed class UIEngineHost : IDisposable
         }
 
         return InteractionResult.Success(subscription);
+    }
+
+    public Task<InteractionResult<ObservationSubscription>> ObserveAsync(
+        ObjectNode node,
+        TimeSpan? pollingInterval = null)
+    {
+        return node switch
+        {
+            LiveObjectNode objectNode => ObserveAsync(
+                objectNode.Handle,
+                pollingInterval: pollingInterval),
+            LiveValueNode valueNode => ObserveAsync(
+                valueNode.Descriptor.Owner,
+                valueNode.Id,
+                pollingInterval),
+            LiveReflectedMemberNode memberNode => ObserveAsync(
+                memberNode.Descriptor.Owner,
+                memberNode.Id,
+                pollingInterval),
+            _ => Task.FromResult(InteractionResult.Failure<ObservationSubscription>(
+                InteractionErrorCode.UNSUPPORTED,
+                "Only live object and member nodes can be observed.")),
+        };
     }
 
     public void Dispose()
@@ -550,7 +601,7 @@ public sealed class UIEngineHost : IDisposable
             }
             catch (AggregateException exception)
             {
-                _ReportUnexpected("invocation cancellation", exception);
+                _ReportUnexpected("invocation completion", exception);
             }
         }
     }
@@ -578,37 +629,21 @@ public sealed class UIEngineHost : IDisposable
 
     internal async Task<InteractionResult<T>> ExecuteAsync<T>(
         string operation,
-        Func<Task<InteractionResult<T>>> action,
-        CancellationToken cancellationToken)
+        Func<Task<InteractionResult<T>>> action)
     {
         if (IsDisposed)
         {
             return _DisposedFailure<T>();
         }
 
-        if (cancellationToken.IsCancellationRequested)
-        {
-            return InteractionResult.Failure<T>(
-                InteractionErrorCode.CANCELLED,
-                $"The {operation} operation was cancelled.");
-        }
-
         try
         {
             if (_Settings.Dispatcher.CheckAccess())
             {
-                return await _ExecuteCheckedAsync(action, cancellationToken);
+                return await _ExecuteCheckedAsync(action);
             }
 
-            return await _Settings.Dispatcher.InvokeAsync(
-                () => _ExecuteCheckedAsync(action, cancellationToken),
-                cancellationToken);
-        }
-        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
-        {
-            return InteractionResult.Failure<T>(
-                InteractionErrorCode.CANCELLED,
-                $"The {operation} operation was cancelled.");
+            return await _Settings.Dispatcher.InvokeAsync(() => _ExecuteCheckedAsync(action));
         }
         catch (ObjectDisposedException) when (IsDisposed)
         {
@@ -630,11 +665,10 @@ public sealed class UIEngineHost : IDisposable
         }
     }
 
-    internal ActionInvocation CreateInvocation(string actionId, bool supportsCancellation)
+    internal ActionInvocation CreateInvocation(string actionId)
     {
         var invocation = new ActionInvocation(
             actionId,
-            supportsCancellation,
             _Settings.InvocationProgressBufferCapacity,
             _InvocationCompleted);
         lock (_Gate)
@@ -683,7 +717,7 @@ public sealed class UIEngineHost : IDisposable
         return handle;
     }
 
-    private InteractionResult<DomainIdentity?> _DiscoverDomainIdentity(object instance)
+    private InteractionResult<string?> _DiscoverDomainIdentity(object instance)
     {
         if (_Settings.Exposures.TryGetValue(instance.GetType(), out var exposure))
         {
@@ -706,7 +740,7 @@ public sealed class UIEngineHost : IDisposable
             }
             else
             {
-                return InteractionResult.Failure<DomainIdentity?>(
+                return InteractionResult.Failure<string?>(
                     InteractionErrorCode.INVALID_INPUT,
                     "A domain identity member must be a readable string field or property.");
             }
@@ -716,7 +750,7 @@ public sealed class UIEngineHost : IDisposable
         if (fromInterface is not null && attributed is not null &&
             !StringComparer.Ordinal.Equals(fromInterface, attributed))
         {
-            return InteractionResult.Failure<DomainIdentity?>(
+            return InteractionResult.Failure<string?>(
                 InteractionErrorCode.AMBIGUOUS,
                 "The object supplies conflicting domain identities.");
         }
@@ -727,7 +761,7 @@ public sealed class UIEngineHost : IDisposable
     private InteractionResult<ObjectDescriptor> _CreateDescriptor(
         object instance,
         ObjectHandle handle,
-        DomainIdentity? identity)
+        string? identity)
     {
         var metadata = ReflectionMetadata.Get(instance.GetType());
         _Settings.Exposures.TryGetValue(instance.GetType(), out var exposure);
@@ -824,50 +858,46 @@ public sealed class UIEngineHost : IDisposable
     }
 
     private static async Task<InteractionResult<object?>> _ReadObservableAsync(
-        MemberDescriptor member,
-        CancellationToken cancellationToken) => member switch
+        MemberDescriptor member) => member switch
     {
-        ValueDescriptor value => await value.ReadAsync(cancellationToken),
-        ReferenceDescriptor reference => await _ReadReferenceAsync(reference, cancellationToken),
+        ValueDescriptor value => await value.ReadAsync(),
+        ReferenceDescriptor reference => await _ReadReferenceAsync(reference),
         _ => InteractionResult.Failure<object?>(
             InteractionErrorCode.UNSUPPORTED,
             $"Member '{member.Id}' cannot be polled."),
     };
 
     private static async Task<InteractionResult<object?>> _ReadReferenceAsync(
-        ReferenceDescriptor reference,
-        CancellationToken cancellationToken)
+        ReferenceDescriptor reference)
     {
-        var read = await reference.ReadAsync(cancellationToken);
+        var read = await reference.ReadAsync();
         return read.IsSuccess
             ? InteractionResult.Success<object?>(read.Value)
             : InteractionResult.Failure<object?>(read.Error!);
     }
 
-    private static InteractionResult<DomainIdentity?> _NormalizeIdentity(string? value)
+    private static InteractionResult<string?> _NormalizeIdentity(string? value)
     {
         if (value is null)
         {
-            return InteractionResult.Success<DomainIdentity?>(null);
+            return InteractionResult.Success<string?>(null);
         }
 
         return string.IsNullOrWhiteSpace(value)
-            ? InteractionResult.Failure<DomainIdentity?>(
+            ? InteractionResult.Failure<string?>(
                 InteractionErrorCode.INVALID_INPUT,
                 "A domain identity cannot be empty or whitespace.")
-            : InteractionResult.Success<DomainIdentity?>(new DomainIdentity(value));
+            : InteractionResult.Success<string?>(value);
     }
 
     private async Task<InteractionResult<T>> _ExecuteCheckedAsync<T>(
-        Func<Task<InteractionResult<T>>> action,
-        CancellationToken cancellationToken)
+        Func<Task<InteractionResult<T>>> action)
     {
         if (IsDisposed)
         {
             return _DisposedFailure<T>();
         }
 
-        cancellationToken.ThrowIfCancellationRequested();
         return await action();
     }
 
@@ -907,7 +937,7 @@ public sealed class UIEngineHost : IDisposable
             $"The {operation} operation failed unexpectedly.");
     }
 
-    private static InteractionResult<ObjectHandle> _DomainIdentityNotFound(DomainIdentity identity) =>
+    private static InteractionResult<ObjectHandle> _DomainIdentityNotFound(string identity) =>
         InteractionResult.Failure<ObjectHandle>(
             InteractionErrorCode.NOT_FOUND,
             $"No live object has domain identity '{identity}'.");

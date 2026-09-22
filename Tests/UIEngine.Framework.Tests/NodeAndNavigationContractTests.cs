@@ -130,7 +130,7 @@ public sealed class NodeAndNavigationContractTests
     {
         public ObjectHandle Handle { get; } = new(Guid.NewGuid());
 
-        public DomainIdentity? DomainIdentity => null;
+        public string? DomainIdentity => null;
 
         public string? Summary => null;
 
@@ -162,8 +162,6 @@ public sealed class NodeAndNavigationContractTests
         public bool IsAsynchronous => false;
 
         public Type? ProgressType => null;
-
-        public bool SupportsCancellation => false;
 
         public Task<InteractionResult<ActionInvocation>> InvokeAsync(
             IReadOnlyDictionary<string, object?> arguments) => throw new NotSupportedException();

@@ -167,17 +167,15 @@ public sealed class Nation : INotifyPropertyChanged, IStableDomainIdentity
         return replacement;
     }
 
-    /// <summary>Runs deterministic asynchronous turns with normalized progress and cancellation.</summary>
+    /// <summary>Runs deterministic asynchronous turns with normalized progress.</summary>
     [Action]
     public async Task<int> SimulateGrowthAsync(
         [Range(1, 100)] int years,
         [Range(0, 10_000)] int populationPerYear,
-        IProgress<SimulationProgress> progress,
-        CancellationToken cancellationToken)
+        IProgress<SimulationProgress> progress)
     {
         for (var year = 1; year <= years; year++)
         {
-            cancellationToken.ThrowIfCancellationRequested();
             await Task.Yield();
             Population += populationPerYear;
             _Turn++;

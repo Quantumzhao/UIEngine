@@ -1,8 +1,6 @@
 using System.Xml.Linq;
 using UIEngine.Core;
 using UIEngine.Frontend.Tui;
-using XenoAtom.Terminal;
-using XenoAtom.Terminal.Backends;
 using Xunit;
 
 namespace UIEngine.Frontend.Tui.Tests;
@@ -52,17 +50,13 @@ public sealed class TuiBoundaryTests
     }
 
     [Fact]
-    public async Task FullscreenRunnerHonorsCancellationAndLeavesCallerOwnedHostAlive()
+    public void FullscreenRunnerExposesOnlyHostAndOptions()
     {
-        var backend = new InMemoryTerminalBackend(new TerminalSize(40, 10));
-        using var terminal = Terminal.Open(backend, new TerminalOptions(), force: true);
-        using var host = new UIEngineHost();
-        using var cancellation = new CancellationTokenSource();
-        cancellation.Cancel();
+        var run = Assert.Single(typeof(TuiFrontend).GetMethods(), static method =>
+            method.Name == nameof(TuiFrontend.RunAsync));
 
-        await TuiFrontend.RunAsync(host, cancellationToken: cancellation.Token);
-
-        Assert.False(host.IsDisposed);
+        Assert.Equal([typeof(UIEngineHost), typeof(TuiFrontendOptions)],
+            run.GetParameters().Select(static parameter => parameter.ParameterType));
     }
 
     [Fact]

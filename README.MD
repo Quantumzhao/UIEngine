@@ -44,10 +44,10 @@ using UIEngine.Frontend.Tui;
 using var host = new UIEngineHost();
 host.SetRoot("model", model);
 
-await TuiFrontend.RunAsync(host, cancellationToken: stoppingToken);
+await TuiFrontend.RunAsync(host);
 ```
 
-The caller owns the host. Closing the TUI disposes frontend work without stopping the domain
+The caller owns the host. Closing the TUI disposes frontend resources without stopping the domain
 runtime or a method invocation that has already started.
 
 ## Documentation

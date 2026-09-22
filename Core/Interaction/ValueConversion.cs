@@ -126,7 +126,7 @@ internal static class ValueConversion
             {
                 result = attribute.GetValidationResult(value, context);
             }
-            catch (Exception exception) when (exception is not OperationCanceledException)
+            catch (Exception)
             {
                 issues.Add(new ValidationIssue(
                     ValidationIssueCode.RULE_FAILED,

@@ -4,8 +4,7 @@ internal static class PathResolution
 {
     public static async Task<InteractionResult<ResolvedPath>> ResolveAsync(
         UIEngineHost host,
-        LogicalPath path,
-        CancellationToken cancellationToken)
+        LogicalPath path)
     {
         if (path.Segments.Count == 0)
         {
@@ -28,7 +27,7 @@ internal static class PathResolution
         var locations = new List<PathLocation> { new(root.Handle, canonical) };
         host.RecordCanonicalPath(root.Handle, canonical);
         var handle = root.Handle;
-        var described = await host.DescribeAsync(handle, cancellationToken);
+        var described = await host.DescribeAsync(handle);
         if (!described.IsSuccess)
         {
             return InteractionResult.Failure<ResolvedPath>(described.Error!);
@@ -89,7 +88,7 @@ internal static class PathResolution
                     return _InvalidTraversal(segment.Identifier);
                 }
 
-                var read = await reference.ReadAsync(cancellationToken);
+                var read = await reference.ReadAsync();
                 if (!read.IsSuccess)
                 {
                     return InteractionResult.Failure<ResolvedPath>(read.Error!);
@@ -123,7 +122,7 @@ internal static class PathResolution
                         locations));
                 }
 
-                var selected = await collection.SelectAsync(segment.Selector, cancellationToken);
+                var selected = await collection.SelectAsync(segment.Selector);
                 if (!selected.IsSuccess)
                 {
                     return InteractionResult.Failure<ResolvedPath>(selected.Error!);
@@ -147,7 +146,7 @@ internal static class PathResolution
                 canonical = canonical.Append(segment.Identifier, segment.Selector);
             }
 
-            described = await host.DescribeAsync(handle, cancellationToken);
+            described = await host.DescribeAsync(handle);
             if (!described.IsSuccess)
             {
                 return InteractionResult.Failure<ResolvedPath>(described.Error!);

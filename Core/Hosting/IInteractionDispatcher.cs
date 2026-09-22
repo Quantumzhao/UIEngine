@@ -5,9 +5,7 @@ public interface IInteractionDispatcher
 {
     bool CheckAccess();
 
-    Task<T> InvokeAsync<T>(
-        Func<Task<T>> action,
-        CancellationToken cancellationToken = default);
+    Task<T> InvokeAsync<T>(Func<Task<T>> action);
 }
 
 public sealed class InlineInteractionDispatcher : IInteractionDispatcher
@@ -20,11 +18,5 @@ public sealed class InlineInteractionDispatcher : IInteractionDispatcher
 
     public bool CheckAccess() => true;
 
-    public Task<T> InvokeAsync<T>(
-        Func<Task<T>> action,
-        CancellationToken cancellationToken = default)
-    {
-        cancellationToken.ThrowIfCancellationRequested();
-        return action();
-    }
+    public Task<T> InvokeAsync<T>(Func<Task<T>> action) => action();
 }

@@ -32,9 +32,8 @@ public sealed class TuiOperationScopeTests
         app.Post(() =>
         {
             commandThread = Environment.CurrentManagedThreadId;
-            var operation = scope.RunAsync(cancellationToken => host.ResolvePathAsync(
-                LogicalPath.Root.Append("model"),
-                cancellationToken));
+            var operation = scope.RunAsync(() => host.ResolvePathAsync(
+                LogicalPath.Root.Append("model")));
             _ = operation.ContinueWith(
                 completed => app.Post(() =>
                 {
@@ -42,19 +41,19 @@ public sealed class TuiOperationScopeTests
                     stateChangeThread = Environment.CurrentManagedThreadId;
                     app.Stop();
                 }),
-                CancellationToken.None,
+                default,
                 TaskContinuationOptions.ExecuteSynchronously,
                 TaskScheduler.Default);
         });
 
-        await app.RunAsync(CancellationToken.None).WaitAsync(TimeSpan.FromSeconds(5));
+        await app.RunAsync(default).WaitAsync(TimeSpan.FromSeconds(5));
 
         Assert.NotEqual(0, commandThread);
         Assert.Equal(commandThread, stateChangeThread);
     }
 
     [Fact]
-    public async Task DisposingOneScopeDoesNotCancelAnUnrelatedRead()
+    public async Task DisposingOneScopeDoesNotStopInFlightOrUnrelatedReads()
     {
         var domainDispatcher = new _OrderedDomainDispatcher();
         using var host = new UIEngineHost(new UIEngineHostOptions
@@ -67,26 +66,26 @@ public sealed class TuiOperationScopeTests
         var retiredScope = workspace.CreateOperationScope();
         using var currentScope = workspace.CreateOperationScope();
 
-        var retiredRead = retiredScope.RunAsync(cancellationToken => host.ResolvePathAsync(
-            LogicalPath.Root.Append("first"),
-            cancellationToken));
+        var retiredRead = retiredScope.RunAsync(() => host.ResolvePathAsync(
+            LogicalPath.Root.Append("first")));
         await domainDispatcher.FirstInvocationStarted.Task.WaitAsync(TimeSpan.FromSeconds(5));
 
-        var currentRead = await currentScope.RunAsync(cancellationToken => host.ResolvePathAsync(
-            LogicalPath.Root.Append("second"),
-            cancellationToken));
+        var currentRead = await currentScope.RunAsync(() => host.ResolvePathAsync(
+            LogicalPath.Root.Append("second")));
         await Task.Run(retiredScope.Dispose).WaitAsync(TimeSpan.FromSeconds(5));
+        Assert.False(retiredRead.IsCompleted);
+        domainDispatcher.ReleaseFirst();
         var retiredResult = await retiredRead.WaitAsync(TimeSpan.FromSeconds(5));
 
         Assert.True(currentRead.IsSuccess);
-        Assert.Equal(InteractionErrorCode.CANCELLED, retiredResult.Error?.Code);
+        Assert.True(retiredResult.IsSuccess);
         Assert.True(retiredScope.IsDisposed);
         Assert.False(currentScope.IsDisposed);
         Assert.False(host.IsDisposed);
     }
 
     [Fact]
-    public async Task WorkspaceDisposalCancelsAnInFlightReadWithoutDisposingTheHost()
+    public async Task WorkspaceDisposalLeavesAnInFlightReadAndHostAlive()
     {
         var domainDispatcher = new _BlockingDomainDispatcher();
         using var host = new UIEngineHost(new UIEngineHostOptions
@@ -96,16 +95,16 @@ public sealed class TuiOperationScopeTests
         host.SetRoot("model", new object());
         var workspace = TuiFrontend.CreateWorkspace(host);
         var scope = workspace.CreateOperationScope();
-        var read = scope.RunAsync(cancellationToken => host.ResolvePathAsync(
-            LogicalPath.Root.Append("model"),
-            cancellationToken));
+        var read = scope.RunAsync(() => host.ResolvePathAsync(
+            LogicalPath.Root.Append("model")));
         await domainDispatcher.InvocationStarted.Task.WaitAsync(TimeSpan.FromSeconds(5));
 
         await Task.Run(workspace.Dispose).WaitAsync(TimeSpan.FromSeconds(5));
+        Assert.False(read.IsCompleted);
+        domainDispatcher.Release();
         var result = await read.WaitAsync(TimeSpan.FromSeconds(5));
 
-        Assert.Equal(InteractionErrorCode.CANCELLED, result.Error?.Code);
-        Assert.True(domainDispatcher.CancellationObserved);
+        Assert.True(result.IsSuccess);
         Assert.True(scope.IsDisposed);
         Assert.False(host.IsDisposed);
         Assert.Throws<ObjectDisposedException>(workspace.CreateOperationScope);
@@ -123,9 +122,9 @@ public sealed class TuiOperationScopeTests
         Assert.True(scope.TryOwn(observed.Value));
         var presented = new TaskCompletionSource<ChangeRecord>(
             TaskCreationOptions.RunContinuationsAsynchronously);
-        var reader = scope.RunAsync(async cancellationToken =>
+        var reader = scope.RunAsync(async () =>
         {
-            await foreach (var change in observed.Value.ReadAllAsync(cancellationToken))
+            await foreach (var change in observed.Value.ReadAllAsync())
             {
                 presented.TrySetResult(change);
             }
@@ -137,7 +136,7 @@ public sealed class TuiOperationScopeTests
         Assert.Equal(ChangeKind.MEMBER_CHANGED, change.Kind);
 
         await Task.Run(scope.Dispose).WaitAsync(TimeSpan.FromSeconds(5));
-        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => reader);
+        await reader.WaitAsync(TimeSpan.FromSeconds(5));
         model.Value = 2;
 
         Assert.Equal(0, model.PropertyHandlerCount);
@@ -145,7 +144,7 @@ public sealed class TuiOperationScopeTests
     }
 
     [Fact]
-    public async Task ScopeDisposalStopsProgressReaderWithoutCancellingInvocation()
+    public async Task ScopeDisposalDoesNotStopAHostOwnedInvocationOrProgressReader()
     {
         var model = new _ActionModel();
         using var host = new UIEngineHost();
@@ -157,9 +156,9 @@ public sealed class TuiOperationScopeTests
         var scope = workspace.CreateOperationScope();
         var progressRead = new TaskCompletionSource(
             TaskCreationOptions.RunContinuationsAsynchronously);
-        var reader = scope.RunAsync(async cancellationToken =>
+        var reader = scope.RunAsync(async () =>
         {
-            await foreach (var _ in started.Value.ReadProgressAsync(cancellationToken))
+            await foreach (var _ in started.Value.ReadProgressAsync())
             {
                 progressRead.TrySetResult();
             }
@@ -167,11 +166,9 @@ public sealed class TuiOperationScopeTests
         await progressRead.Task.WaitAsync(TimeSpan.FromSeconds(5));
 
         scope.Dispose();
-        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => reader);
+        Assert.False(reader.IsCompleted);
 
         Assert.Equal(InvocationStatus.RUNNING, started.Value.Status);
-        Assert.False(started.Value.IsCancellationRequested);
-        Assert.False(model.CancellationObserved);
         Assert.False(host.IsDisposed);
 
         model.Release();
@@ -179,6 +176,7 @@ public sealed class TuiOperationScopeTests
 
         Assert.True(completion.IsSuccess);
         Assert.Equal(InvocationStatus.SUCCEEDED, started.Value.Status);
+        await reader.WaitAsync(TimeSpan.FromSeconds(5));
     }
 
     [Fact]
@@ -189,7 +187,7 @@ public sealed class TuiOperationScopeTests
         var resource = new _TrackedResource();
 
         await Assert.ThrowsAsync<ObjectDisposedException>(() =>
-            scope.RunAsync(_ => Task.CompletedTask));
+            scope.RunAsync(() => Task.CompletedTask));
         Assert.Throws<ObjectDisposedException>(scope.CreateChild);
         Assert.False(scope.TryOwn(resource));
         Assert.True(resource.IsDisposed);
@@ -198,7 +196,7 @@ public sealed class TuiOperationScopeTests
     private sealed class _OrderedDomainDispatcher : IInteractionDispatcher
     {
         private readonly AsyncLocal<bool> _Inside = new();
-        private readonly TaskCompletionSource _Never =
+        private readonly TaskCompletionSource _ReleaseFirst =
             new(TaskCreationOptions.RunContinuationsAsynchronously);
         private int _InvocationCount;
 
@@ -207,15 +205,13 @@ public sealed class TuiOperationScopeTests
 
         public bool CheckAccess() => _Inside.Value;
 
-        public async Task<T> InvokeAsync<T>(
-            Func<Task<T>> action,
-            CancellationToken cancellationToken = default)
+        public async Task<T> InvokeAsync<T>(Func<Task<T>> action)
         {
             var invocation = Interlocked.Increment(ref _InvocationCount);
             if (invocation == 1)
             {
                 FirstInvocationStarted.TrySetResult();
-                await _Never.Task.WaitAsync(cancellationToken);
+                await _ReleaseFirst.Task;
             }
 
             _Inside.Value = true;
@@ -228,6 +224,8 @@ public sealed class TuiOperationScopeTests
                 _Inside.Value = false;
             }
         }
+
+        public void ReleaseFirst() => _ReleaseFirst.TrySetResult();
     }
 
     private sealed class _BlockingDomainDispatcher : IInteractionDispatcher
@@ -238,27 +236,16 @@ public sealed class TuiOperationScopeTests
         public TaskCompletionSource InvocationStarted { get; } =
             new(TaskCreationOptions.RunContinuationsAsynchronously);
 
-        public bool CancellationObserved { get; private set; }
-
         public bool CheckAccess() => false;
 
-        public async Task<T> InvokeAsync<T>(
-            Func<Task<T>> action,
-            CancellationToken cancellationToken = default)
+        public async Task<T> InvokeAsync<T>(Func<Task<T>> action)
         {
             InvocationStarted.TrySetResult();
-            try
-            {
-                await _Never.Task.WaitAsync(cancellationToken);
-            }
-            catch (OperationCanceledException)
-            {
-                CancellationObserved = true;
-                throw;
-            }
-
+            await _Never.Task;
             return await action();
         }
+
+        public void Release() => _Never.TrySetResult();
     }
 
     private sealed class _TrackedResource : IDisposable
@@ -306,25 +293,13 @@ public sealed class TuiOperationScopeTests
         private readonly TaskCompletionSource _Release =
             new(TaskCreationOptions.RunContinuationsAsynchronously);
 
-        public bool CancellationObserved { get; private set; }
-
         public void Release() => _Release.TrySetResult();
 
         [UIEngine.Core.Attributes.Action]
-        public async Task WorkAsync(
-            IProgress<int> progress,
-            CancellationToken cancellationToken)
+        public async Task WorkAsync(IProgress<int> progress)
         {
             progress.Report(1);
-            try
-            {
-                await _Release.Task.WaitAsync(cancellationToken);
-            }
-            catch (OperationCanceledException)
-            {
-                CancellationObserved = true;
-                throw;
-            }
+            await _Release.Task;
         }
     }
 }

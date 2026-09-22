@@ -12,13 +12,13 @@ internal sealed class CliTextReaderRunner
         _Input = input;
     }
 
-    internal async Task RunAsync(CancellationToken cancellationToken = default)
+    internal async Task RunAsync()
     {
-        while (!cancellationToken.IsCancellationRequested)
+        while (true)
         {
-            var line = await _Input.ReadLineAsync(cancellationToken);
+            var line = await _Input.ReadLineAsync();
             if (line is null ||
-                !await _Session.ExecuteAsync(line, cancellationToken))
+                !await _Session.ExecuteAsync(line))
             {
                 return;
             }

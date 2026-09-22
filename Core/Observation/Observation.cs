@@ -36,7 +36,7 @@ public readonly record struct ObservationValue
 
 public sealed record ChangeRecord(
     ObjectHandle Source,
-    DomainIdentity? DomainIdentity,
+    string? DomainIdentity,
     string? MemberId,
     ChangeKind Kind,
     ObservationValue OldValue,
@@ -79,9 +79,7 @@ public sealed class ObservationSubscription : IDisposable
 
     public bool IsDisposed => Volatile.Read(ref _Disposed) != 0;
 
-    public IAsyncEnumerable<ChangeRecord> ReadAllAsync(
-        CancellationToken cancellationToken = default) =>
-        _Changes.ReadAllAsync(cancellationToken);
+    public IAsyncEnumerable<ChangeRecord> ReadAllAsync() => _Changes.ReadAllAsync();
 
     internal void Publish(ChangeRecord change) => _Changes.Publish(change);
 
@@ -160,14 +158,13 @@ internal sealed class NotificationObserver : IDisposable
         ObjectDescriptor descriptor,
         MemberDescriptor? member,
         Action<string?, ChangeKind, ObservationValue, ObservationValue, int?, int?> publish,
-        Action<Exception> reportFailure,
-        CancellationToken cancellationToken)
+        Action<Exception> reportFailure)
     {
         var collection = member as CollectionDescriptor;
         INotifyCollectionChanged? collectionSource = source as INotifyCollectionChanged;
         if (collection is not null)
         {
-            var read = await collection.ReadSourceAsync(cancellationToken);
+            var read = await collection.ReadSourceAsync();
             if (!read.IsSuccess)
             {
                 return InteractionResult.Failure<IDisposable>(read.Error!);
@@ -371,16 +368,17 @@ internal sealed class NotificationObserver : IDisposable
 
 internal sealed class PollingObserver : IDisposable
 {
-    private readonly CancellationTokenSource _Cancellation = new();
+    private readonly PeriodicTimer _Timer;
     private int _Disposed;
 
     public PollingObserver(
         object? initialValue,
         TimeSpan interval,
-        Func<CancellationToken, Task<InteractionResult<object?>>> read,
+        Func<Task<InteractionResult<object?>>> read,
         Action<object?, object?> publish,
         Action<Exception> reportFailure)
     {
+        _Timer = new PeriodicTimer(interval);
         _ = _RunAsync();
 
         async Task _RunAsync()
@@ -388,24 +386,20 @@ internal sealed class PollingObserver : IDisposable
             var previous = initialValue;
             try
             {
-                while (!_Cancellation.IsCancellationRequested)
+                while (await _Timer.WaitForNextTickAsync())
                 {
-                    await Task.Delay(interval, _Cancellation.Token);
-                    var current = await read(_Cancellation.Token);
+                    var current = await read();
                     if (!current.IsSuccess)
                     {
                         continue;
                     }
 
-                    if (!Equals(previous, current.Value))
+                    if (!IsDisposed && !Equals(previous, current.Value))
                     {
                         publish(previous, current.Value);
                         previous = current.Value;
                     }
                 }
-            }
-            catch (OperationCanceledException) when (_Cancellation.IsCancellationRequested)
-            {
             }
             catch (Exception exception)
             {
@@ -418,8 +412,9 @@ internal sealed class PollingObserver : IDisposable
     {
         if (Interlocked.Exchange(ref _Disposed, 1) == 0)
         {
-            _Cancellation.Cancel();
-            _Cancellation.Dispose();
+            _Timer.Dispose();
         }
     }
+
+    private bool IsDisposed => Volatile.Read(ref _Disposed) != 0;
 }

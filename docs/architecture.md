@@ -69,7 +69,7 @@ The source of an exposure and its value shape are independent facets:
 |---|---|---|
 | Reflected property | `IPropertyNode` | Readable/writable/nullability and value-shape facets |
 | Reflected field | `IFieldNode` | Readable/writable/nullability and value-shape facets |
-| Reflected method | `IMethodNode` | Parameter, result, progress, and cancellation metadata |
+| Reflected method | `IMethodNode` | Parameter, result, and progress metadata |
 | Programmatic scalar | `IProgrammaticValueNode` | Readable/writable/nullability and value-shape facets |
 
 A programmatic scalar is deliberately not an `IPropertyNode` or `IFieldNode`; it is an exposed
@@ -97,7 +97,7 @@ UIEngine keeps three concepts separate:
 | Concept | Purpose |
 |---|---|
 | `ObjectHandle` | Identifies one live reference within a host lifetime. |
-| `DomainIdentity` | Optionally identifies a domain entity across compatible replacement. |
+| Domain identity string | Optionally identifies a domain entity across compatible replacement. |
 | `LogicalPath` | Identifies how a navigator reached an exposed node. |
 
 Logical paths are absolute, case-sensitive, and percent-escaped. Collection elements use an
@@ -148,7 +148,7 @@ navigator follows the same rule at the current path, so the two navigators do no
 Navigator mutations are latest-request-wins. Starting a mutation advances that navigator's
 generation and supersedes any older unresolved mutation. Resolution may complete in the
 background, but it may publish an entry or change notification only if its generation is still
-current. Back, removal, disposal, or caller cancellation also invalidates affected pending work,
+current. Back, removal, or disposal also invalidates affected pending work,
 so an older resolution can never restore stale state. Successful mutation results and change
 notifications carry the same committed change object; failed or superseded mutations publish no
 change.
@@ -183,8 +183,8 @@ All live operations flow through the host and its `IInteractionDispatcher`. Expe
 Collection access is always bounded. Collection windows retain positions, optional keys, nulls,
 scalar values, references, optional total counts, and whether more data is available.
 
-Method invocation returns an `ActionInvocation` with terminal status, completion, bounded ordered
-progress, and optional cancellation support. Once started, an invocation is owned by the host.
+Method invocation returns an `ActionInvocation` with terminal status, completion, and bounded
+ordered progress. Once started, an invocation is owned by the host.
 Removing a node or control stops only frontend observation of that invocation.
 
 Observation uses domain notifications or explicit polling. Streams are bounded, overflow is
@@ -193,15 +193,15 @@ visible, and subscriptions detach deterministically.
 ## Frontend Lifetime
 
 For every active navigation entry, a frontend creates a control and an independent frontend
-operation scope. The scope owns reads, observation subscriptions, and progress readers started by
-that control.
+operation scope. The scope owns disposable resources such as observation subscriptions; completed
+async work is applied only while that entry's generation remains current.
 
-When an entry is removed, the frontend disposes its control and scope. This cancels frontend work
-and prevents updates to a detached visual tree. It does not dispose the host, stop the domain
-object, or cancel a started invocation.
+When an entry is removed, the frontend disposes its control, subscriptions, and other owned
+resources. Already-started tasks may finish, but generation checks prevent them from updating a
+detached visual tree. Disposal does not stop the domain object or a started invocation.
 
-Removing one navigator cannot cancel work owned by another navigator, even when both point to the
-same path.
+Removing one navigator cannot interfere with work owned by another navigator, even when both point
+to the same path.
 
 ## Dependency Direction
 

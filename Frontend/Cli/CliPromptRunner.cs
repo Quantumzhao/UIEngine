@@ -16,14 +16,14 @@ internal sealed class CliPromptRunner
         _Session = session;
     }
 
-    internal async Task RunAsync(CancellationToken cancellationToken = default)
+    internal async Task RunAsync()
     {
         var configuration = CreateConfiguration();
         await using var prompt = new Prompt(
             callbacks: new CliPromptCallbacks(_Session),
             configuration: configuration);
 
-        while (!cancellationToken.IsCancellationRequested)
+        while (true)
         {
             configuration.Prompt = $"{_Session.CurrentPath}> ";
             var response = await prompt.ReadLineAsync();
@@ -32,10 +32,7 @@ internal sealed class CliPromptRunner
                 continue;
             }
 
-            using var commandCancellation = CancellationTokenSource.CreateLinkedTokenSource(
-                cancellationToken,
-                response.CancellationToken);
-            if (!await _Session.ExecuteAsync(response.Text, commandCancellation.Token))
+            if (!await _Session.ExecuteAsync(response.Text))
             {
                 return;
             }

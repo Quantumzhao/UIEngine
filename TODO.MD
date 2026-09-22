@@ -6,7 +6,7 @@
 - [x] Stable domain identity and canonical logical paths.
 - [x] Live reads, writes, conversion, and validation.
 - [x] Bounded collection access.
-- [x] Synchronous and asynchronous invocation with progress and cancellation.
+- [x] Synchronous and asynchronous invocation with progress.
 - [x] Notification and polling observation with visible overflow.
 - [x] Explicit domain dispatch.
 - [x] Structured interaction failures.
@@ -18,8 +18,8 @@
 - [x] Model property, field, object, reference, collection, method, string, boolean, number, and
   enum semantics.
 - [x] Support overlapping language-semantic facets.
-- [ ] Resolve every exposed root and member to a fresh node instance.
-- [ ] Preserve validation, observation, dispatch, collection bounds, and invocation behavior.
+- [x] Resolve every exposed root and member to a fresh node instance.
+- [x] Preserve validation, observation, dispatch, collection bounds, and invocation behavior.
 - [ ] Resolve logical paths to terminal as well as navigable nodes.
 - [ ] Define semantic parent traversal for members and selected collection elements.
 - [ ] Cover cycles, shared references, replacement, nulls, and unavailable targets.
@@ -33,7 +33,7 @@
 - [ ] Navigate back by permanently removing the current entry.
 - [ ] Duplicate a navigator at the same path with independent node instances.
 - [ ] Keep broken paths as visible entries that can navigate back.
-- [ ] Prove that one navigator cannot cancel or mutate another navigator's presentation state.
+- [ ] Prove that one navigator cannot interfere with another navigator's presentation state.
 
 ## Layout Persistence
 

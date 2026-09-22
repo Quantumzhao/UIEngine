@@ -63,7 +63,7 @@ public sealed class RuntimeBehaviorTests
         var write = await value.WriteAsync("125.5");
         var rejected = await value.WriteAsync("10000001");
 
-        Assert.Equal("economy/N1", described.Value.DomainIdentity?.Value);
+        Assert.Equal("economy/N1", described.Value.DomainIdentity);
         Assert.Equal(125.5m, write.Value);
         Assert.Equal(125.5m, profile.GrossDomesticProduct);
         Assert.Equal(InteractionErrorCode.VALIDATION_FAILED, rejected.Error?.Code);
@@ -170,7 +170,7 @@ public sealed class RuntimeBehaviorTests
     }
 
     [Fact]
-    public async Task ActionsSupportSyncTaskProgressCancellationAndDomainFaults()
+    public async Task ActionsSupportSyncTaskProgressAndDomainFaults()
     {
         var model = new _ActionModel();
         using var host = new UIEngineHost();
@@ -200,12 +200,6 @@ public sealed class RuntimeBehaviorTests
         Assert.Equal([1, 2, 3], progress.Select(static update => (int)update.Value!).ToArray());
         Assert.Equal(3, (await worked.Value.Completion).Value);
 
-        var waiting = await actions["WaitAsync"].InvokeAsync(new Dictionary<string, object?>());
-        Assert.True(waiting.Value.Cancel());
-        var cancelled = await waiting.Value.Completion;
-        Assert.Equal(InvocationStatus.CANCELLED, waiting.Value.Status);
-        Assert.Equal(InteractionErrorCode.CANCELLED, cancelled.Error?.Code);
-
         var failed = await actions["Fail"].InvokeAsync(new Dictionary<string, object?>());
         var fault = await failed.Value.Completion;
         Assert.Equal(InvocationStatus.FAILED, failed.Value.Status);
@@ -214,7 +208,7 @@ public sealed class RuntimeBehaviorTests
     }
 
     [Fact]
-    public async Task HostDisposalCancelsRunningInvocationsAndRejectsFurtherWork()
+    public async Task HostDisposalCompletesRunningInvocationsAndRejectsFurtherWork()
     {
         var host = new UIEngineHost();
         var root = host.SetRoot("model", new _ActionModel());
@@ -250,6 +244,7 @@ public sealed class RuntimeBehaviorTests
             "IPathSelector",
             "IInteractionDispatchPolicy",
             "ObjectIdentity",
+            "DomainIdentity",
             "BindingResolution",
             "PathResolutionState",
         };
@@ -380,13 +375,11 @@ public sealed class RuntimeBehaviorTests
         [Action]
         public async Task<int> WorkAsync(
             [Range(1, 5)] int steps,
-            IProgress<int> progress,
-            CancellationToken cancellationToken)
+            IProgress<int> progress)
         {
             _InvocationCount++;
             for (var step = 1; step <= steps; step++)
             {
-                cancellationToken.ThrowIfCancellationRequested();
                 await Task.Yield();
                 progress.Report(step);
             }
@@ -395,10 +388,10 @@ public sealed class RuntimeBehaviorTests
         }
 
         [Action]
-        public Task WaitAsync(CancellationToken cancellationToken)
+        public Task WaitAsync()
         {
             _InvocationCount++;
-            return Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
+            return new TaskCompletionSource().Task;
         }
 
         [Action]

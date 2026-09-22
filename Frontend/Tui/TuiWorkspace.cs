@@ -5,7 +5,7 @@ namespace UIEngine.Frontend.Tui;
 
 /// <summary>A disposable UIEngine workspace that can be embedded in a XenoAtom visual tree.</summary>
 /// <remarks>
-/// The workspace owns its frontend operation lifetime, but not the Core host used to create it. A
+/// The workspace owns its frontend resources, but not the Core host used to create it. A
 /// visual may be attached to one XenoAtom visual tree at a time.
 /// </remarks>
 public sealed class TuiWorkspace : IDisposable
@@ -35,6 +35,6 @@ public sealed class TuiWorkspace : IDisposable
 
     internal TuiOperationScope CreateOperationScope() => _Lifetime.CreateChild();
 
-    /// <summary>Disposes frontend work without disposing the caller-owned Core host.</summary>
+    /// <summary>Disposes frontend resources without disposing the caller-owned Core host.</summary>
     public void Dispose() => _Lifetime.Dispose();
 }

@@ -11,7 +11,7 @@ public static class TuiFrontend
 {
     /// <summary>Creates a workspace for composition into an existing XenoAtom application.</summary>
     /// <remarks>
-    /// The returned workspace owns its frontend operation scopes. The caller retains ownership of
+    /// The returned workspace owns its frontend resource scopes. The caller retains ownership of
     /// <paramref name="host"/> and must dispose it separately.
     /// </remarks>
     public static TuiWorkspace CreateWorkspace(
@@ -28,7 +28,7 @@ public static class TuiFrontend
         return new TuiWorkspace(host, settings, visual);
     }
 
-    /// <summary>Runs a workspace in a fullscreen terminal application until exit or cancellation.</summary>
+    /// <summary>Runs a workspace in a fullscreen terminal application until exit.</summary>
     /// <remarks>
     /// This convenience host creates and disposes the workspace and terminal application. It does
     /// not dispose <paramref name="host"/>. The same workspace and visual created by
@@ -36,8 +36,7 @@ public static class TuiFrontend
     /// </remarks>
     public static async Task RunAsync(
         UIEngineHost host,
-        TuiFrontendOptions? options = null,
-        CancellationToken cancellationToken = default)
+        TuiFrontendOptions? options = null)
     {
         var workspace = CreateWorkspace(host, options);
         await using var app = new TerminalApp(
@@ -46,11 +45,11 @@ public static class TuiFrontend
             new TerminalAppOptions { HostKind = TerminalHostKind.Fullscreen });
         try
         {
-            await app.RunAsync(cancellationToken);
+            await app.RunAsync(default);
         }
         finally
         {
-            // Join frontend work while the toolkit dispatcher still belongs to this application.
+            // Release frontend resources while the toolkit dispatcher belongs to this application.
             workspace.Dispose();
         }
     }

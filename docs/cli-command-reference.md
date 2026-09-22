@@ -32,7 +32,6 @@ Output is human-readable and is not a machine protocol.
 | `get <member>` | Read a scalar value. |
 | `set <member> <value>` | Convert, validate, and write a scalar value. |
 | `call <action> [name=value ...]` | Invoke an action and stream progress. |
-| `watch <member>` | Stream notifications until cancellation. |
 | `exit` | Dispose the session and host. |
 
 ## Paths
@@ -71,7 +70,7 @@ optional key, and exactly one of null, scalar value, or reference handle/domain 
 
 `inspect` prints the canonical path, CLR type, runtime handle, optional domain identity, summary,
 and role-specific member metadata. It includes nullability, enum options, ranges, collection
-element/key types, and action parameter/default/progress/cancellation information.
+element/key types, and action parameter/default/progress information.
 
 Examples:
 
@@ -83,20 +82,8 @@ call AdvanceTurn populationDelta=5
 call SimulateGrowthAsync years=3 populationPerYear=2
 ```
 
-Arguments are named and may appear in any order. Progress and cancellation infrastructure
-parameters are supplied by the framework. Cancelling the command calls `ActionInvocation.Cancel()`
-when supported.
-
-## Observation
-
-```text
-watch Population
-watch Cities
-```
-
-`watch` occupies the command loop until cancelled. It prints ordered changes, old/new values when
-available, collection indices, and visible buffer-overflow counts. The CLI uses notification mode;
-explicit polling remains available through the Core API.
+Arguments are named and may appear in any order. Progress reporters are supplied by the framework.
+Notification and explicit polling observation remain available through the Core API.
 
 ## Errors
 

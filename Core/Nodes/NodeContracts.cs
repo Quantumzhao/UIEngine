@@ -33,7 +33,7 @@ public interface IObjectNode : INavigableNode
 {
     ObjectHandle Handle { get; }
 
-    DomainIdentity? DomainIdentity { get; }
+    string? DomainIdentity { get; }
 
     string? Summary { get; }
 
@@ -134,8 +134,6 @@ public interface IMethodNode : IMemberNode
     bool IsAsynchronous { get; }
 
     Type? ProgressType { get; }
-
-    bool SupportsCancellation { get; }
 
     Task<InteractionResult<ActionInvocation>> InvokeAsync(
         IReadOnlyDictionary<string, object?> arguments);

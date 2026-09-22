@@ -1,4 +1,3 @@
-using System.Runtime.CompilerServices;
 using System.Threading.Channels;
 
 namespace UIEngine.Core;
@@ -82,8 +81,7 @@ internal sealed class BoundedAsyncStream<T>
         }
     }
 
-    public async IAsyncEnumerable<T> ReadAllAsync(
-        [EnumeratorCancellation] CancellationToken cancellationToken = default)
+    public async IAsyncEnumerable<T> ReadAllAsync()
     {
         if (Interlocked.Exchange(ref _ReaderStarted, 1) != 0)
         {
@@ -92,7 +90,7 @@ internal sealed class BoundedAsyncStream<T>
 
         while (true)
         {
-            await _Signal.Reader.ReadAsync(cancellationToken);
+            await _Signal.Reader.ReadAsync();
 
             T[] items;
             T? overflow = default;

@@ -13,7 +13,6 @@ public enum InteractionErrorCode
     CONVERSION_FAILED,
     VALIDATION_FAILED,
     PERMISSION_DENIED,
-    CANCELLED,
     DISPOSED,
     FAULT,
 }

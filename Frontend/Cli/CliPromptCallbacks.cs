@@ -17,7 +17,7 @@ internal sealed class CliPromptCallbacks : PromptCallbacks
     protected override Task<TextSpan> GetSpanToReplaceByCompletionAsync(
         string text,
         int caret,
-        CancellationToken cancellationToken)
+        CancellationToken _)
     {
         var start = caret;
         while (start > 0 && !char.IsWhiteSpace(text[start - 1]))
@@ -38,9 +38,9 @@ internal sealed class CliPromptCallbacks : PromptCallbacks
         string text,
         int caret,
         TextSpan spanToBeReplaced,
-        CancellationToken cancellationToken)
+        CancellationToken _)
     {
-        var completions = await _Session.GetCompletionsAsync(text, caret, cancellationToken);
+        var completions = await _Session.GetCompletionsAsync(text, caret);
         return completions.Select(static completion => new CompletionItem(completion)).ToArray();
     }
 }

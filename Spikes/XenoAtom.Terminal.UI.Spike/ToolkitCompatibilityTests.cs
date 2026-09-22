@@ -63,7 +63,7 @@ public sealed class ToolkitCompatibilityTests
                 }
             },
             new TerminalRunOptions(),
-            CancellationToken.None).AsTask().WaitAsync(TimeSpan.FromSeconds(5));
+            default).AsTask().WaitAsync(TimeSpan.FromSeconds(5));
 
         Assert.True(clicked);
         Assert.Equal(40, resizedWidth);
@@ -84,7 +84,7 @@ public sealed class ToolkitCompatibilityTests
         });
 
         app.Post(app.Stop);
-        await app.RunAsync(CancellationToken.None).WaitAsync(TimeSpan.FromSeconds(5));
+        await app.RunAsync(default).WaitAsync(TimeSpan.FromSeconds(5));
 
         Assert.Same(hostVisual, app.ContentRoot);
         Assert.Same(hostVisual, workspace.Parent);
@@ -117,18 +117,12 @@ public sealed class ToolkitCompatibilityTests
                 switch (phase)
                 {
                     case 0:
-                        _ReplaceItems(list, (await collection.ReadAsync(
-                            0,
-                            3,
-                            CancellationToken.None)).Value);
+                        _ReplaceItems(list, (await collection.ReadAsync(0, 3)).Value);
                         enumerationCounts.Add(source.MoveNextCount);
                         phase = 1;
                         return TerminalLoopResult.Continue;
                     case 1:
-                        _UpdateItems(list, (await collection.ReadAsync(
-                            3,
-                            3,
-                            CancellationToken.None)).Value);
+                        _UpdateItems(list, (await collection.ReadAsync(3, 3)).Value);
                         enumerationCounts.Add(source.MoveNextCount);
                         phase = 2;
                         return TerminalLoopResult.Continue;
@@ -137,7 +131,7 @@ public sealed class ToolkitCompatibilityTests
                 }
             },
             new TerminalRunOptions(),
-            CancellationToken.None).AsTask().WaitAsync(TimeSpan.FromSeconds(5));
+            default).AsTask().WaitAsync(TimeSpan.FromSeconds(5));
 
         Assert.Equal([4, 11], enumerationCounts);
         Assert.Equal(["3", "4", "5"], list.Items);

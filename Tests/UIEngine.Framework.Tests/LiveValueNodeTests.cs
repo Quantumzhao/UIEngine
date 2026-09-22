@@ -12,10 +12,10 @@ public sealed class LiveValueNodeTests
     {
         var model = new _ReflectedModel();
         using var host = new UIEngineHost();
-        var handle = host.SetRoot("model", model).Value;
+        host.SetRoot("model", model);
 
-        var first = await _CreateReflectedNodesAsync(host, handle);
-        var second = await _CreateReflectedNodesAsync(host, handle);
+        var first = await _ResolveMembersAsync(host, "model");
+        var second = await _ResolveMembersAsync(host, "model");
 
         var state = first[nameof(_ReflectedModel.State)];
         Assert.NotSame(state, second[nameof(_ReflectedModel.State)]);
@@ -84,14 +84,10 @@ public sealed class LiveValueNodeTests
         {
             Exposures = [new TypeExposure<_ProgrammaticModel>([exposure])],
         });
-        var handle = host.SetRoot("model", model).Value;
+        host.SetRoot("model", model);
 
-        var firstDescriptor = Assert.Single(
-            (await host.DescribeAsync(handle)).Value.Members.OfType<ValueDescriptor>());
-        var secondDescriptor = Assert.Single(
-            (await host.DescribeAsync(handle)).Value.Members.OfType<ValueDescriptor>());
-        ObjectNode first = new LiveValueNode(firstDescriptor);
-        ObjectNode second = new LiveValueNode(secondDescriptor);
+        var first = Assert.Single((await _ResolveMembersAsync(host, "model")).Values);
+        var second = Assert.Single((await _ResolveMembersAsync(host, "model")).Values);
 
         Assert.NotSame(first, second);
         Assert.True(first is IProgrammaticValueNode);
@@ -110,20 +106,15 @@ public sealed class LiveValueNodeTests
         Assert.Equal(12.5m, read.Value);
     }
 
-    private static async Task<IReadOnlyDictionary<string, ObjectNode>> _CreateReflectedNodesAsync(
+    private static async Task<IReadOnlyDictionary<string, ObjectNode>> _ResolveMembersAsync(
         UIEngineHost host,
-        ObjectHandle handle)
+        string rootIdentifier)
     {
-        var described = await host.DescribeAsync(handle);
-        var metadata = ReflectionMetadata.Get(typeof(_ReflectedModel));
-        return described.Value.Members
-            .OfType<ValueDescriptor>()
-            .ToDictionary(
-                static descriptor => descriptor.Id,
-                descriptor => (ObjectNode)new LiveValueNode(
-                    descriptor,
-                    Assert.Single(metadata.Members, member => member.Id == descriptor.Id)),
-                StringComparer.Ordinal);
+        var resolved = await host.ResolveRootNodeAsync(rootIdentifier);
+        Assert.True(resolved.IsSuccess);
+        return ((IObjectNode)resolved.Value.Node).Members.ToDictionary(
+            static node => node.Id,
+            StringComparer.Ordinal);
     }
 
     private sealed class _ReflectedModel

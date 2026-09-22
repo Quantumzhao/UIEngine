@@ -9,7 +9,6 @@ internal sealed class ReflectedAction
         MethodInfo method,
         ParameterInfo[] userParameters,
         ParameterInfo? progressParameter,
-        ParameterInfo? cancellationParameter,
         Type? resultType,
         Type? progressType)
     {
@@ -17,7 +16,6 @@ internal sealed class ReflectedAction
         MethodParameters = method.GetParameters();
         UserParameters = userParameters;
         ProgressParameter = progressParameter;
-        CancellationParameter = cancellationParameter;
         ResultType = resultType;
         ProgressType = progressType;
     }
@@ -29,8 +27,6 @@ internal sealed class ReflectedAction
     public ParameterInfo[] UserParameters { get; }
 
     public ParameterInfo? ProgressParameter { get; }
-
-    public ParameterInfo? CancellationParameter { get; }
 
     public Type? ResultType { get; }
 
@@ -52,34 +48,26 @@ internal sealed class ReflectedAction
         }
 
         var infrastructureStart = Array.FindIndex(parameters, static parameter =>
-            parameter.ParameterType == typeof(CancellationToken) || _IsProgress(parameter.ParameterType));
+            _IsProgress(parameter.ParameterType));
         if (infrastructureStart < 0)
         {
             infrastructureStart = parameters.Length;
         }
 
         if (parameters.Skip(infrastructureStart).Any(static parameter =>
-                parameter.ParameterType != typeof(CancellationToken) && !_IsProgress(parameter.ParameterType)))
+                !_IsProgress(parameter.ParameterType)))
         {
-            return _Unsupported(method, "user parameters must precede progress and cancellation parameters");
+            return _Unsupported(method, "user parameters must precede the progress parameter");
         }
 
         var progressParameters = parameters.Where(
             static parameter => _IsProgress(parameter.ParameterType)).ToArray();
-        var cancellationParameters = parameters.Where(
-            static parameter => parameter.ParameterType == typeof(CancellationToken)).ToArray();
-        if (progressParameters.Length > 1 || cancellationParameters.Length > 1)
+        if (progressParameters.Length > 1)
         {
-            return _Unsupported(method, "only one progress and one cancellation parameter are supported");
+            return _Unsupported(method, "only one progress parameter is supported");
         }
 
         var progress = progressParameters.SingleOrDefault();
-        var cancellation = cancellationParameters.SingleOrDefault();
-
-        if (progress is not null && cancellation is not null && progress.Position > cancellation.Position)
-        {
-            return _Unsupported(method, "progress must precede cancellation");
-        }
 
         var returnType = method.ReturnType;
         if (returnType.IsGenericType && returnType.GetGenericTypeDefinition() == typeof(ValueTask<>) ||
@@ -110,7 +98,6 @@ internal sealed class ReflectedAction
             method,
             parameters.Take(infrastructureStart).ToArray(),
             progress,
-            cancellation,
             resultType,
             progress?.ParameterType.GetGenericArguments()[0]));
     }
@@ -136,7 +123,7 @@ public sealed class ActionDescriptor : MemberDescriptor
         ObjectHandle owner,
         string id,
         ReflectedAction action)
-        : base(id, MemberKind.ACTION)
+        : base(host, owner, id, MemberKind.ACTION)
     {
         _Host = host;
         _Owner = owner;
@@ -174,13 +161,12 @@ public sealed class ActionDescriptor : MemberDescriptor
 
     public bool IsAsynchronous => _Action.IsAsynchronous;
 
-    public bool SupportsCancellation => _Action.CancellationParameter is not null;
-
     public Type? ProgressType => _Action.ProgressType;
 
+    internal Type ReturnType => _Action.Method.ReturnType;
+
     public Task<InteractionResult<ActionInvocation>> InvokeAsync(
-        IReadOnlyDictionary<string, object?> arguments,
-        CancellationToken cancellationToken = default) => _Host.ExecuteAsync(
+        IReadOnlyDictionary<string, object?> arguments) => _Host.ExecuteAsync(
         $"invoke action {Id}",
         async () =>
         {
@@ -249,11 +235,7 @@ public sealed class ActionDescriptor : MemberDescriptor
                 bound[parameter.Position] = converted.Value;
             }
 
-            var invocation = _Host.CreateInvocation(Id, SupportsCancellation);
-            if (_Action.CancellationParameter is not null)
-            {
-                bound[_Action.CancellationParameter.Position] = invocation.CancellationToken;
-            }
+            var invocation = _Host.CreateInvocation(Id);
 
             if (_Action.ProgressParameter is not null)
             {
@@ -284,8 +266,7 @@ public sealed class ActionDescriptor : MemberDescriptor
 
             await Task.CompletedTask;
             return InteractionResult.Success(invocation);
-        },
-        cancellationToken);
+        });
 
     private async Task _CompleteAsync(ActionInvocation invocation, Task task)
     {

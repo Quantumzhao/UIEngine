@@ -16,13 +16,11 @@ internal sealed class CliSession : IDisposable
         "get",
         "set",
         "call",
-        "watch",
         "exit",
     ];
 
     private readonly UIEngineHost _Host;
     private readonly TextWriter _Output;
-    private readonly HashSet<ObservationSubscription> _Subscriptions = [];
     private List<_LocationBinding> _Locations = [];
     private bool _Disposed;
 
@@ -38,9 +36,7 @@ internal sealed class CliSession : IDisposable
 
     internal string CurrentPath => _Locations.Count == 0 ? "/" : _Locations[^1].Path.ToString();
 
-    internal async Task<bool> ExecuteAsync(
-        string line,
-        CancellationToken cancellationToken = default)
+    internal async Task<bool> ExecuteAsync(string line)
     {
         if (_Disposed)
         {
@@ -64,25 +60,22 @@ internal sealed class CliSession : IDisposable
         switch (tokens[0].ToUpperInvariant())
         {
             case "LS":
-                await _ListAsync(tokens, cancellationToken);
+                await _ListAsync(tokens);
                 return true;
             case "CD":
-                await _ChangeDirectoryAsync(tokens, cancellationToken);
+                await _ChangeDirectoryAsync(tokens);
                 return true;
             case "INSPECT":
-                await _InspectAsync(tokens, cancellationToken);
+                await _InspectAsync(tokens);
                 return true;
             case "GET":
-                await _GetAsync(tokens, cancellationToken);
+                await _GetAsync(tokens);
                 return true;
             case "SET":
-                await _SetAsync(tokens, cancellationToken);
+                await _SetAsync(tokens);
                 return true;
             case "CALL":
-                await _CallAsync(tokens, cancellationToken);
-                return true;
-            case "WATCH":
-                await _WatchAsync(tokens, cancellationToken);
+                await _CallAsync(tokens);
                 return true;
             case "EXIT":
                 if (!_HasArity(tokens, 1, "exit"))
@@ -103,8 +96,7 @@ internal sealed class CliSession : IDisposable
 
     internal async Task<IReadOnlyList<string>> GetCompletionsAsync(
         string text,
-        int caret,
-        CancellationToken cancellationToken = default)
+        int caret)
     {
         ArgumentOutOfRangeException.ThrowIfGreaterThan((uint)caret, (uint)text.Length);
 
@@ -124,16 +116,14 @@ internal sealed class CliSession : IDisposable
         return completedTokens[0].ToUpperInvariant() switch
         {
             "CD" when completedTokens.Length == 1 =>
-                await _GetNavigationCompletionsAsync(cancellationToken),
+                await _GetNavigationCompletionsAsync(),
             "LS" when completedTokens.Length == 1 =>
-                await _GetCollectionCompletionsAsync(cancellationToken),
+                await _GetCollectionCompletionsAsync(),
             "GET" when completedTokens.Length == 1 =>
-                await _GetValueCompletionsAsync(false, cancellationToken),
+                await _GetValueCompletionsAsync(false),
             "SET" when completedTokens.Length == 1 =>
-                await _GetValueCompletionsAsync(true, cancellationToken),
-            "CALL" => await _GetActionCompletionsAsync(completedTokens, cancellationToken),
-            "WATCH" when completedTokens.Length == 1 =>
-                await _GetWatchCompletionsAsync(cancellationToken),
+                await _GetValueCompletionsAsync(true),
+            "CALL" => await _GetActionCompletionsAsync(completedTokens),
             _ => [],
         };
     }
@@ -146,22 +136,14 @@ internal sealed class CliSession : IDisposable
         }
 
         _Disposed = true;
-        foreach (var subscription in _Subscriptions.ToArray())
-        {
-            subscription.Dispose();
-        }
-
-        _Subscriptions.Clear();
         _Host.Dispose();
     }
 
-    private async Task _ListAsync(
-        IReadOnlyList<string> tokens,
-        CancellationToken cancellationToken)
+    private async Task _ListAsync(IReadOnlyList<string> tokens)
     {
         if (tokens.Count > 1)
         {
-            await _ListCollectionAsync(tokens, cancellationToken);
+            await _ListCollectionAsync(tokens);
             return;
         }
 
@@ -175,7 +157,7 @@ internal sealed class CliSession : IDisposable
             return;
         }
 
-        var described = await _GetCurrentDescriptorAsync(cancellationToken);
+        var described = await _GetCurrentDescriptorAsync();
         if (!described.IsSuccess)
         {
             _WriteFailure(described.Error!);
@@ -190,9 +172,7 @@ internal sealed class CliSession : IDisposable
         }
     }
 
-    private async Task _ListCollectionAsync(
-        IReadOnlyList<string> tokens,
-        CancellationToken cancellationToken)
+    private async Task _ListCollectionAsync(IReadOnlyList<string> tokens)
     {
         var options = _ParseCollectionOptions(tokens);
         if (!options.IsSuccess)
@@ -201,7 +181,7 @@ internal sealed class CliSession : IDisposable
             return;
         }
 
-        var binding = await _ResolveMemberAsync(tokens[1], MemberKind.COLLECTION, cancellationToken);
+        var binding = await _ResolveMemberAsync(tokens[1], MemberKind.COLLECTION);
         if (!binding.IsSuccess)
         {
             _WriteFailure(binding.Error!);
@@ -211,8 +191,7 @@ internal sealed class CliSession : IDisposable
         var collection = (CollectionDescriptor)binding.Value.Member;
         var read = await collection.ReadAsync(
             options.Value.Offset,
-            options.Value.Limit ?? DEFAULT_COLLECTION_LIMIT,
-            cancellationToken);
+            options.Value.Limit ?? DEFAULT_COLLECTION_LIMIT);
         if (!read.IsSuccess)
         {
             _WriteFailure(read.Error!);
@@ -238,9 +217,7 @@ internal sealed class CliSession : IDisposable
         }
     }
 
-    private async Task _ChangeDirectoryAsync(
-        IReadOnlyList<string> tokens,
-        CancellationToken cancellationToken)
+    private async Task _ChangeDirectoryAsync(IReadOnlyList<string> tokens)
     {
         if (!_HasArity(tokens, 2, "cd <absolute-path|..>"))
         {
@@ -260,7 +237,7 @@ internal sealed class CliSession : IDisposable
             return;
         }
 
-        var resolution = await _Host.ResolvePathAsync(tokens[1], cancellationToken);
+        var resolution = await _Host.ResolvePathAsync(tokens[1]);
         if (!resolution.IsSuccess)
         {
             _WriteFailure(resolution.Error!);
@@ -275,7 +252,7 @@ internal sealed class CliSession : IDisposable
             return;
         }
 
-        var captured = await _CaptureLocationsAsync(resolution.Value.Locations, cancellationToken);
+        var captured = await _CaptureLocationsAsync(resolution.Value.Locations);
         if (!captured.IsSuccess)
         {
             _WriteFailure(captured.Error!);
@@ -286,16 +263,14 @@ internal sealed class CliSession : IDisposable
         _Output.WriteLine(CurrentPath);
     }
 
-    private async Task _InspectAsync(
-        IReadOnlyList<string> tokens,
-        CancellationToken cancellationToken)
+    private async Task _InspectAsync(IReadOnlyList<string> tokens)
     {
         if (!_HasArity(tokens, 1, "inspect"))
         {
             return;
         }
 
-        var described = await _GetCurrentDescriptorAsync(cancellationToken);
+        var described = await _GetCurrentDescriptorAsync();
         if (!described.IsSuccess)
         {
             _WriteFailure(described.Error!);
@@ -342,23 +317,21 @@ internal sealed class CliSession : IDisposable
                             $" options={(parameter.Options.Count == 0 ? "none" : string.Join('|', parameter.Options.Select(static option => _FormatValue(option.Value))))}"));
                     _Output.WriteLine(
                         $"action {action.Id}({parameters}) result={action.ResultType?.Name ?? "void"} " +
-                        $"async={action.IsAsynchronous} cancellation={action.SupportsCancellation} " +
+                        $"async={action.IsAsynchronous} " +
                         $"progress={action.ProgressType?.Name ?? "none"}");
                     break;
             }
         }
     }
 
-    private async Task _GetAsync(
-        IReadOnlyList<string> tokens,
-        CancellationToken cancellationToken)
+    private async Task _GetAsync(IReadOnlyList<string> tokens)
     {
         if (!_HasArity(tokens, 2, "get <member>"))
         {
             return;
         }
 
-        var binding = await _ResolveMemberAsync(tokens[1], MemberKind.VALUE, cancellationToken);
+        var binding = await _ResolveMemberAsync(tokens[1], MemberKind.VALUE);
         if (!binding.IsSuccess)
         {
             _WriteFailure(binding.Error!);
@@ -366,7 +339,7 @@ internal sealed class CliSession : IDisposable
         }
 
         var value = (ValueDescriptor)binding.Value.Member;
-        var read = await value.ReadAsync(cancellationToken);
+        var read = await value.ReadAsync();
         if (!read.IsSuccess)
         {
             _WriteFailure(read.Error!);
@@ -376,16 +349,14 @@ internal sealed class CliSession : IDisposable
         _Output.WriteLine($"{value.Id} = {_FormatValue(read.Value)}");
     }
 
-    private async Task _SetAsync(
-        IReadOnlyList<string> tokens,
-        CancellationToken cancellationToken)
+    private async Task _SetAsync(IReadOnlyList<string> tokens)
     {
         if (!_HasArity(tokens, 3, "set <member> <value>"))
         {
             return;
         }
 
-        var binding = await _ResolveMemberAsync(tokens[1], MemberKind.VALUE, cancellationToken);
+        var binding = await _ResolveMemberAsync(tokens[1], MemberKind.VALUE);
         if (!binding.IsSuccess)
         {
             _WriteFailure(binding.Error!);
@@ -393,7 +364,7 @@ internal sealed class CliSession : IDisposable
         }
 
         var value = (ValueDescriptor)binding.Value.Member;
-        var write = await value.WriteAsync(tokens[2], cancellationToken);
+        var write = await value.WriteAsync(tokens[2]);
         if (!write.IsSuccess)
         {
             _WriteFailure(write.Error!);
@@ -403,9 +374,7 @@ internal sealed class CliSession : IDisposable
         _Output.WriteLine($"{value.Id} = {_FormatValue(write.Value)}");
     }
 
-    private async Task _CallAsync(
-        IReadOnlyList<string> tokens,
-        CancellationToken cancellationToken)
+    private async Task _CallAsync(IReadOnlyList<string> tokens)
     {
         if (tokens.Count < 2)
         {
@@ -420,7 +389,7 @@ internal sealed class CliSession : IDisposable
             return;
         }
 
-        var binding = await _ResolveMemberAsync(tokens[1], MemberKind.ACTION, cancellationToken);
+        var binding = await _ResolveMemberAsync(tokens[1], MemberKind.ACTION);
         if (!binding.IsSuccess)
         {
             _WriteFailure(binding.Error!);
@@ -428,7 +397,7 @@ internal sealed class CliSession : IDisposable
         }
 
         var action = (ActionDescriptor)binding.Value.Member;
-        var started = await action.InvokeAsync(arguments.Value, cancellationToken);
+        var started = await action.InvokeAsync(arguments.Value);
         if (!started.IsSuccess)
         {
             _WriteFailure(started.Error!);
@@ -436,10 +405,7 @@ internal sealed class CliSession : IDisposable
         }
 
         var invocation = started.Value;
-        using var registration = action.SupportsCancellation
-            ? cancellationToken.Register(static state => ((ActionInvocation)state!).Cancel(), invocation)
-            : default;
-        await foreach (var progress in invocation.ReadProgressAsync(CancellationToken.None))
+        await foreach (var progress in invocation.ReadProgressAsync())
         {
             _Output.WriteLine(
                 $"progress {action.Id} token={progress.OrderingToken} " +
@@ -456,70 +422,7 @@ internal sealed class CliSession : IDisposable
         _Output.WriteLine($"{action.Id} => {_FormatValue(completion.Value)}");
     }
 
-    private async Task _WatchAsync(
-        IReadOnlyList<string> tokens,
-        CancellationToken cancellationToken)
-    {
-        if (!_HasArity(tokens, 2, "watch <member|collection>"))
-        {
-            return;
-        }
-
-        var descriptor = await _GetCurrentDescriptorAsync(cancellationToken);
-        if (!descriptor.IsSuccess)
-        {
-            _WriteFailure(descriptor.Error!);
-            return;
-        }
-
-        var member = descriptor.Value.Members.FirstOrDefault(candidate =>
-            StringComparer.Ordinal.Equals(candidate.Id, tokens[1]));
-        if (member is null || member is ActionDescriptor)
-        {
-            _WriteFailure(
-                InteractionErrorCode.NOT_FOUND,
-                $"Observable member '{tokens[1]}' was not found at '{CurrentPath}'.");
-            return;
-        }
-
-        var observed = await _Host.ObserveAsync(
-            descriptor.Value.Handle,
-            tokens[1],
-            cancellationToken: cancellationToken);
-        if (!observed.IsSuccess)
-        {
-            _WriteFailure(observed.Error!);
-            return;
-        }
-
-        var subscription = observed.Value;
-        _Subscriptions.Add(subscription);
-        _Output.WriteLine($"watching {tokens[1]} (cancel to stop)");
-        try
-        {
-            await foreach (var change in subscription.ReadAllAsync(cancellationToken))
-            {
-                _Output.WriteLine(
-                    $"change {change.OrderingToken} kind={change.Kind} " +
-                    $"member={change.MemberId ?? "*"} old={_FormatObservationValue(change.OldValue)} " +
-                    $"new={_FormatObservationValue(change.NewValue)} " +
-                    $"oldIndex={_FormatValue(change.OldIndex)} newIndex={_FormatValue(change.NewIndex)} " +
-                    $"dropped={change.DroppedChangeCount}");
-            }
-        }
-        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
-        {
-            _Output.WriteLine("watch cancelled");
-        }
-        finally
-        {
-            _Subscriptions.Remove(subscription);
-            subscription.Dispose();
-        }
-    }
-
-    private async Task<IReadOnlyList<string>> _GetNavigationCompletionsAsync(
-        CancellationToken cancellationToken)
+    private async Task<IReadOnlyList<string>> _GetNavigationCompletionsAsync()
     {
         var completions = new HashSet<string>(StringComparer.Ordinal) { "/", ".." };
         foreach (var root in _Host.Roots)
@@ -529,7 +432,7 @@ internal sealed class CliSession : IDisposable
 
         if (CurrentHandle is not null)
         {
-            var descriptor = await _GetCurrentDescriptorAsync(cancellationToken);
+            var descriptor = await _GetCurrentDescriptorAsync();
             if (descriptor.IsSuccess)
             {
                 var current = _Locations[^1].Path;
@@ -544,11 +447,9 @@ internal sealed class CliSession : IDisposable
         return completions.OrderBy(static value => value, StringComparer.Ordinal).ToArray();
     }
 
-    private async Task<IReadOnlyList<string>> _GetValueCompletionsAsync(
-        bool writableOnly,
-        CancellationToken cancellationToken)
+    private async Task<IReadOnlyList<string>> _GetValueCompletionsAsync(bool writableOnly)
     {
-        var descriptor = await _GetCurrentDescriptorAsync(cancellationToken);
+        var descriptor = await _GetCurrentDescriptorAsync();
         return descriptor.IsSuccess
             ? descriptor.Value.Members.OfType<ValueDescriptor>()
                 .Where(value => !writableOnly || value.CanWrite)
@@ -558,10 +459,9 @@ internal sealed class CliSession : IDisposable
             : [];
     }
 
-    private async Task<IReadOnlyList<string>> _GetCollectionCompletionsAsync(
-        CancellationToken cancellationToken)
+    private async Task<IReadOnlyList<string>> _GetCollectionCompletionsAsync()
     {
-        var descriptor = await _GetCurrentDescriptorAsync(cancellationToken);
+        var descriptor = await _GetCurrentDescriptorAsync();
         return descriptor.IsSuccess
             ? descriptor.Value.Members.OfType<CollectionDescriptor>()
                 .Select(static collection => collection.Id)
@@ -570,24 +470,10 @@ internal sealed class CliSession : IDisposable
             : [];
     }
 
-    private async Task<IReadOnlyList<string>> _GetWatchCompletionsAsync(
-        CancellationToken cancellationToken)
-    {
-        var descriptor = await _GetCurrentDescriptorAsync(cancellationToken);
-        return descriptor.IsSuccess
-            ? descriptor.Value.Members
-                .Where(static member => member is not ActionDescriptor)
-                .Select(static member => member.Id)
-                .OrderBy(static value => value, StringComparer.Ordinal)
-                .ToArray()
-            : [];
-    }
-
     private async Task<IReadOnlyList<string>> _GetActionCompletionsAsync(
-        string[] completedTokens,
-        CancellationToken cancellationToken)
+        string[] completedTokens)
     {
-        var descriptor = await _GetCurrentDescriptorAsync(cancellationToken);
+        var descriptor = await _GetCurrentDescriptorAsync();
         if (!descriptor.IsSuccess)
         {
             return [];
@@ -618,8 +504,7 @@ internal sealed class CliSession : IDisposable
             .ToArray();
     }
 
-    private async Task<InteractionResult<ObjectDescriptor>> _GetCurrentDescriptorAsync(
-        CancellationToken cancellationToken)
+    private async Task<InteractionResult<ObjectDescriptor>> _GetCurrentDescriptorAsync()
     {
         if (_Locations.Count == 0)
         {
@@ -629,7 +514,7 @@ internal sealed class CliSession : IDisposable
         }
 
         var location = _Locations[^1];
-        var resolution = await _Host.ResolvePathAsync(location.Path, cancellationToken);
+        var resolution = await _Host.ResolvePathAsync(location.Path);
         if (!resolution.IsSuccess)
         {
             return _Failure<ObjectDescriptor>(resolution.Error!);
@@ -643,8 +528,7 @@ internal sealed class CliSession : IDisposable
         }
 
         var descriptor = resolution.Value.OwnerDescriptor;
-        if (location.DomainIdentity is not null &&
-            !StringComparer.Ordinal.Equals(location.DomainIdentity, descriptor.DomainIdentity?.Value))
+        if (location.DomainIdentity != descriptor.DomainIdentity)
         {
             return InteractionResult.Failure<ObjectDescriptor>(
                 InteractionErrorCode.NOT_FOUND,
@@ -668,8 +552,7 @@ internal sealed class CliSession : IDisposable
 
     private async Task<InteractionResult<ResolvedBinding>> _ResolveMemberAsync(
         string memberId,
-        MemberKind kind,
-        CancellationToken cancellationToken)
+        MemberKind kind)
     {
         if (_Locations.Count == 0)
         {
@@ -684,8 +567,7 @@ internal sealed class CliSession : IDisposable
                 location.Path.ToString(),
                 memberId,
                 kind,
-                location.DomainIdentity),
-            cancellationToken);
+                location.DomainIdentity));
         if (!resolved.IsSuccess)
         {
             return resolved;
@@ -700,13 +582,12 @@ internal sealed class CliSession : IDisposable
     }
 
     private async Task<InteractionResult<List<_LocationBinding>>> _CaptureLocationsAsync(
-        IReadOnlyList<PathLocation> locations,
-        CancellationToken cancellationToken)
+        IReadOnlyList<PathLocation> locations)
     {
         var captured = new List<_LocationBinding>(locations.Count);
         foreach (var location in locations)
         {
-            var described = await _Host.DescribeAsync(location.Handle, cancellationToken);
+            var described = await _Host.DescribeAsync(location.Handle);
             if (!described.IsSuccess)
             {
                 return _Failure<List<_LocationBinding>>(described.Error!);
@@ -714,7 +595,7 @@ internal sealed class CliSession : IDisposable
 
             captured.Add(new _LocationBinding(
                 location.Path,
-                described.Value.DomainIdentity?.Value,
+                described.Value.DomainIdentity,
                 described.Value.TypeName,
                 location.Handle));
         }
@@ -823,9 +704,6 @@ internal sealed class CliSession : IDisposable
 
     private void _WriteFailure(InteractionErrorCode code, string message) =>
         _Output.WriteLine($"error {code}: {message}");
-
-    private static string _FormatObservationValue(ObservationValue value) =>
-        value.IsSupplied ? _FormatValue(value.Value) : "unspecified";
 
     private static string _FormatRange(IValueRange? range) => range is null
         ? "none"

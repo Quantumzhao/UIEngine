@@ -14,11 +14,21 @@ public enum MemberKind
 
 public abstract class MemberDescriptor
 {
-    private protected MemberDescriptor(string id, MemberKind kind)
+    private protected MemberDescriptor(
+        UIEngineHost host,
+        ObjectHandle owner,
+        string id,
+        MemberKind kind)
     {
+        Host = host;
+        Owner = owner;
         Id = id;
         Kind = kind;
     }
+
+    internal UIEngineHost Host { get; }
+
+    internal ObjectHandle Owner { get; }
 
     public string Id { get; }
 
@@ -29,7 +39,7 @@ public sealed class ObjectDescriptor
 {
     internal ObjectDescriptor(
         ObjectHandle handle,
-        DomainIdentity? domainIdentity,
+        string? domainIdentity,
         string typeName,
         string? summary,
         IReadOnlyList<MemberDescriptor> members)
@@ -43,7 +53,7 @@ public sealed class ObjectDescriptor
 
     public ObjectHandle Handle { get; }
 
-    public DomainIdentity? DomainIdentity { get; }
+    public string? DomainIdentity { get; }
 
     public string TypeName { get; }
 
@@ -67,7 +77,7 @@ public sealed class ValueDescriptor : MemberDescriptor
         IReadOnlyList<ValidationAttribute> validationAttributes,
         Func<object, object?> read,
         Action<object, object?>? write)
-        : base(id, MemberKind.VALUE)
+        : base(host, owner, id, MemberKind.VALUE)
     {
         Binding = new ValueNodeBinding(
             host,
@@ -98,12 +108,9 @@ public sealed class ValueDescriptor : MemberDescriptor
 
     public IValueRange? Range => Binding.Range;
 
-    public Task<InteractionResult<object?>> ReadAsync(
-        CancellationToken cancellationToken = default) => Binding.ReadAsync(cancellationToken);
+    public Task<InteractionResult<object?>> ReadAsync() => Binding.ReadAsync();
 
-    public Task<InteractionResult<object?>> WriteAsync(
-        object? value,
-        CancellationToken cancellationToken = default) => Binding.WriteAsync(value, cancellationToken);
+    public Task<InteractionResult<object?>> WriteAsync(object? value) => Binding.WriteAsync(value);
 }
 
 public sealed class ReferenceDescriptor : MemberDescriptor
@@ -118,7 +125,7 @@ public sealed class ReferenceDescriptor : MemberDescriptor
         string id,
         Type referenceType,
         Func<object, object?> read)
-        : base(id, MemberKind.REFERENCE)
+        : base(host, owner, id, MemberKind.REFERENCE)
     {
         _Host = host;
         _Owner = owner;
@@ -128,8 +135,7 @@ public sealed class ReferenceDescriptor : MemberDescriptor
 
     public Type ReferenceType { get; }
 
-    public Task<InteractionResult<ObjectHandle?>> ReadAsync(
-        CancellationToken cancellationToken = default) => _Host.ExecuteAsync(
+    public Task<InteractionResult<ObjectHandle?>> ReadAsync() => _Host.ExecuteAsync(
         $"read reference {Id}",
         async () =>
         {
@@ -153,12 +159,11 @@ public sealed class ReferenceDescriptor : MemberDescriptor
             }
 
             var encountered = _Host.GetOrCreateHandle(value);
-            var indexed = await _Host.GetDomainIdentityAsync(encountered, cancellationToken);
+            var indexed = await _Host.GetDomainIdentityAsync(encountered);
             return indexed.IsSuccess
                 ? InteractionResult.Success<ObjectHandle?>(encountered)
                 : InteractionResult.Failure<ObjectHandle?>(indexed.Error!);
-        },
-        cancellationToken);
+        });
 }
 
 public abstract record CollectionEntry(long Position, object? Key);
@@ -172,7 +177,7 @@ public sealed record ScalarCollectionEntry(long Position, object Value, object? 
 public sealed record ReferenceCollectionEntry(
     long Position,
     ObjectHandle Handle,
-    DomainIdentity? DomainIdentity,
+    string? DomainIdentity,
     object? Key = null)
     : CollectionEntry(Position, Key);
 
@@ -194,7 +199,7 @@ public sealed class CollectionDescriptor : MemberDescriptor
         string id,
         Type collectionType,
         Func<object, object?> read)
-        : base(id, MemberKind.COLLECTION)
+        : base(host, owner, id, MemberKind.COLLECTION)
     {
         _Host = host;
         _Owner = owner;
@@ -212,8 +217,7 @@ public sealed class CollectionDescriptor : MemberDescriptor
 
     public Task<InteractionResult<CollectionSlice>> ReadAsync(
         long offset,
-        int limit,
-        CancellationToken cancellationToken = default)
+        int limit)
     {
         if (offset < 0 || limit <= 0)
         {
@@ -239,20 +243,16 @@ public sealed class CollectionDescriptor : MemberDescriptor
                     return InteractionResult.Failure<CollectionSlice>(source.Error!);
                 }
 
-                return await _ReadSliceAsync(source.Value, offset, limit, cancellationToken);
-            },
-            cancellationToken);
+                return await _ReadSliceAsync(source.Value, offset, limit);
+            });
     }
 
-    internal Task<InteractionResult<IEnumerable>> ReadSourceAsync(
-        CancellationToken cancellationToken = default) => _Host.ExecuteAsync(
+    internal Task<InteractionResult<IEnumerable>> ReadSourceAsync() => _Host.ExecuteAsync(
         $"read collection source {Id}",
-        _ReadSourceCoreAsync,
-        cancellationToken);
+        _ReadSourceCoreAsync);
 
     internal async Task<InteractionResult<IReadOnlyList<ObjectHandle>>> SelectAsync(
-        CollectionSelector selector,
-        CancellationToken cancellationToken)
+        CollectionSelector selector)
     {
         if (selector.Kind == CollectionSelectorKind.INDEX)
         {
@@ -262,13 +262,13 @@ public sealed class CollectionDescriptor : MemberDescriptor
                 return InteractionResult.Success<IReadOnlyList<ObjectHandle>>([]);
             }
 
-            var slice = await ReadAsync(index, 1, cancellationToken);
+            var slice = await ReadAsync(index, 1);
             return slice.IsSuccess
                 ? _ReferenceHandles(slice.Value.Entries)
                 : InteractionResult.Failure<IReadOnlyList<ObjectHandle>>(slice.Error!);
         }
 
-        var snapshot = await ReadAsync(0, _Host.MaxCollectionItems, cancellationToken);
+        var snapshot = await ReadAsync(0, _Host.MaxCollectionItems);
         if (!snapshot.IsSuccess)
         {
             return InteractionResult.Failure<IReadOnlyList<ObjectHandle>>(snapshot.Error!);
@@ -289,7 +289,7 @@ public sealed class CollectionDescriptor : MemberDescriptor
                     Convert.ToString(entry.Key, CultureInfo.InvariantCulture),
                     selector.Value),
                 CollectionSelectorKind.DOMAIN_IDENTITY => StringComparer.Ordinal.Equals(
-                    entry.DomainIdentity?.Value,
+                    entry.DomainIdentity,
                     selector.Value),
                 _ => false,
             })
@@ -316,8 +316,7 @@ public sealed class CollectionDescriptor : MemberDescriptor
     private async Task<InteractionResult<CollectionSlice>> _ReadSliceAsync(
         IEnumerable source,
         long offset,
-        int limit,
-        CancellationToken cancellationToken)
+        int limit)
     {
         var entries = new List<CollectionEntry>(limit);
         long? total = null;
@@ -328,9 +327,8 @@ public sealed class CollectionDescriptor : MemberDescriptor
             var end = Math.Min((long)count, offset + limit);
             for (var index = offset; index < end; index++)
             {
-                cancellationToken.ThrowIfCancellationRequested();
                 var split = CollectionReflection.SplitEntry(source, read((int)index));
-                entries.Add(await _CreateEntryAsync(index, split.Key, split.Value, cancellationToken));
+                entries.Add(await _CreateEntryAsync(index, split.Key, split.Value));
             }
 
             hasMore = end < count;
@@ -352,7 +350,6 @@ public sealed class CollectionDescriptor : MemberDescriptor
             var position = 0L;
             foreach (var raw in source)
             {
-                cancellationToken.ThrowIfCancellationRequested();
                 if (position < offset)
                 {
                     position++;
@@ -366,7 +363,7 @@ public sealed class CollectionDescriptor : MemberDescriptor
                 }
 
                 var split = CollectionReflection.SplitEntry(source, raw);
-                entries.Add(await _CreateEntryAsync(position, split.Key, split.Value, cancellationToken));
+                entries.Add(await _CreateEntryAsync(position, split.Key, split.Value));
                 position++;
             }
         }
@@ -377,8 +374,7 @@ public sealed class CollectionDescriptor : MemberDescriptor
     private async Task<CollectionEntry> _CreateEntryAsync(
         long position,
         object? key,
-        object? value,
-        CancellationToken cancellationToken)
+        object? value)
     {
         if (value is null)
         {
@@ -391,7 +387,7 @@ public sealed class CollectionDescriptor : MemberDescriptor
         }
 
         var handle = _Host.GetOrCreateHandle(value);
-        var identity = await _Host.GetDomainIdentityAsync(handle, cancellationToken);
+        var identity = await _Host.GetDomainIdentityAsync(handle);
         if (!identity.IsSuccess)
         {
             throw new InvalidOperationException(identity.Error!.Message);

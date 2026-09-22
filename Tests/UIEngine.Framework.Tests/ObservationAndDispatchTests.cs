@@ -122,20 +122,8 @@ public sealed class ObservationAndDispatchTests
     }
 
     [Fact]
-    public async Task QueuedCancellationAndDisposalAreNormalizedByTheHost()
+    public async Task QueuedDisposalIsNormalizedByTheHost()
     {
-        var cancelledDispatcher = new _QueuedDispatcher();
-        using var cancelledHost = new UIEngineHost(new UIEngineHostOptions
-        {
-            Dispatcher = cancelledDispatcher,
-        });
-        var cancelledRoot = cancelledHost.SetRoot("model", new _PollingModel());
-        using var cancellation = new CancellationTokenSource();
-        var cancelledTask = cancelledHost.DescribeAsync(cancelledRoot.Value, cancellation.Token);
-        cancellation.Cancel();
-        var cancelled = await cancelledTask;
-        Assert.Equal(InteractionErrorCode.CANCELLED, cancelled.Error?.Code);
-
         var disposedDispatcher = new _QueuedDispatcher();
         var disposedHost = new UIEngineHost(new UIEngineHostOptions
         {
@@ -240,11 +228,8 @@ public sealed class ObservationAndDispatchTests
 
         public bool CheckAccess() => _Inside.Value;
 
-        public async Task<T> InvokeAsync<T>(
-            Func<Task<T>> action,
-            CancellationToken cancellationToken = default)
+        public async Task<T> InvokeAsync<T>(Func<Task<T>> action)
         {
-            cancellationToken.ThrowIfCancellationRequested();
             InvocationCount++;
             _Inside.Value = true;
             try
@@ -265,11 +250,9 @@ public sealed class ObservationAndDispatchTests
 
         public bool CheckAccess() => false;
 
-        public async Task<T> InvokeAsync<T>(
-            Func<Task<T>> action,
-            CancellationToken cancellationToken = default)
+        public async Task<T> InvokeAsync<T>(Func<Task<T>> action)
         {
-            await _Released.Task.WaitAsync(cancellationToken);
+            await _Released.Task;
             return await action();
         }
 

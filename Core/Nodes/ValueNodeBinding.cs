@@ -43,8 +43,7 @@ internal sealed class ValueNodeBinding(
 
     public IValueRange? Range { get; } = range;
 
-    public Task<InteractionResult<object?>> ReadAsync(
-        CancellationToken cancellationToken = default) => _Host.ExecuteAsync(
+    public Task<InteractionResult<object?>> ReadAsync() => _Host.ExecuteAsync(
         $"read value {Id}",
         async () =>
         {
@@ -63,12 +62,9 @@ internal sealed class ValueNodeBinding(
 
             await Task.CompletedTask;
             return InteractionResult.Success(_Read(target.Value));
-        },
-        cancellationToken);
+        });
 
-    public Task<InteractionResult<object?>> WriteAsync(
-        object? value,
-        CancellationToken cancellationToken = default) => _Host.ExecuteAsync(
+    public Task<InteractionResult<object?>> WriteAsync(object? value) => _Host.ExecuteAsync(
         $"write value {Id}",
         async () =>
         {
@@ -125,8 +121,7 @@ internal sealed class ValueNodeBinding(
 
             await Task.CompletedTask;
             return InteractionResult.Success(converted.Value);
-        },
-        cancellationToken);
+        });
 
     private InteractionResult<object?> _SetterRejected(Exception exception) =>
         InteractionResult.Failure<object?>(

@@ -12,7 +12,7 @@ internal sealed class LiveValueNode : ObjectNode, IDynamicInterfaceCastable
 
     internal LiveValueNode(ValueDescriptor descriptor, ReflectedMember member)
         : this(
-            descriptor.Binding,
+            descriptor,
             member.Member switch
             {
                 PropertyInfo => ValueNodeSource.PROPERTY,
@@ -25,23 +25,26 @@ internal sealed class LiveValueNode : ObjectNode, IDynamicInterfaceCastable
     }
 
     internal LiveValueNode(ValueDescriptor descriptor)
-        : this(descriptor.Binding, ValueNodeSource.PROGRAMMATIC, declaringType: null)
+        : this(descriptor, ValueNodeSource.PROGRAMMATIC, declaringType: null)
     {
     }
 
     private LiveValueNode(
-        ValueNodeBinding binding,
+        ValueDescriptor descriptor,
         ValueNodeSource source,
         Type? declaringType)
-        : base(binding.Host, binding.Id, binding.ValueType)
+        : base(descriptor.Binding.Host, descriptor.Binding.Id, descriptor.Binding.ValueType)
     {
-        Binding = binding;
+        Descriptor = descriptor;
+        Binding = descriptor.Binding;
         DeclaringType = declaringType;
         _Source = source;
-        _Shape = _GetShape(binding.ValueType);
+        _Shape = _GetShape(descriptor.Binding.ValueType);
     }
 
     internal ValueNodeBinding Binding { get; }
+
+    internal ValueDescriptor Descriptor { get; }
 
     internal Type? DeclaringType { get; }
 

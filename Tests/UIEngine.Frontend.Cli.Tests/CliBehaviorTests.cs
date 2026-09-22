@@ -1,7 +1,5 @@
 using System.Globalization;
-using System.Text;
 using UIEngine.Core;
-using UIEngine.Core.Attributes;
 using UIEngine.Examples.CyclicDomain;
 using Xunit;
 
@@ -77,7 +75,6 @@ public sealed class CliBehaviorTests
         Assert.Contains("Population", await session.GetCompletionsAsync("get P", 5));
         Assert.DoesNotContain("Turn", await session.GetCompletionsAsync("set T", 5));
         Assert.Contains("Cities", await session.GetCompletionsAsync("ls C", 4));
-        Assert.Contains("Population", await session.GetCompletionsAsync("watch P", 7));
         Assert.Contains("AdvanceTurn", await session.GetCompletionsAsync("call A", 6));
         Assert.Contains(
             "populationDelta=",
@@ -133,49 +130,6 @@ public sealed class CliBehaviorTests
     }
 
     [Fact]
-    public async Task WatchStreamsNotificationsUntilCancellation()
-    {
-        var world = CyclicWorldFactory.Create();
-        var output = new _SignalingWriter();
-        var host = _CreateHost();
-        host.SetRoot("world", world);
-        using var session = new CliSession(host, output);
-        using var cancellation = new CancellationTokenSource();
-        var input = new StringReader(
-            "cd /world/Nations[index=0]\n" +
-            "watch Population\n");
-
-        var run = new CliTextReaderRunner(session, input).RunAsync(cancellation.Token);
-        await output.Watching.WaitAsync(TimeSpan.FromSeconds(5));
-        Assert.Single(world.Nations).Population = 101;
-        await output.Change.WaitAsync(TimeSpan.FromSeconds(5));
-        cancellation.Cancel();
-        await run;
-
-        Assert.Contains("kind=MEMBER_CHANGED", output.ToString(), StringComparison.Ordinal);
-        Assert.Contains("watch cancelled", output.ToString(), StringComparison.Ordinal);
-    }
-
-    [Fact]
-    public async Task CallForwardsCancellationToTheInvocation()
-    {
-        var output = new _SignalingWriter();
-        var host = new UIEngineHost();
-        host.SetRoot("model", new _CancellableModel());
-        using var session = new CliSession(host, output);
-        using var cancellation = new CancellationTokenSource();
-        var input = new StringReader("cd /model\ncall WaitAsync\n");
-
-        var run = new CliTextReaderRunner(session, input).RunAsync(cancellation.Token);
-        await output.Progress.WaitAsync(TimeSpan.FromSeconds(5));
-        cancellation.Cancel();
-        await run;
-
-        Assert.Contains("progress WaitAsync", output.ToString(), StringComparison.Ordinal);
-        Assert.Contains("error CANCELLED", output.ToString(), StringComparison.Ordinal);
-    }
-
-    [Fact]
     public void InteractivePromptKeepsOutputSpaceAvailable()
     {
         var configuration = CliPromptRunner.CreateConfiguration();
@@ -196,68 +150,4 @@ public sealed class CliBehaviorTests
         Exposures = CyclicWorldFactory.CreateExposures(),
     });
 
-    private sealed class _CancellableModel
-    {
-        private int _InvocationCount;
-
-        [Action]
-        public async Task WaitAsync(
-            IProgress<int> progress,
-            CancellationToken cancellationToken)
-        {
-            progress.Report(++_InvocationCount);
-            await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
-        }
-    }
-
-    private sealed class _SignalingWriter : TextWriter
-    {
-        private readonly object _Gate = new();
-        private readonly StringWriter _Writer = new(CultureInfo.InvariantCulture);
-        private readonly TaskCompletionSource _Watching =
-            new(TaskCreationOptions.RunContinuationsAsynchronously);
-        private readonly TaskCompletionSource _Change =
-            new(TaskCreationOptions.RunContinuationsAsynchronously);
-        private readonly TaskCompletionSource _Progress =
-            new(TaskCreationOptions.RunContinuationsAsynchronously);
-
-        public override Encoding Encoding => Encoding.UTF8;
-
-        public Task Watching => _Watching.Task;
-
-        public Task Change => _Change.Task;
-
-        public Task Progress => _Progress.Task;
-
-        public override void WriteLine(string? value)
-        {
-            lock (_Gate)
-            {
-                _Writer.WriteLine(value);
-            }
-
-            if (value?.StartsWith("watching ", StringComparison.Ordinal) == true)
-            {
-                _Watching.TrySetResult();
-            }
-
-            if (value?.StartsWith("change ", StringComparison.Ordinal) == true)
-            {
-                _Change.TrySetResult();
-            }
-
-            if (value?.StartsWith("progress ", StringComparison.Ordinal) == true)
-            {
-                _Progress.TrySetResult();
-            }
-        }
-
-        public override string ToString()
-        {
-            lock (_Gate)
-            {
-                return _Writer.ToString();
-            }
-        }
-    }
 }
