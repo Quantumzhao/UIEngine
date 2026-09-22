@@ -11,44 +11,50 @@ using Xunit;
 namespace UIEngine.Frontend.Tui.Tests;
 
 [Collection("Terminal application")]
-public sealed class TuiSessionTests
+public sealed class TuiOperationScopeTests
 {
     [Fact]
-    public async Task SynchronousIntentEntryMarshalsPresentationToToolkitDispatcher()
+    public async Task DirectCoreCallMarshalsStateChangeWithToolkitDispatcher()
     {
         var backend = new InMemoryTerminalBackend(new TerminalSize(40, 10));
         using var terminal = Terminal.Open(backend, new TerminalOptions(), force: true);
         using var host = new UIEngineHost();
         host.SetRoot("model", new object());
         using var workspace = TuiFrontend.CreateWorkspace(host);
+        using var scope = workspace.CreateOperationScope();
         await using var app = new TerminalApp(
             workspace.Visual,
             terminal.Instance,
             new TerminalAppOptions { HostKind = TerminalHostKind.Fullscreen });
-        var intentThread = 0;
-        var presentationThread = 0;
+        var commandThread = 0;
+        var stateChangeThread = 0;
 
         app.Post(() =>
         {
-            intentThread = Environment.CurrentManagedThreadId;
-            Assert.True(workspace.Session.TryReadPath(
+            commandThread = Environment.CurrentManagedThreadId;
+            var operation = scope.RunAsync(cancellationToken => host.ResolvePathAsync(
                 LogicalPath.Root.Append("model"),
-                result =>
+                cancellationToken));
+            _ = operation.ContinueWith(
+                completed => app.Post(() =>
                 {
-                    Assert.True(result.IsSuccess);
-                    presentationThread = Environment.CurrentManagedThreadId;
+                    Assert.True(completed.Result.IsSuccess);
+                    stateChangeThread = Environment.CurrentManagedThreadId;
                     app.Stop();
-                }));
+                }),
+                CancellationToken.None,
+                TaskContinuationOptions.ExecuteSynchronously,
+                TaskScheduler.Default);
         });
 
         await app.RunAsync(CancellationToken.None).WaitAsync(TimeSpan.FromSeconds(5));
 
-        Assert.NotEqual(0, intentThread);
-        Assert.Equal(intentThread, presentationThread);
+        Assert.NotEqual(0, commandThread);
+        Assert.Equal(commandThread, stateChangeThread);
     }
 
     [Fact]
-    public async Task NewIntentRejectsAStaleReadResult()
+    public async Task DisposingOneScopeDoesNotCancelAnUnrelatedRead()
     {
         var domainDispatcher = new _OrderedDomainDispatcher();
         using var host = new UIEngineHost(new UIEngineHostOptions
@@ -57,38 +63,30 @@ public sealed class TuiSessionTests
         });
         host.SetRoot("first", new object());
         host.SetRoot("second", new object());
-        var session = new TuiSession(
-            host,
-            new TuiFrontendOptions(),
-            _ImmediatePresentationDispatcher.Instance);
-        var stalePresented = false;
-        var currentPresented = new TaskCompletionSource(
-            TaskCreationOptions.RunContinuationsAsynchronously);
+        using var workspace = TuiFrontend.CreateWorkspace(host);
+        var retiredScope = workspace.CreateOperationScope();
+        using var currentScope = workspace.CreateOperationScope();
 
-        Assert.True(session.TryReadPath(
+        var retiredRead = retiredScope.RunAsync(cancellationToken => host.ResolvePathAsync(
             LogicalPath.Root.Append("first"),
-            _ => stalePresented = true));
+            cancellationToken));
         await domainDispatcher.FirstInvocationStarted.Task.WaitAsync(TimeSpan.FromSeconds(5));
 
-        Assert.True(session.TryReadPath(
+        var currentRead = await currentScope.RunAsync(cancellationToken => host.ResolvePathAsync(
             LogicalPath.Root.Append("second"),
-            result =>
-            {
-                Assert.True(result.IsSuccess);
-                currentPresented.TrySetResult();
-            }));
-        await currentPresented.Task.WaitAsync(TimeSpan.FromSeconds(5));
+            cancellationToken));
+        await Task.Run(retiredScope.Dispose).WaitAsync(TimeSpan.FromSeconds(5));
+        var retiredResult = await retiredRead.WaitAsync(TimeSpan.FromSeconds(5));
 
-        domainDispatcher.ReleaseFirstInvocation();
-        session.Dispose();
-
-        Assert.False(stalePresented);
-        Assert.True(domainDispatcher.InvocationCount >= 2);
+        Assert.True(currentRead.IsSuccess);
+        Assert.Equal(InteractionErrorCode.CANCELLED, retiredResult.Error?.Code);
+        Assert.True(retiredScope.IsDisposed);
+        Assert.False(currentScope.IsDisposed);
         Assert.False(host.IsDisposed);
     }
 
     [Fact]
-    public async Task DisposalCancelsAnInFlightReadWithoutDisposingTheHost()
+    public async Task WorkspaceDisposalCancelsAnInFlightReadWithoutDisposingTheHost()
     {
         var domainDispatcher = new _BlockingDomainDispatcher();
         using var host = new UIEngineHost(new UIEngineHostOptions
@@ -96,73 +94,50 @@ public sealed class TuiSessionTests
             Dispatcher = domainDispatcher,
         });
         host.SetRoot("model", new object());
-        var session = new TuiSession(
-            host,
-            new TuiFrontendOptions(),
-            _ImmediatePresentationDispatcher.Instance);
-        var presented = false;
-
-        Assert.True(session.TryReadPath(
+        var workspace = TuiFrontend.CreateWorkspace(host);
+        var scope = workspace.CreateOperationScope();
+        var read = scope.RunAsync(cancellationToken => host.ResolvePathAsync(
             LogicalPath.Root.Append("model"),
-            _ => presented = true));
+            cancellationToken));
         await domainDispatcher.InvocationStarted.Task.WaitAsync(TimeSpan.FromSeconds(5));
 
-        await Task.Run(session.Dispose).WaitAsync(TimeSpan.FromSeconds(5));
+        await Task.Run(workspace.Dispose).WaitAsync(TimeSpan.FromSeconds(5));
+        var result = await read.WaitAsync(TimeSpan.FromSeconds(5));
 
+        Assert.Equal(InteractionErrorCode.CANCELLED, result.Error?.Code);
         Assert.True(domainDispatcher.CancellationObserved);
-        Assert.False(presented);
+        Assert.True(scope.IsDisposed);
         Assert.False(host.IsDisposed);
-        Assert.False(session.TryReadPath(LogicalPath.Root, _ => { }));
+        Assert.Throws<ObjectDisposedException>(workspace.CreateOperationScope);
     }
 
     [Fact]
-    public async Task PostedPresentationDoesNotUpdateADisposedWorkspace()
-    {
-        using var host = new UIEngineHost();
-        host.SetRoot("model", new object());
-        var presentationDispatcher = new _QueuedPresentationDispatcher();
-        var session = new TuiSession(
-            host,
-            new TuiFrontendOptions(),
-            presentationDispatcher);
-        var presented = false;
-
-        Assert.True(session.TryReadPath(
-            LogicalPath.Root.Append("model"),
-            _ => presented = true));
-        await presentationDispatcher.Posted.Task.WaitAsync(TimeSpan.FromSeconds(5));
-
-        session.Dispose();
-        presentationDispatcher.RunPosted();
-
-        Assert.False(presented);
-        Assert.False(host.IsDisposed);
-    }
-
-    [Fact]
-    public async Task DisposalDetachesOwnedObservationAndStopsPresentation()
+    public async Task ScopeDisposalDetachesOwnedObservationAndStopsItsReader()
     {
         var model = new _ObservableModel();
         using var host = new UIEngineHost();
         var root = host.SetRoot("model", model);
         var observed = await host.ObserveAsync(root.Value, nameof(_ObservableModel.Value));
-        var session = new TuiSession(
-            host,
-            new TuiFrontendOptions(),
-            _ImmediatePresentationDispatcher.Instance);
+        using var workspace = TuiFrontend.CreateWorkspace(host);
+        var scope = workspace.CreateOperationScope();
+        Assert.True(scope.TryOwn(observed.Value));
         var presented = new TaskCompletionSource<ChangeRecord>(
             TaskCreationOptions.RunContinuationsAsynchronously);
+        var reader = scope.RunAsync(async cancellationToken =>
+        {
+            await foreach (var change in observed.Value.ReadAllAsync(cancellationToken))
+            {
+                presented.TrySetResult(change);
+            }
+        });
 
-        Assert.True(session.TryOwnObservation(
-            observed.Value,
-            change => presented.TrySetResult(change)));
         Assert.Equal(1, model.PropertyHandlerCount);
-
         model.Value = 1;
         var change = await presented.Task.WaitAsync(TimeSpan.FromSeconds(5));
         Assert.Equal(ChangeKind.MEMBER_CHANGED, change.Kind);
 
-        session.Dispose();
+        await Task.Run(scope.Dispose).WaitAsync(TimeSpan.FromSeconds(5));
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => reader);
         model.Value = 2;
 
         Assert.Equal(0, model.PropertyHandlerCount);
@@ -170,7 +145,7 @@ public sealed class TuiSessionTests
     }
 
     [Fact]
-    public async Task DisposalCancelsOwnedInvocationProgressReader()
+    public async Task ScopeDisposalStopsProgressReaderWithoutCancellingInvocation()
     {
         var model = new _ActionModel();
         using var host = new UIEngineHost();
@@ -178,61 +153,57 @@ public sealed class TuiSessionTests
         var described = await host.DescribeAsync(root.Value);
         var action = Assert.Single(described.Value.Members.OfType<ActionDescriptor>());
         var started = await action.InvokeAsync(new Dictionary<string, object?>());
-        var session = new TuiSession(
-            host,
-            new TuiFrontendOptions(),
-            _ImmediatePresentationDispatcher.Instance);
-        var progressPresented = new TaskCompletionSource(
+        using var workspace = TuiFrontend.CreateWorkspace(host);
+        var scope = workspace.CreateOperationScope();
+        var progressRead = new TaskCompletionSource(
             TaskCreationOptions.RunContinuationsAsynchronously);
+        var reader = scope.RunAsync(async cancellationToken =>
+        {
+            await foreach (var _ in started.Value.ReadProgressAsync(cancellationToken))
+            {
+                progressRead.TrySetResult();
+            }
+        });
+        await progressRead.Task.WaitAsync(TimeSpan.FromSeconds(5));
 
-        Assert.True(session.TryOwnInvocation(
-            started.Value,
-            _ => progressPresented.TrySetResult(),
-            _ => { }));
-        await progressPresented.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        scope.Dispose();
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => reader);
 
-        session.Dispose();
+        Assert.Equal(InvocationStatus.RUNNING, started.Value.Status);
+        Assert.False(started.Value.IsCancellationRequested);
+        Assert.False(model.CancellationObserved);
+        Assert.False(host.IsDisposed);
+
+        model.Release();
         var completion = await started.Value.Completion.WaitAsync(TimeSpan.FromSeconds(5));
 
-        Assert.Equal(InteractionErrorCode.CANCELLED, completion.Error?.Code);
-        Assert.True(model.CancellationObserved);
-        Assert.False(host.IsDisposed);
+        Assert.True(completion.IsSuccess);
+        Assert.Equal(InvocationStatus.SUCCEEDED, started.Value.Status);
     }
 
-    private sealed class _ImmediatePresentationDispatcher : ITuiPresentationDispatcher
+    [Fact]
+    public async Task DisposedScopeRejectsNewWorkAndDisposesNewResources()
     {
-        public static _ImmediatePresentationDispatcher Instance { get; } = new();
+        var scope = new TuiOperationScope();
+        scope.Dispose();
+        var resource = new _TrackedResource();
 
-        public void Post(Action action) => action();
-    }
-
-    private sealed class _QueuedPresentationDispatcher : ITuiPresentationDispatcher
-    {
-        private Action? _Posted;
-
-        public TaskCompletionSource Posted { get; } =
-            new(TaskCreationOptions.RunContinuationsAsynchronously);
-
-        public void Post(Action action)
-        {
-            _Posted = action;
-            Posted.TrySetResult();
-        }
-
-        public void RunPosted() => Interlocked.Exchange(ref _Posted, null)?.Invoke();
+        await Assert.ThrowsAsync<ObjectDisposedException>(() =>
+            scope.RunAsync(_ => Task.CompletedTask));
+        Assert.Throws<ObjectDisposedException>(scope.CreateChild);
+        Assert.False(scope.TryOwn(resource));
+        Assert.True(resource.IsDisposed);
     }
 
     private sealed class _OrderedDomainDispatcher : IInteractionDispatcher
     {
         private readonly AsyncLocal<bool> _Inside = new();
-        private readonly TaskCompletionSource _ReleaseFirst =
+        private readonly TaskCompletionSource _Never =
             new(TaskCreationOptions.RunContinuationsAsynchronously);
         private int _InvocationCount;
 
         public TaskCompletionSource FirstInvocationStarted { get; } =
             new(TaskCreationOptions.RunContinuationsAsynchronously);
-
-        public int InvocationCount => Volatile.Read(ref _InvocationCount);
 
         public bool CheckAccess() => _Inside.Value;
 
@@ -244,7 +215,7 @@ public sealed class TuiSessionTests
             if (invocation == 1)
             {
                 FirstInvocationStarted.TrySetResult();
-                await _ReleaseFirst.Task;
+                await _Never.Task.WaitAsync(cancellationToken);
             }
 
             _Inside.Value = true;
@@ -257,8 +228,6 @@ public sealed class TuiSessionTests
                 _Inside.Value = false;
             }
         }
-
-        public void ReleaseFirstInvocation() => _ReleaseFirst.TrySetResult();
     }
 
     private sealed class _BlockingDomainDispatcher : IInteractionDispatcher
@@ -290,6 +259,13 @@ public sealed class TuiSessionTests
 
             return await action();
         }
+    }
+
+    private sealed class _TrackedResource : IDisposable
+    {
+        public bool IsDisposed { get; private set; }
+
+        public void Dispose() => IsDisposed = true;
     }
 
     private sealed class _ObservableModel : INotifyPropertyChanged
@@ -327,7 +303,12 @@ public sealed class TuiSessionTests
 
     private sealed class _ActionModel
     {
+        private readonly TaskCompletionSource _Release =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
+
         public bool CancellationObserved { get; private set; }
+
+        public void Release() => _Release.TrySetResult();
 
         [UIEngine.Core.Attributes.Action]
         public async Task WorkAsync(
@@ -337,7 +318,7 @@ public sealed class TuiSessionTests
             progress.Report(1);
             try
             {
-                await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
+                await _Release.Task.WaitAsync(cancellationToken);
             }
             catch (OperationCanceledException)
             {

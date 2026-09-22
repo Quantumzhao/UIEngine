@@ -12,13 +12,15 @@ Phase 1 compatibility spike passes. Pin the accepted package version; do not use
 
 **Boundary scaffold:** Implementation Step 2 completed on 2026-09-21 with a reusable class
 library, dependency tests, caller-owned host contracts, shared fullscreen/embedded workspace
-construction, and a thin cyclic-world composition executable. Interactive session behavior starts
-in Step 3.
+construction, and a thin cyclic-world composition executable. Interactive controls start in Step
+4 after the Step 3 architecture simplification.
 
-**Async bridge:** Implementation Step 3 completed on 2026-09-21 with a typed intent pump,
-session/generation cancellation, stale-presentation guards, toolkit dispatcher marshalling, and
-deterministic cleanup of reads, observation subscriptions, and invocation progress readers while
-preserving caller ownership of the Core host.
+**Operation-lifetime simplification:** The initial Step 3 async bridge completed on 2026-09-21
+characterized the required cancellation, stale-result, dispatch, and cleanup guarantees. Revised
+Step 3 completed on 2026-09-22 by removing its typed intent pump, presentation callbacks, and global
+operation generation in favor of direct descriptor calls, independently scoped operation
+lifetimes, native toolkit dispatch, and one workspace-owned root lifetime. See
+[TUI Frontend Simplification](../tui-frontend-simplification.md).
 
 **Prerequisite:** The streamlined Framework MVP capabilities described by
 [Project context](../../PROJECT_CONTEXT.md) and [the current architecture](../architecture.md) are
@@ -26,6 +28,7 @@ the starting contract. Milestone 02's capability outcomes are retained even thou
 implementation shape was superseded.
 
 **Governing documents:** [Project context](../../PROJECT_CONTEXT.md),
+[TUI frontend simplification](../tui-frontend-simplification.md),
 [architecture and reboot plan](../../REBOOT_PLAN.md), and [progress tracker](../../TODO.MD)
 
 This outline does not authorize implementation. Work begins only when the milestone is explicitly
@@ -35,12 +38,12 @@ selected for implementation.
 
 Deliver the first product frontend as a reusable .NET class library:
 
-`Domain model -> UIEngine.Core host and descriptors -> UIEngine TUI session -> XenoAtom visuals -> caller-owned terminal application`
+`Domain model -> UIEngine.Core host and descriptors -> XenoAtom controls and native bindings -> caller-owned terminal application`
 
 The TUI will turn an exposed live object graph into a keyboard-first interactive application with
 no model-specific screens. It will browse roots, references, cycles, and bounded collections;
-generate value editors and action forms; present observation, progress, cancellation, and
-structured failures; and remain responsive when the terminal is resized.
+generate value editors and action forms; present observation, progress, and structured failures;
+and remain responsive when the terminal is resized.
 
 The frontend itself is not an executable. A domain application may reference `Core` and the TUI
 library directly, or a separate thin composition project may reference the domain model, `Core`,
@@ -74,8 +77,9 @@ The toolkit also imposes constraints that shape this milestone:
 
 - The UI loop and `State<T>`/visual objects are single-thread-affine. Background observation and
   invocation updates must be marshalled through the toolkit dispatcher.
-- Routed event handlers are synchronous. They must enqueue intent for an async session pump; the
-  TUI must not use `async void` handlers.
+- Routed event handlers are synchronous. They should start scoped asynchronous work through native
+  toolkit commands or bindings; the TUI must not use `async void` handlers or require a universal
+  intent pump.
 - Fullscreen `Run`/`RunAsync` owns the calling thread's terminal loop. UIEngine must offer this as a
   convenience host without making it the only integration path.
 - The package has moved through many releases in a short period. UIEngine should isolate toolkit
@@ -160,11 +164,12 @@ The public contract must make ownership explicit:
 
 - The caller owns `UIEngineHost` by default. Closing or disposing the TUI does not silently dispose
   the domain runtime.
-- The TUI session owns its observation subscriptions, invocation readers, queued intents, and
-  presentation cancellation source, and releases all of them on close.
+- The workspace and its controls own the operation scopes, observation subscriptions, and
+  invocation readers they start, and release all of them on close. Started `ActionInvocation`s
+  remain owned by the caller's host and are never cancelled by TUI navigation or disposal.
 - A convenience overload may opt into host ownership only if the name or option makes that
   behavior unambiguous.
-- `RunAsync` and the embeddable workspace use the same session/controller behavior so the
+- `RunAsync` and the embeddable workspace construct the same controls and bindings so the
   convenience path cannot become a second frontend implementation.
 
 The zero-configuration path must fully support the semantic types Core can currently convert:
@@ -176,13 +181,28 @@ fixture workflow.
 ## Frontend Architecture
 
 Keep the implementation small and concrete. Do not add a general UI abstraction layer or mirror
-the domain graph.
+the domain graph. Official examples should demonstrate the direct control-to-descriptor design.
+Most source files should remain below roughly 200 lines, while one complete control and its
+bindings should normally remain within roughly 300 lines.
 
-### Session and state
+### Control and navigation-page state
 
-- One disposable TUI session holds the current canonical path, resolved object descriptor,
-  back/forward history, breadcrumb locations, selected member, current collection window, active
-  form drafts, subscriptions, invocations, and user-visible status.
+- Each value, reference, collection, and action control keeps its native toolkit state, bindings,
+  edit drafts, validation presentation, and event handling together while calling the matching
+  Core descriptor operations directly.
+- `TuiWorkspace` owns the caller-supplied host reference without taking host ownership, the copied
+  options, root visual, root operation lifetime, current navigation page, and bounded back/forward
+  page stacks. It does not keep a separate authoritative current path.
+- A `NavigationPage` owns one `LogicalPath`, the corresponding object/member control, its local
+  presentation state, and a child operation scope. The name distinguishes a navigation/history
+  entry from a node in the exposed domain object graph.
+- Going up derives the parent path from the current page. Back and forward switch between pages
+  that each retain their own path and inexpensive control state.
+- When a page becomes inactive, it retires active reads, observations, and progress readers rather
+  than leaving background work attached. Reactivation creates a fresh scope and re-resolves the
+  page path before refreshing its control.
+- There is no separate `TuiSession` or general navigation/controller abstraction. Add another
+  coordination type only if a later concrete consumer cannot be served by the workspace and pages.
 - Durable navigation state uses `LogicalPath`, `PathLocation`, and `BindingReference`, not raw
   object references or process-global widget state.
 - Descriptors and handles may be retained only as live interaction state and must be re-resolved
@@ -206,20 +226,29 @@ At normal widths the browser and detail surface may be side by side. At narrow w
 collapse into a single active pane without losing the current path, draft, or selection. Layout
 geometry remains frontend-owned and is not persisted in this milestone.
 
-### Async and dispatch bridge
+### Direct operations, lifetime, and dispatch
 
-- Synchronous XenoAtom handlers enqueue small typed intents such as navigate, refresh, commit,
-  invoke, cancel, page, and close.
-- One async pump processes intents through Core `Task` APIs. It must not block the terminal input
-  loop while a dispatched domain operation or action completion is pending.
-- UI state changes occur only on the XenoAtom dispatcher. Domain calls continue to honor the
-  caller-supplied `IInteractionDispatcher`; the frontend must not assume that the UI thread is the
-  domain thread or replace the domain dispatcher implicitly.
+- Controls call `ResolvePathAsync`, descriptor reads and writes, bounded collection reads,
+  `InvokeAsync`, and `ObserveAsync` directly from native commands and bindings. Do not duplicate
+  these semantic operations in a `TuiIntent` hierarchy.
+- Use small operation scopes where asynchronous ownership is needed. A scope may start and own
+  work, expose cancellation and completion, reject stale results within that scope, and join owned
+  work during disposal; its cancellation is a frontend lifetime mechanism and must never be
+  forwarded as a request to cancel a domain action. It must not know why work was started or how
+  results are presented.
+- Give independent controls independent scopes. Navigation may retire a detail scope without
+  cancelling an unrelated collection read or action-progress reader; there is no global operation
+  generation.
+- UI state changes occur only through XenoAtom's native dispatcher facilities. Domain calls
+  continue to honor the caller-supplied `IInteractionDispatcher`; the frontend must not assume
+  that the UI thread is the domain thread or replace the domain dispatcher implicitly.
 - Long-running `ActionInvocation` completion and progress are observed separately after invocation
-  starts. The form closes or remains available according to explicit session state, not by waiting
-  synchronously in an event handler.
-- Every session-owned task has cancellation and deterministic completion during disposal. No
-  background reader may update a detached visual tree.
+  starts. The owning action control decides whether its form remains available without blocking a
+  synchronous event handler. Retiring the control stops its readers but does not cancel the
+  invocation, which continues under the caller-owned host. The TUI does not retain a background
+  job registry or replay progress/results after that view is closed.
+- Every frontend-started task has cancellation and deterministic completion during its owning
+  scope's disposal. No background reader may update a detached visual tree.
 
 ## Descriptor-to-UI Mapping
 
@@ -235,7 +264,7 @@ geometry remains frontend-owned and is not persisted in this milestone.
 | `ReferenceDescriptor` | Navigable row; null, unavailable, and resolution failure remain distinct |
 | `CollectionDescriptor` | Bounded window with position/key, null/scalar/reference entry variants, next/previous/refresh |
 | `ActionDescriptor` | Generated parameter form with required/default/null/options/range metadata |
-| `ActionInvocation` | Running/result state, progress area, and cancel command only when supported |
+| `ActionInvocation` | Running/result state and progress area; no TUI cancellation command |
 | `ObservationSubscription` | Targeted refresh/invalidation with overflow warning and manual refresh |
 | `InteractionError` | Stable state-specific presentation; logs and exception text are not parsed |
 
@@ -269,9 +298,10 @@ The TUI must not expose a Core value by binding a control directly to the domain
   nullable values. Omitting a defaulted parameter must remain different from explicitly submitting
   null.
 - After a successful write, read the authoritative value again before updating the displayed row.
-- After an action starts, show ordered progress, terminal status, result, structured failure, and
-  cancellation availability. Do not surface trusted `Fault` details unless an explicit
-  development option allows it.
+- After an action starts, show ordered progress, terminal status, result, and structured failure.
+  The TUI does not offer action cancellation or undo. Do not surface trusted `Fault` details unless
+  an explicit development option allows it. Closing the action view deliberately gives up further
+  TUI tracking of that invocation.
 
 ## Bounded Collections
 
@@ -295,8 +325,8 @@ The TUI must not expose a Core value by binding a control directly to the domain
   user that displayed state may have skipped changes.
 - On source replacement, re-resolve the current path/binding, dispose the old subscription, attach
   at most one new subscription, and retain navigation/form state only when still compatible.
-- Leaving a screen, switching roots, closing the workspace, or disposing the session cancels
-  readers and detaches subscriptions deterministically.
+- Leaving a screen, switching roots, closing the workspace, or disposing the owning operation
+  scope cancels readers and detaches subscriptions deterministically.
 
 ## Frontend Capability Policy
 
@@ -324,7 +354,7 @@ Keep MVP configuration deliberately narrow:
 - trusted-development fault detail toggle; and
 - overridable keyboard gestures only where conflicts with an embedding host require them.
 
-Configuration is copied into one session and is not global. Custom layouts, arbitrary control
+Configuration is copied into the workspace and is not global. Custom layouts, arbitrary control
 factories, persisted settings, dashboards, and a public plug-in model remain deferred. Advanced
 consumers can embed the workspace visual and compose around it without changing Core.
 
@@ -333,10 +363,11 @@ consumers can embed the workspace visual and compose around it without changing 
 - Dependency tests prove that Core has no XenoAtom reference, the TUI is a class library, and only
   the optional example/consumer project is executable.
 - Public API tests cover caller-owned host lifetime, `RunAsync`, workspace creation, configuration
-  validation, session disposal, and the absence of domain-fixture dependencies.
-- Session tests exercise intents and presentation state without requiring a physical terminal:
-  loading, stale-result rejection, duplicate-submit prevention, cancellation, disposal, and
-  observation coalescing.
+  validation, workspace disposal, and the absence of domain-fixture dependencies.
+- Control and operation-scope tests exercise direct descriptor calls without requiring a physical
+  terminal: loading, scope-local stale-result rejection, independent cancellation,
+  duplicate-submit prevention, disposal, and observation coalescing. Navigation-page tests cover
+  path ownership, inactive-page cleanup, re-resolution, and bounded history behavior.
 - Toolkit adapter tests use the supported in-memory terminal backend to inject keys and resize
   events and to inspect stable semantic output. Avoid broad character-perfect snapshots that make
   harmless style changes expensive.
@@ -349,8 +380,8 @@ consumers can embed the workspace visual and compose around it without changing 
   optional counts, `HasMore`, keys, null/scalar/reference entries, empty slices, resets, overflow,
   large lazy sources, and no eager enumeration.
 - Action tests cover required/default/null parameters, generated controls, synchronous and
-  asynchronous results, progress, supported and unsupported cancellation, failure, and repeated
-  invocation prevention.
+  asynchronous results, progress, failure, repeated invocation prevention, and continued domain
+  execution after the action view closes.
 - Failure-state tests cover every `InteractionErrorCode` without parsing messages and verify that
   trusted exception details are hidden by default.
 - Lifecycle tests prove that navigation and close detach subscriptions, cancel frontend readers,
@@ -371,8 +402,8 @@ The thin cyclic-world consumer must demonstrate, without custom screen code:
 3. Read and edit supported values, see a rejected value inline, and reload authoritative state.
 4. Browse multiple bounded windows of the population forecast without materializing it.
 5. Browse dictionary keys plus null, scalar, and reference collection entries.
-6. Invoke synchronous and asynchronous actions, see progress, cancel a cancellable action, and
-   distinguish success, cancellation, and failure.
+6. Invoke synchronous and asynchronous actions, see progress, and distinguish success from
+   failure without offering cancellation or undo.
 7. Observe deterministic external mutation, collection reset, and compatible replacement without
    retaining stale handlers.
 8. Display unavailable, missing, ambiguous, mismatched, permission, and overflow states with valid
@@ -388,16 +419,17 @@ The thin cyclic-world consumer must demonstrate, without custom screen code:
   specific domain model.
 - A documented minimal consumer can create a fully interactive TUI by constructing a Core host,
   registering roots, and invoking the frontend; no model-specific views are required.
-- Both convenience fullscreen hosting and embeddable visual composition use one session behavior
-  implementation with explicit ownership and disposal.
+- Both convenience fullscreen hosting and embeddable visual composition use the same controls and
+  bindings with explicit ownership and disposal.
 - Core remains terminal- and frontend-neutral, and no speculative frontend negotiation system is
   added.
-- Navigation, editing, action forms, bounded collections, progress, cancellation, observation,
+- Navigation, editing, action forms, bounded collections, progress, observation,
   replacement, and all structured target states meet the scenarios above.
 - The complete cyclic-world workflow works keyboard-first and remains usable across the accepted
   normal and narrow terminal sizes.
-- The TUI does not bypass Core operations, eagerly enumerate collections, parse rendered errors,
-  leak subscriptions/tasks, expose trusted faults by default, or dispose a caller-owned host.
+- The TUI does not duplicate Core operations in an intent layer, impose a global cancellation
+  generation, bypass Core operations, eagerly enumerate collections, parse rendered errors, leak
+  subscriptions/tasks, expose trusted faults by default, or dispose a caller-owned host.
 - `dotnet build UIEngine.sln` completes with zero warnings and errors, and
   `dotnet test UIEngine.sln --no-build` passes Core, CLI, TUI, dependency, and lifecycle tests.
 - Packaging remains disabled and no post-MVP layout, batch, search, remote, or scripting subsystem
@@ -426,38 +458,51 @@ behavior rather than deferring coverage to the final acceptance pass.
 1. Add `Frontend/Tui` as a class library and `Tests/UIEngine.Frontend.Tui.Tests` as its test project.
 2. Reference only Core and the pinned toolkit from the frontend; add dependency tests preventing
    Core-to-TUI/toolkit and TUI-to-domain-fixture references.
-3. Add the minimal public options, session/facade, fullscreen runner, and embeddable workspace
-   contracts with explicit ownership documentation.
+3. Add the minimal public options, facade, fullscreen runner, and embeddable workspace contracts
+   with explicit ownership documentation.
 4. Add an empty thin cyclic-world consumer that composes the domain model, Core host, and TUI
    library, and verify that all reusable behavior remains outside the executable.
 
-### 3. Implement session lifetime and the async bridge
+### 3. Simplify operation lifetime and workspace ownership
 
-1. Add disposable session state, typed intent queue, cancellation, and stale-operation generation
-   guards.
-2. Route synchronous control events into the async pump without `async void` handlers.
-3. Marshal presentation changes to the toolkit dispatcher while leaving domain dispatch under the
-   configured Core host.
-4. Prove deterministic close/disposal with in-flight reads, observation, and action progress, and
-   prove that a caller-owned host survives.
+1. Characterize the cancellation, stale-result, dispatch, and deterministic-cleanup guarantees of
+   the existing bridge with focused tests before changing its structure.
+2. Remove `TuiIntent`, presentation callbacks in queued requests, and the global operation
+   generation. Have controls invoke Core descriptor operations directly through native commands
+   and bindings.
+3. Add small independent session, screen, and control/operation scopes where ownership is needed;
+   ensure that cancellation or stale-result rejection in one scope does not invalidate unrelated
+   work.
+4. Keep shared lifetime on `TuiWorkspace`; do not introduce a separate session or controller before
+   a concrete consumer requires one.
+5. Marshal control state changes with the toolkit's native dispatcher while leaving domain
+   dispatch under the configured Core host.
+6. Prove deterministic close/disposal with in-flight reads, observation, and action progress, and
+   prove that a caller-owned host survives in both fullscreen and embedded hosting paths.
+7. Keep the existing workspace facade and thin cyclic-world composition host unchanged where
+   their contracts do not conflict with the simplified architecture.
 
 ### 4. Build responsive workspace chrome
 
 1. Add the header, browser, detail surface, status area, and discoverable command bar.
 2. Define stable keyboard commands for root selection, activation, parent/back/forward, refresh,
-   commit/cancel, paging, action cancellation, help, and close.
+   commit/cancel, paging, help, and close.
 3. Implement normal and narrow layouts that preserve state and focus across resize.
 4. Verify complete focus traversal, visible focus, dialog return focus, and keyboard-only access.
 
 ### 5. Add object navigation and history
 
-1. Load roots and object descriptors through Core, presenting summary, type, runtime handle, and
-   optional domain identity without retaining raw domain objects.
-2. Render members by semantic role and navigate references through canonical resolved paths.
-3. Add breadcrumbs plus bounded back/forward history, including roots, cycles, shared references,
-   null references, and path-resolution failures.
-4. Re-resolve navigation state after replacement and reject identity conflicts rather than silently
-   rebinding.
+1. Add `NavigationPage` as the path-and-control unit. Each page owns one logical path, its
+   corresponding object/member control, local presentation state, and active operation scope
+   without retaining raw domain objects.
+2. Load roots and object descriptors through Core, presenting summary, type, runtime handle, and
+   optional domain identity, then render members by semantic role and navigate references through
+   canonical resolved paths.
+3. Add breadcrumbs plus bounded back/forward page history, including roots, cycles, shared
+   references, null references, and path-resolution failures; derive up-navigation from the current
+   page's path.
+4. Retire active work when a page becomes inactive, then re-resolve its path on activation or
+   replacement and reject identity conflicts rather than silently rebinding.
 
 ### 6. Generate value presentation and editors
 
@@ -482,9 +527,10 @@ behavior rather than deferring coverage to the final acceptance pass.
    omitted-default versus explicit-null semantics.
 2. Start invocations once, disable duplicate submission, and present synchronous/asynchronous
    completion and result values.
-3. Stream ordered progress without blocking the UI and expose cancellation only when supported.
-4. Present validation, cancellation, permission, target-loss, and fault outcomes without leaking
-   trusted exception details by default.
+3. Stream ordered progress without blocking the UI; closing the view stops only the frontend
+   reader and leaves the domain invocation running.
+4. Present validation, permission, target-loss, and fault outcomes without leaking trusted
+   exception details by default.
 
 ### 9. Integrate observation and recovery
 
@@ -502,20 +548,21 @@ behavior rather than deferring coverage to the final acceptance pass.
    host.
 2. Add a quick-start showing both direct application embedding and the preferred separate host for
    a reusable domain library.
-3. Document options, host/session ownership, supported descriptor mapping, keyboard commands,
-   terminal requirements, toolkit version policy, and known limitations.
+3. Document options, host/workspace/navigation-page/operation-scope ownership, supported descriptor
+   mapping, keyboard commands, terminal requirements, toolkit version policy, and known
+   limitations.
 4. Reconcile the architecture, repository structure, roadmap, milestone index, and progress
    tracker without marking Product Release or post-MVP work complete.
 
 ### 11. Run milestone acceptance
 
-1. Run the toolkit-spike, dependency, public API, session, navigation, value, collection, action,
-   observation, failure, lifecycle, input, and resize tests.
+1. Run the toolkit-spike, dependency, public API, control, operation-scope, optional-session,
+   navigation, value, collection, action, observation, failure, lifecycle, input, and resize tests.
 2. Complete the cyclic-world workflow with injected keyboard input and with a real terminal smoke
    test; record any platform not exercised rather than implying support.
 3. Run `dotnet build UIEngine.sln` with zero warnings and errors, followed by
    `dotnet test UIEngine.sln --no-build`, and verify the same checks in CI.
-4. Confirm that packaging remains disabled, no deferred subsystem entered scope, all session-owned
-   resources detach, and only completed [TODO.MD](../../TODO.MD) items are checked.
+4. Confirm that packaging remains disabled, no deferred subsystem entered scope, all
+   frontend-owned resources detach, and only completed [TODO.MD](../../TODO.MD) items are checked.
 
 Milestone 04 may address Product Release only after this milestone satisfies every exit criterion.

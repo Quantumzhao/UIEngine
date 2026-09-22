@@ -57,12 +57,13 @@ the future roadmap. Completed milestone records remain under [docs/milestones](d
 - [x] Establish the reusable TUI library, test, dependency, ownership, hosting, and thin consumer
   boundaries.
 - [x] Keep toolkit capability handling frontend-local; no Core negotiation contract was required.
-- [x] Add the cancellable typed-intent pump, stale-operation guards, UI dispatch marshalling, and
-  deterministic session-owned reader/subscription disposal.
+- [x] Replace the provisional intent pump and global generation with direct Core calls, native UI
+  dispatch, and independent operation scopes with deterministic task/resource disposal.
 - [ ] Build graph browsing with navigation history or breadcrumbs.
 - [ ] Generate value editors and action forms from the concrete descriptors.
 - [ ] Add bounded collection browsing.
-- [ ] Present asynchronous progress, cancellation, observation, and structured errors.
+- [ ] Present asynchronous progress, observation, and structured errors without action
+  cancellation or undo controls.
 - [ ] Show unavailable, missing, ambiguous, and mismatched targets explicitly.
 - [ ] Verify keyboard-first operation and terminal resizing.
 - [ ] Prove the TUI against the same cyclic-world workflow as the CLI.

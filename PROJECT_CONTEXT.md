@@ -20,9 +20,9 @@ prototypes whose domain model remains the source of truth.
   progress, cancellation, notification observation, and explicit polling.
 - Dispatch: one optional `IInteractionDispatcher` controls domain thread affinity.
 - CLI: navigation, inspection, mutation, collection reading, invocation, watching, and completion.
-- TUI: pinned toolkit, reusable hosting boundaries, and a cancellable intent/dispatcher bridge
-  with deterministic reader and subscription lifetime; interactive workspace behavior remains in
-  progress.
+- TUI: pinned toolkit, reusable hosting boundaries, and independent hierarchical operation scopes
+  with deterministic task, reader, subscription, and invocation lifetime; interactive workspace
+  behavior remains in progress.
 - Tests: black-box framework and CLI behavior suites.
 - Packaging: disabled until release policy, compatibility, licensing, and support are defined.
 
@@ -79,10 +79,10 @@ prototypes whose domain model remains the source of truth.
 ## Scope
 
 The current framework includes the Core and CLI workflows demonstrated by the cyclic model and the
-reusable Product MVP TUI boundary with its session lifetime and async bridge. The interactive TUI
-is in progress. Persistent layouts, batch mutation, remote transport, scripting, source
-generation, automatic undo, and a supported package remain deferred until backed by concrete
-requirements.
+reusable Product MVP TUI boundary with workspace-owned scoped operation lifetime.
+The interactive TUI is in progress. Persistent layouts, batch mutation, remote transport,
+scripting, source generation, automatic undo, and a supported package remain deferred until backed
+by concrete requirements.
 
 ## Verification
 

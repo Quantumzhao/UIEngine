@@ -1,4 +1,3 @@
-using System.Reflection;
 using System.Xml.Linq;
 using UIEngine.Core;
 using UIEngine.Frontend.Tui;
@@ -24,14 +23,14 @@ public sealed class TuiBoundaryTests
 
         using var workspace = TuiFrontend.CreateWorkspace(host, options);
 
-        Assert.NotSame(options, workspace.Session.Options);
-        Assert.Equal(options, workspace.Session.Options);
-        Assert.False(workspace.Session.IsDisposed);
+        Assert.NotSame(options, workspace.Options);
+        Assert.Equal(options, workspace.Options);
+        Assert.False(workspace.IsDisposed);
         Assert.False(host.IsDisposed);
 
         workspace.Dispose();
 
-        Assert.True(workspace.Session.IsDisposed);
+        Assert.True(workspace.IsDisposed);
         Assert.False(host.IsDisposed);
     }
 
@@ -64,6 +63,17 @@ public sealed class TuiBoundaryTests
         await TuiFrontend.RunAsync(host, cancellationToken: cancellation.Token);
 
         Assert.False(host.IsDisposed);
+    }
+
+    [Fact]
+    public void WorkspaceIsTheOnlyPublicFrontendLifetime()
+    {
+        var workspaceType = typeof(TuiWorkspace);
+
+        Assert.Null(workspaceType.GetProperty("Session"));
+        Assert.DoesNotContain(workspaceType.Assembly.GetTypes(), static type =>
+            type.Name is "TuiSession" or "TuiIntent" or "QueuedTuiIntent" or
+                "ITuiPresentationDispatcher");
     }
 
     [Fact]

@@ -2,7 +2,7 @@ using UIEngine.Core;
 
 namespace UIEngine.Frontend.Tui;
 
-/// <summary>Configures one TUI session.</summary>
+/// <summary>Configures one TUI workspace.</summary>
 public sealed record TuiFrontendOptions
 {
     /// <summary>Gets the title shown by the workspace.</summary>
