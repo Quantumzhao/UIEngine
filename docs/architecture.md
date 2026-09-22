@@ -63,6 +63,19 @@ Semantic facets may overlap. For example, a writable enum property has property,
 writable semantics. Its frontend chooses an appropriate editor from those semantics without Core
 naming a widget such as a choice control.
 
+The source of an exposure and its value shape are independent facets:
+
+| Exposure | Membership facet | Additional facets |
+|---|---|---|
+| Reflected property | `IPropertyNode` | Readable/writable/nullability and value-shape facets |
+| Reflected field | `IFieldNode` | Readable/writable/nullability and value-shape facets |
+| Reflected method | `IMethodNode` | Parameter, result, progress, and cancellation metadata |
+| Programmatic scalar | `IProgrammaticValueNode` | Readable/writable/nullability and value-shape facets |
+
+A programmatic scalar is deliberately not an `IPropertyNode` or `IFieldNode`; it is an exposed
+value without a reflected-member claim. String, character, Boolean, number, and enum facets are
+orthogonal to membership, reading, writing, and nullability.
+
 Nodes expose the live operations appropriate to their semantics:
 
 - readable nodes read the current value;
@@ -107,6 +120,10 @@ Path resolution returns a fresh node plus its canonical path. Resolution may use
 identity to survive compatible replacement, but it must reject a path that resolves to a
 conflicting identity.
 
+`ResolvedNode` is the Core-owned hand-off for that pair. It retains its originating host
+internally so a workspace can reject an occurrence from another host, while neither
+`ObjectNode` nor its semantic facets expose a logical path.
+
 ## Navigators
 
 A `Navigator` is one independent entry point into the graph. It owns a stack of navigation entries.
@@ -127,6 +144,14 @@ Navigation has destructive stack semantics:
 A navigator may start from a registered root or a specific resolved `ObjectNode`. The workspace
 captures the node's current location and resolves a navigator-owned instance. Duplicating a
 navigator follows the same rule at the current path, so the two navigators do not share nodes.
+
+Navigator mutations are latest-request-wins. Starting a mutation advances that navigator's
+generation and supersedes any older unresolved mutation. Resolution may complete in the
+background, but it may publish an entry or change notification only if its generation is still
+current. Back, removal, disposal, or caller cancellation also invalidates affected pending work,
+so an older resolution can never restore stale state. Successful mutation results and change
+notifications carry the same committed change object; failed or superseded mutations publish no
+change.
 
 If a path cannot resolve, the current entry remains present with its structured failure. Back
 navigation remains available. A restored broken path therefore stays visible and can be unwound

@@ -213,7 +213,7 @@ public sealed class RuntimeBehaviorTests
     }
 
     [Fact]
-    public void PublicApiContainsOnlyTheTwoIntentionalExtensionInterfaces()
+    public void PublicApiContainsOnlyIntentionalExtensionAndNodeSemanticInterfaces()
     {
         var assembly = typeof(UIEngineHost).Assembly;
         var interfaces = assembly.GetExportedTypes()
@@ -234,7 +234,29 @@ public sealed class RuntimeBehaviorTests
             "PathResolutionState",
         };
 
-        Assert.Equal(["IInteractionDispatcher", "IStableDomainIdentity"], interfaces);
+        Assert.Equal(
+            [
+                "IBooleanNode",
+                "ICharacterNode",
+                "ICollectionNode",
+                "IEnumNode",
+                "IFieldNode",
+                "IInteractionDispatcher",
+                "IMemberNode",
+                "IMethodNode",
+                "INavigableNode",
+                "INullableValueNode",
+                "INumberNode",
+                "IObjectNode",
+                "IProgrammaticValueNode",
+                "IPropertyNode",
+                "IReadableValueNode",
+                "IReferenceNode",
+                "IStableDomainIdentity",
+                "IStringNode",
+                "IWritableValueNode",
+            ],
+            interfaces);
         foreach (var name in removed)
         {
             Assert.DoesNotContain(assembly.GetExportedTypes(), type => type.Name == name);

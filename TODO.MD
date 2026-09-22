@@ -14,10 +14,10 @@
 
 ## Object Nodes
 
-- [ ] Define the frontend-neutral `ObjectNode` contract.
-- [ ] Model property, field, object, reference, collection, method, string, boolean, number, and
+- [x] Define the frontend-neutral `ObjectNode` contract.
+- [x] Model property, field, object, reference, collection, method, string, boolean, number, and
   enum semantics.
-- [ ] Support overlapping language-semantic facets.
+- [x] Support overlapping language-semantic facets.
 - [ ] Resolve every exposed root and member to a fresh node instance.
 - [ ] Preserve validation, observation, dispatch, collection bounds, and invocation behavior.
 - [ ] Resolve logical paths to terminal as well as navigable nodes.

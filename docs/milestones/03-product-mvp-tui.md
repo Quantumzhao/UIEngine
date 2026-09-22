@@ -91,20 +91,373 @@ The cyclic-world example must demonstrate:
 
 ## Implementation Steps
 
+Keep the solution buildable after every step. Add the smallest meaningful tests with each behavior;
+do not defer Core or lifetime coverage to the final TUI acceptance pass.
+
+### Migration assumptions
+
+- `ObjectNode` replaces the public descriptor hierarchy as the frontend-facing model. Temporary
+  adapters are acceptable while the CLI is migrated, but the completed architecture does not keep
+  two parallel public models.
+- Nodes expose language semantics through a small base contract plus composable facets. Avoid a
+  separate concrete class for every possible combination of property, field, value kind,
+  nullability, and mutability.
+- A node has no public logical-path property. Path plus resolution state belongs to a navigation
+  entry or another Core-owned resolution envelope.
+- `UIEngineWorkspace` and `Navigator` do not own the `UIEngineHost`. A TUI-created Core workspace
+  may be owned by `TuiWorkspace`; a caller-supplied Core workspace remains caller-owned.
+- Core produces versioned layout data but does not choose a file, perform file I/O, or persist live
+  state. The TUI owns its stable presentation fields and maps them into that data contract.
+- The existing conversion, validation, identity, dispatch, bounded-stream, observation, and
+  invocation implementations are behavior to preserve, not subsystems to redesign.
+
+If public compatibility with the current descriptor APIs is required, decide that before Step 1;
+the default sequence below assumes a clean migration to nodes.
+
 ### Completed foundation
 
-- Qualify and pin XenoAtom.Terminal.UI.
-- Establish reusable fullscreen and embedded hosting.
-- Add independent operation scopes with deterministic cleanup.
+- [x] Qualify and pin XenoAtom.Terminal.UI 3.9.0 through the toolkit spike.
+- [x] Establish reusable fullscreen and embedded hosting with the same root visual.
+- [x] Establish the Core/TUI/domain dependency boundaries and thin example executable.
+- [x] Add independent hierarchical `TuiOperationScope`s with deterministic cancellation,
+  resource cleanup, and task joining.
+- [x] Prove that removing a frontend progress reader does not cancel its host-owned invocation.
+- [x] Prove that closing the current TUI boundary leaves the caller-owned host usable.
 
-### Remaining work
+### 1. Specify the node and navigation contracts
 
-1. Implement the Core `ObjectNode`, `UIEngineWorkspace`, and `Navigator` contracts.
-2. Build multi-navigator workspace chrome and keyboard commands.
-3. Map object, reference, scalar, enum, number, collection, and method semantics to controls.
-4. Add observation, structured failure, and replacement handling.
-5. Add layout snapshots and TUI presentation configuration.
-6. Complete the cyclic-world acceptance workflow.
+Before moving behavior, define and test the smallest public contracts needed by both frontends.
+
+1. Define `ObjectNode` and composable language-semantic facets for:
+   - object and reference access;
+   - property, field, and method membership;
+   - readable, writable, and nullable values;
+   - string/character, boolean, number, and enum values;
+   - collections and their bounded entry shapes; and
+   - method parameters, results, progress, and cancellation metadata.
+2. Record how reflected properties and fields combine with value/reference/collection facets. For
+   example, a writable enum property must remain identifiable as a property, enum, readable value,
+   and writable value without Core naming a control.
+3. Define the semantic treatment of programmatic scalar exposures so they do not falsely claim to
+   be reflected fields or properties.
+4. Define a resolved-node envelope or equivalent Core-owned location token. It must carry the
+   canonical path beside a node, allow a workspace to start from an already resolved occurrence,
+   and still keep logical paths off the node itself.
+5. Define `NavigationEntry` as path plus either a fresh node or a structured resolution failure.
+   A broken entry is navigation state, not a fake node kind.
+6. Define async mutation results and frontend-neutral change notifications for navigator add,
+   navigate, back, duplicate, reorder, and remove operations. Notifications must let the TUI
+   retire exactly the control and scope associated with a removed entry without exposing toolkit
+   types from Core.
+7. Decide and document mutation serialization: one navigator must not publish a stale resolution
+   after a later navigation, back, removal, or cancellation has won.
+
+Verification:
+
+- Add contract tests for overlapping facets, fresh occurrence identity, terminal nodes, structured
+  broken entries, and host/workspace ownership.
+- Keep Core free of XenoAtom references and presentation terminology.
+
+### 2. Replace descriptors with live node creation
+
+Move the current descriptor behavior behind nodes while preserving the live-domain guarantees.
+
+1. Extract the useful internals of `ObjectDescriptor`, `MemberDescriptor`, `ValueDescriptor`,
+   `ReferenceDescriptor`, `CollectionDescriptor`, and `ActionDescriptor` into a node factory and
+   node operations. Do not retain a second independent implementation of conversion, validation,
+   collection access, or invocation.
+2. Resolve a registered root to an object node and every exposed member to a node with the correct
+   overlapping facets. Continue to expose only opted-in reflection members and configured
+   programmatic values.
+3. Create new node instances on each resolution. Nodes may share the same host, live target, runtime
+   handle, and domain identity, but never the same node occurrence across navigator entries.
+4. Keep live operations host-mediated:
+   - reads and writes resolve the current owner and run through `IInteractionDispatcher`;
+   - writes use the existing invariant conversion and validation pipeline;
+   - reference access handles null and unavailable targets explicitly;
+   - collection reads retain the host maximum and closed entry variants; and
+   - method invocation returns the existing host-owned `ActionInvocation` lifetime.
+5. Preserve metadata needed by generated controls: runtime type, summary, read/write capability,
+   nullability, enum members, numeric range, method defaults, result type, progress type, and
+   cancellation support.
+6. Update observation entry points to accept the applicable node occurrence or its internal target
+   binding instead of requiring frontends to reconstruct owner handle/member identifiers.
+
+Verification:
+
+- Port the existing Core behavior tests to nodes before deleting descriptor coverage.
+- Add focused tests for property versus field semantics, enum and numeric overlap, read-only and
+  nullable values, null references, programmatic values, and two fresh nodes operating on the same
+  live value.
+- Confirm bounded collection, validation, dispatch, observation, and invocation tests retain their
+  current behavior.
+
+### 3. Resolve logical paths to every node kind
+
+Replace the current owner-plus-optional-member result with node resolution that works uniformly for
+roots, members, collections, selected elements, scalars, and methods.
+
+1. Resolve root paths to object nodes and member paths to the member node itself, including
+   terminal scalar and method nodes.
+2. Resolve reference members without recursively materializing their target graph. A successfully
+   resolved reference can expose object semantics for its current live target while retaining its
+   reference and property/field semantics.
+3. Resolve a collection path to its collection node and a selector path to the selected reference
+   element. Keep selector lookup bounded and retain index, key, and domain-identity selectors.
+4. Define semantic parent calculation rather than only removing the final path segment:
+   - the parent of `/world/Name` is `/world`;
+   - the parent of `/world/Nations[index=0]` is `/world/Nations`; and
+   - the parent of `/world/Nations[index=0]/Name` is
+     `/world/Nations[index=0]`.
+5. Return enough semantic ancestor information to initialize a navigator or rebuild its destructive
+   stack from one saved current path.
+6. Preserve canonical escaping, case sensitivity, cycles, shared references, compatible identity
+   recovery, and conflicting-identity refusal.
+7. Remove or internalize `ResolvedPath`, `ResolvedBinding`, `BindingReference`, `MemberKind`, and
+   descriptor-specific resolution once all consumers use resolved nodes.
+
+Verification:
+
+- Cover every node kind as the end of a path.
+- Cover all three selector kinds, collection-to-element parent traversal, cycles, shared references,
+  compatible replacement, identity conflict, null, missing, ambiguous, and unavailable targets.
+- Assert that resolving the same path twice returns distinct nodes with the expected shared domain
+  handle or identity.
+
+### 4. Implement `UIEngineWorkspace` and `Navigator`
+
+Add the frontend-neutral navigation session only after node and path behavior is stable.
+
+1. Add a caller-disposable `UIEngineWorkspace` over one caller-owned host and an ordered,
+   read-only public view of its navigators.
+2. Create a navigator from:
+   - a selected registered root;
+   - an absolute logical path; and
+   - a supplied resolved-node occurrence through the location hand-off defined in Step 1.
+3. Give each navigator a stable identifier, an ordered entry stack, and one current entry.
+4. Navigate deeper by resolving and pushing a fresh node. Reject navigation from terminal nodes
+   without changing the stack.
+5. Go back by permanently removing the current entry. Expose no forward history, and define the
+   root-entry behavior as a structured no-op/failure rather than silently removing the navigator.
+6. Duplicate the current navigator by resolving its current path into a new navigator with fresh
+   entries and node instances.
+7. Remove and reorder navigators without affecting their domain objects, host-owned invocations,
+   or any other navigator.
+8. Retain an attempted target as a broken current entry when resolution fails. Back must remove the
+   broken entry and reveal the previous entry.
+9. Dispose all entries and publish deterministic removal notifications when a navigator or
+   workspace is disposed. Do not make a node own frontend work.
+
+Verification:
+
+- Test push, destructive back, terminal rejection, duplicate, reorder, remove, disposal, and no
+  forward history.
+- Prove two navigators at one path have distinct nodes and navigation stacks while writes remain
+  visible through their shared domain object.
+- Prove cancellation or removal of one navigator cannot invalidate another navigator's operation.
+- Prove workspace disposal leaves its host and already-started invocation alive.
+
+### 5. Add versioned layout snapshots and restore
+
+Implement address persistence before building TUI save/restore commands.
+
+1. Define a small versioned layout DTO containing navigator identifiers, order, current paths, the
+   selected navigator identifier, and stable per-navigator presentation configuration.
+2. Choose one bounded, serializable representation for TUI presentation configuration. Keep it
+   opaque to Core and restrict the initial schema to placement and size fields required by this
+   milestone.
+3. Snapshot only stable data. Add explicit tests preventing domain values, runtime handles, node or
+   control instances, drafts, subscriptions, progress, and invocations from entering the contract.
+4. Restore each navigator independently. One invalid record must not discard the remaining valid
+   navigators.
+5. Reconstruct each navigation stack from the saved current path and its semantic parents. Include
+   the collection path before a selected element path.
+6. If any restored prefix cannot resolve, retain that prefix and each requested descendant as
+   structured broken entries so repeated back navigation eventually reaches the deepest valid
+   ancestor.
+7. Define deterministic handling for an unknown layout version, duplicate navigator identifiers,
+   an invalid selected identifier, empty layouts, and invalid presentation fields.
+8. Keep JSON or other file storage in the caller/example layer; Core only creates and consumes the
+   serializable snapshot.
+
+Verification:
+
+- Round-trip multi-navigator order, identifiers, paths, selection, placement, and size.
+- Restore mixed valid and broken navigators and navigate backward from a broken selected element to
+  its valid collection.
+- Inspect serialized test data to prove excluded live state is absent.
+
+### 6. Migrate the CLI to one navigator
+
+Use the CLI as the first complete consumer of the new Core architecture before adding substantial
+TUI behavior.
+
+1. Replace `CliSession`'s private location bindings with one `UIEngineWorkspace` and one
+   `Navigator`.
+2. Derive the prompt, current path, parent/back behavior, member completion, reads, writes,
+   collection windows, observation, and method invocation from the current node and its facets.
+3. Preserve existing command grammar and output where the architecture does not require a change.
+   Extend navigation/inspection so scalar, collection, and method nodes can be current and terminal.
+4. Use navigator back semantics for `cd ..`; do not reintroduce a CLI-only history model.
+5. Preserve the CLI executable's existing ownership of its host while making workspace disposal
+   explicit.
+6. Delete descriptor-specific CLI code and the temporary compatibility adapter after the CLI tests
+   pass on nodes.
+
+Verification:
+
+- Keep the existing redirected cyclic-world, validation, bounded collection, observation,
+  replacement, cancellation, and completion tests.
+- Add CLI cases for terminal current nodes, collection-selector parent traversal, destructive back,
+  and a structured broken path where the command workflow can create one.
+
+### 7. Rebase the TUI hosting boundary on the Core workspace
+
+Preserve the completed XenoAtom hosting and operation-scope work while changing its model source.
+
+1. Let `TuiFrontend` either:
+   - create and own a `UIEngineWorkspace` from a caller-owned host; or
+   - present a caller-supplied `UIEngineWorkspace` without taking ownership.
+2. Update `TuiWorkspace` to own only its visual tree, TUI state, frontend operation scopes, and an
+   internally created Core workspace when applicable. It never owns a caller-supplied host or
+   workspace.
+3. Replace `InitialPath` with startup configuration that can create the initial navigator or load a
+   supplied layout. Define the empty-workspace behavior without treating `/` as an object node.
+4. Maintain a TUI presentation record keyed by navigator identifier. Each record owns the current
+   control and its child `TuiOperationScope`.
+5. React to Core navigation notifications by creating one replacement control for a pushed/revealed
+   entry and disposing the departed control and scope exactly once.
+6. Marshal visual state changes with the XenoAtom dispatcher while leaving all domain access under
+   the host's `IInteractionDispatcher`.
+
+Verification:
+
+- Extend boundary tests for both ownership paths, empty startup, restored startup, and disposal.
+- Retain the existing in-flight read, observation cleanup, progress-reader, and caller-owned host
+  tests against the Core workspace-backed implementation.
+
+### 8. Build multi-navigator workspace chrome
+
+Build the workspace interaction shell with placeholder node controls before completing the control
+catalogue.
+
+1. Add root selection and commands to create, select, duplicate, reorder, and remove navigators.
+2. Give each navigator a header showing its current canonical path, broken/healthy state, and
+   available back/remove commands.
+3. Define stable keyboard commands and focus order for root selection, navigator selection,
+   duplicate, remove, back, activation, refresh, save/load, help, and close.
+4. Present navigators side by side at accepted normal widths and one selected navigator at a time at
+   narrow widths.
+5. Make resize a presentation recomposition only. Preserve Core navigator identity and paths plus
+   TUI selection and draft state.
+6. Cover zero navigators, one navigator, several navigators, and removal of the selected navigator
+   with deterministic next-selection behavior.
+
+Verification:
+
+- Inject keyboard input for every workspace command and verify visible focus and return focus after
+  dialogs.
+- Resize across normal and narrow thresholds without recreating navigators or losing selection.
+- Duplicate one navigator and prove the two headers refer to distinct Core navigator and node
+  instances.
+
+### 9. Add the node-to-control factory and scalar controls
+
+Select controls from semantic facets rather than `MemberKind`, concrete domain types, or path
+shape.
+
+1. Add one control factory with documented precedence for overlapping facets. For example, enum
+   editing takes precedence over the generic scalar editor, while property and field facets supply
+   labels/metadata rather than choosing a widget.
+2. Add object/reference presentation with summary, runtime identity information where useful, and
+   activatable child nodes. Do not recursively render descendants.
+3. Add read-only scalar display and writable editors for string/character, boolean, number, and
+   enum values.
+4. Represent read-only, nullable, loading, empty, dirty, validation, unavailable, and successful
+   states explicitly.
+5. Keep drafts in the control. Commit through the node, associate validation issues with the
+   editor, re-read authoritative state after success, and allow cancel/reload.
+6. Navigate to any selected child as a new current entry. Scalar and method controls expose no
+   deeper-navigation command.
+
+Verification:
+
+- Test factory selection for every supported facet combination, especially writable enum and
+  numeric properties and reflected fields.
+- Test conversion and validation display, explicit null, read-only state, dirty-draft preservation,
+  successful re-read, and control disposal during an in-flight read.
+- Confirm controls depend only on Core node contracts and contain no cyclic-world types.
+
+### 10. Add bounded collection and method controls
+
+1. Render one configured collection window at a time with position, optional key, and distinct null,
+   scalar, and reference entries.
+2. Add previous, next, direct offset, refresh, count/has-more, loading, empty, and failure states.
+   Never request more than `CollectionWindowSize` or the host maximum.
+3. Navigate reference entries through their canonical selector location. Keep scalar and null
+   entries non-navigable unless Core later defines element nodes for them.
+4. Generate method fields from parameter value semantics and preserve the distinction among
+   omitted, defaulted, explicit-null, and supplied values.
+5. Start a method once per submission, prevent accidental duplicate submission, and present
+   synchronous/asynchronous completion, result, structured failure, and bounded ordered progress.
+6. On method-control disposal, stop only TUI progress/completion readers. Do not call invocation
+   cancellation unless the user explicitly invokes a supported cancel command.
+
+Verification:
+
+- Prove large and lazy collections remain bounded across several windows and selector navigation.
+- Test every collection entry shape and recovery after a source reset.
+- Test method parameter validation/default/null semantics, progress order, success/failure, explicit
+  cancellation, and continued invocation after control removal.
+
+### 11. Integrate observation, replacement, and structured recovery
+
+1. Subscribe only for the current control state that benefits from observation; retain manual
+   refresh where observation is unsupported.
+2. Own each subscription and reader in that control's `TuiOperationScope`. Dispose and reattach
+   exactly once when an entry departs, a navigator is removed, a source is replaced, or the TUI
+   closes.
+3. Coalesce ordinary refreshes on the UI dispatcher, refresh only affected state, and keep buffer
+   overflow visible until the user refreshes or acknowledges it.
+4. Never overwrite a dirty draft. Mark authoritative state as changed and let the user keep,
+   reload, or commit the draft.
+5. Re-resolve through the navigator after compatible replacement so the active entry receives a
+   fresh node. Refuse conflicting identity instead of silently rebinding.
+6. Provide valid recovery commands for null, unavailable, not found, ambiguous, type mismatch,
+   permission, cancelled, disposed, fault, and broken-restored-path states without parsing error
+   messages.
+
+Verification:
+
+- Test notification refresh, polling refresh, overflow, dirty-draft conflict, collection reset,
+  compatible replacement, conflicting replacement, and deterministic handler cleanup.
+- Remove one of two same-path navigators while both observe the domain; prove the remaining
+  navigator still updates.
+- Assert that no disposed control receives a later posted update.
+
+### 12. Connect layout commands and complete acceptance
+
+1. Map the TUI's selected navigator, placement, and size to the Core layout snapshot without adding
+   draft, focus, loaded-value, or running-work state.
+2. Expose save/load through caller-supplied callbacks or another explicit composition boundary so
+   the reusable TUI library does not choose a filesystem location.
+3. Reconcile controls and operation scopes when a layout is loaded: retire removed presentations,
+   retain navigator identifiers from the snapshot, create fresh nodes and controls, and select the
+   restored navigator deterministically.
+4. Finish `Examples/CyclicWorld.Tui` as composition and manual-acceptance code only. Add no
+   model-specific control or Core behavior to the executable.
+5. Automate the full acceptance workflow above with deterministic toolkit input where practical,
+   then perform a real-terminal smoke test for rendering and focus behavior.
+6. Update the README, architecture documents, CLI command reference, milestone index, and
+   `TODO.MD` only after the corresponding behavior is implemented.
+
+Verification:
+
+- Run the focused Core, CLI, TUI, and toolkit-spike tests while implementing each increment.
+- Run `dotnet build UIEngine.sln` and require zero warnings.
+- Run `dotnet test UIEngine.sln --no-build` and require all Core, CLI, TUI, dependency, lifetime,
+  keyboard, resize, and acceptance tests to pass.
+- Record any terminal platform not exercised rather than implying support.
 
 ## Exit Criteria
 

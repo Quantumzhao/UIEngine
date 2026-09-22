@@ -95,3 +95,11 @@ dotnet test UIEngine.sln --no-build
 ```
 
 The build must complete with zero warnings.
+
+## Coding Style
+
+- Don't add null checks when the method's parameters are known to be not-null
+- Never over-design, and be cautious when applying design patterns. 
+- `Task`s don't need cancellation token; canclelling a task is beyond our scope. 
+- In general, files should be within 500 lines. If you think it qualifies being longer than that, discuss it with me. Long files are usually the symbol of bad design. Test files and configurations are exceptions to this. 
+- If classes/structs are wrappers/converters of other ones, think twice if that's necessary.
