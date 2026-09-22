@@ -56,7 +56,7 @@ internal static class ValueConversion
                     : _Failure(value, destinationType);
             }
 
-            if (_IsNumeric(effectiveType))
+            if (IsNumeric(effectiveType))
             {
                 return InteractionResult.Success<object?>(System.Convert.ChangeType(
                     value,
@@ -77,7 +77,7 @@ internal static class ValueConversion
         object? value,
         bool isNullable,
         IReadOnlyList<SelectionOption> options,
-        ValueRange? range,
+        IValueRange? range,
         IReadOnlyList<ValidationAttribute> attributes,
         object? instance,
         string targetId)
@@ -166,12 +166,12 @@ internal static class ValueConversion
             : [];
     }
 
-    private static bool _IsNumeric(Type type) => Type.GetTypeCode(type) is
+    internal static bool IsNumeric(Type type) => Type.GetTypeCode(type) is
         TypeCode.SByte or TypeCode.Byte or TypeCode.Int16 or TypeCode.UInt16 or
         TypeCode.Int32 or TypeCode.UInt32 or TypeCode.Int64 or TypeCode.UInt64 or
         TypeCode.Single or TypeCode.Double or TypeCode.Decimal;
 
-    private static bool _IsInRange(object value, ValueRange range)
+    private static bool _IsInRange(object value, IValueRange range)
     {
         try
         {

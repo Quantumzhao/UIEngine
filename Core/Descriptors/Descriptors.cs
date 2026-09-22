@@ -1,7 +1,6 @@
 using System.Collections;
 using System.ComponentModel.DataAnnotations;
 using System.Globalization;
-using System.Reflection;
 
 namespace UIEngine.Core;
 
@@ -55,12 +54,6 @@ public sealed class ObjectDescriptor
 
 public sealed class ValueDescriptor : MemberDescriptor
 {
-    private readonly UIEngineHost _Host;
-    private readonly ObjectHandle _Owner;
-    private readonly Func<object, object?> _Read;
-    private readonly Action<object, object?>? _Write;
-    private readonly IReadOnlyList<ValidationAttribute> _ValidationAttributes;
-
     internal ValueDescriptor(
         UIEngineHost host,
         ObjectHandle owner,
@@ -70,127 +63,47 @@ public sealed class ValueDescriptor : MemberDescriptor
         bool canWrite,
         bool isNullable,
         IReadOnlyList<SelectionOption> options,
-        ValueRange? range,
+        IValueRange? range,
         IReadOnlyList<ValidationAttribute> validationAttributes,
         Func<object, object?> read,
         Action<object, object?>? write)
         : base(id, MemberKind.VALUE)
     {
-        _Host = host;
-        _Owner = owner;
-        _Read = read;
-        _Write = write;
-        _ValidationAttributes = validationAttributes;
-        ValueType = valueType;
-        CanRead = canRead;
-        CanWrite = canWrite;
-        IsNullable = isNullable;
-        Options = options.ToArray();
-        Range = range;
+        Binding = new ValueNodeBinding(
+            host,
+            owner,
+            id,
+            valueType,
+            canRead,
+            canWrite,
+            isNullable,
+            options,
+            range,
+            validationAttributes,
+            read,
+            write);
     }
 
-    public Type ValueType { get; }
+    internal ValueNodeBinding Binding { get; }
 
-    public bool CanRead { get; }
+    public Type ValueType => Binding.ValueType;
 
-    public bool CanWrite { get; }
+    public bool CanRead => Binding.CanRead;
 
-    public bool IsNullable { get; }
+    public bool CanWrite => Binding.CanWrite;
 
-    public IReadOnlyList<SelectionOption> Options { get; }
+    public bool IsNullable => Binding.IsNullable;
 
-    public ValueRange? Range { get; }
+    public IReadOnlyList<SelectionOption> Options => Binding.Options;
+
+    public IValueRange? Range => Binding.Range;
 
     public Task<InteractionResult<object?>> ReadAsync(
-        CancellationToken cancellationToken = default) => _Host.ExecuteAsync(
-        $"read value {Id}",
-        async () =>
-        {
-            if (!CanRead)
-            {
-                return InteractionResult.Failure<object?>(
-                    InteractionErrorCode.UNSUPPORTED,
-                    $"Value '{Id}' is not readable.");
-            }
-
-            var target = _Host.ResolveTarget(_Owner);
-            if (!target.IsSuccess)
-            {
-                return InteractionResult.Failure<object?>(target.Error!);
-            }
-
-            await Task.CompletedTask;
-            return InteractionResult.Success(_Read(target.Value));
-        },
-        cancellationToken);
+        CancellationToken cancellationToken = default) => Binding.ReadAsync(cancellationToken);
 
     public Task<InteractionResult<object?>> WriteAsync(
         object? value,
-        CancellationToken cancellationToken = default) => _Host.ExecuteAsync(
-        $"write value {Id}",
-        async () =>
-        {
-            if (!CanWrite || _Write is null)
-            {
-                var message = $"Value '{Id}' is read-only.";
-                return InteractionResult.Failure<object?>(
-                    InteractionErrorCode.VALIDATION_FAILED,
-                    message,
-                    [new ValidationIssue(ValidationIssueCode.READ_ONLY, Id, message)]);
-            }
-
-            var target = _Host.ResolveTarget(_Owner);
-            if (!target.IsSuccess)
-            {
-                return InteractionResult.Failure<object?>(target.Error!);
-            }
-
-            var converted = ValueConversion.Convert(value, ValueType);
-            if (!converted.IsSuccess)
-            {
-                return InteractionResult.Failure<object?>(converted.Error!);
-            }
-
-            var issues = ValueConversion.Validate(
-                converted.Value,
-                IsNullable,
-                Options,
-                Range,
-                _ValidationAttributes,
-                target.Value,
-                Id);
-            if (issues.Count > 0)
-            {
-                return InteractionResult.Failure<object?>(
-                    InteractionErrorCode.VALIDATION_FAILED,
-                    $"Value '{Id}' failed validation.",
-                    issues);
-            }
-
-            try
-            {
-                _Write(target.Value, converted.Value);
-            }
-            catch (TargetInvocationException exception)
-                when (exception.InnerException is ArgumentException or InvalidOperationException)
-            {
-                return _SetterRejected(exception.InnerException);
-            }
-            catch (Exception exception) when (exception is ArgumentException or InvalidOperationException)
-            {
-                return _SetterRejected(exception);
-            }
-
-            await Task.CompletedTask;
-            return InteractionResult.Success(converted.Value);
-        },
-        cancellationToken);
-
-    private InteractionResult<object?> _SetterRejected(Exception exception) =>
-        InteractionResult.Failure<object?>(
-            InteractionErrorCode.VALIDATION_FAILED,
-            exception.Message,
-            [new ValidationIssue(ValidationIssueCode.RULE_FAILED, Id, exception.Message)]);
+        CancellationToken cancellationToken = default) => Binding.WriteAsync(value, cancellationToken);
 }
 
 public sealed class ReferenceDescriptor : MemberDescriptor
@@ -512,4 +425,4 @@ public sealed record ActionParameter(
     bool HasDefaultValue,
     object? DefaultValue,
     IReadOnlyList<SelectionOption> Options,
-    ValueRange? Range);
+    IValueRange? Range);

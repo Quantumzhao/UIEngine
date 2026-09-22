@@ -14,7 +14,7 @@ internal sealed record ReflectedMember(
     Type ValueType,
     bool IsNullable,
     IReadOnlyList<SelectionOption> Options,
-    ValueRange? Range,
+    IValueRange? Range,
     IReadOnlyList<ValidationAttribute> ValidationAttributes);
 
 internal sealed record ReflectedType(
@@ -133,7 +133,8 @@ internal static class ReflectionMetadata
             var validation = GetValidationAttributes(member);
             var options = ValueConversion.GetEnumOptions(memberType);
             var range = validation.OfType<RangeAttribute>()
-                .Select(static attribute => new ValueRange(attribute.Minimum, attribute.Maximum))
+                .Select(static attribute =>
+                    new ValueRange<object>(attribute.Minimum, attribute.Maximum))
                 .FirstOrDefault();
             members.Add(new ReflectedMember(
                 id,

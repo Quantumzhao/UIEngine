@@ -71,7 +71,7 @@ public abstract class ValueExposure
         Type valueType,
         bool canWrite,
         bool isNullable,
-        ValueRange? range)
+        IValueRange? range)
     {
         if (string.IsNullOrWhiteSpace(id))
         {
@@ -94,7 +94,7 @@ public abstract class ValueExposure
 
     public bool IsNullable { get; }
 
-    public ValueRange? Range { get; }
+    public IValueRange? Range { get; }
 
     internal Type ObjectType { get; }
 
@@ -113,7 +113,7 @@ public sealed class ValueExposure<T, TValue> : ValueExposure
         string id,
         Func<T, TValue> getter,
         Action<T, TValue>? setter = null,
-        ValueRange? range = null,
+        ValueRange<TValue>? range = null,
         bool? isNullable = null)
         : base(
             typeof(T),
@@ -123,10 +123,7 @@ public sealed class ValueExposure<T, TValue> : ValueExposure
             isNullable ?? _InferNullability(),
             range)
     {
-        if (range is not null &&
-            (!typeof(TValue).IsInstanceOfType(range.Minimum) ||
-                !typeof(TValue).IsInstanceOfType(range.Maximum) ||
-                !_IsOrdered(range)))
+        if (range is not null && !_IsOrdered(range))
         {
             throw new ArgumentException(
                 "Range bounds must be ordered values of the exposed type.",
@@ -135,7 +132,10 @@ public sealed class ValueExposure<T, TValue> : ValueExposure
 
         _Getter = getter;
         _Setter = setter;
+        Range = range;
     }
+
+    public new ValueRange<TValue>? Range { get; }
 
     internal override object? Read(object instance) => _Getter((T)instance);
 
@@ -145,11 +145,11 @@ public sealed class ValueExposure<T, TValue> : ValueExposure
     private static bool _InferNullability() =>
         !typeof(TValue).IsValueType || Nullable.GetUnderlyingType(typeof(TValue)) is not null;
 
-    private static bool _IsOrdered(ValueRange range)
+    private static bool _IsOrdered(ValueRange<TValue> range)
     {
         try
         {
-            return ((IComparable)range.Minimum).CompareTo(range.Maximum) <= 0;
+            return range.Minimum is IComparable minimum && minimum.CompareTo(range.Maximum) <= 0;
         }
         catch (Exception exception) when (exception is ArgumentException or InvalidCastException)
         {

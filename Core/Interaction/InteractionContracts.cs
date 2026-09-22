@@ -88,4 +88,18 @@ public static class InteractionResult
 
 public sealed record SelectionOption(object? Value, string DisplayName);
 
-public sealed record ValueRange(object Minimum, object Maximum);
+/// <summary>Untyped range metadata for runtime-discovered values.</summary>
+public interface IValueRange
+{
+    object? Minimum { get; }
+
+    object? Maximum { get; }
+}
+
+/// <summary>A closed range whose bounds have the same compile-time type.</summary>
+public sealed record ValueRange<T>(T Minimum, T Maximum) : IValueRange
+{
+    object? IValueRange.Minimum => Minimum;
+
+    object? IValueRange.Maximum => Maximum;
+}

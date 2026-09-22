@@ -22,7 +22,7 @@ public static class CyclicWorldFactory
                     nameof(EconomicProfile.GrossDomesticProduct),
                     static profile => profile.GrossDomesticProduct,
                     static (profile, value) => profile.GrossDomesticProduct = value,
-                    new ValueRange(0m, 10_000_000m)),
+                    new ValueRange<decimal>(0m, 10_000_000m)),
             ],
             identity: static profile => $"economy/{profile.RegionCode}",
             summary: static profile =>

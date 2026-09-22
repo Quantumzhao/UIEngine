@@ -149,7 +149,8 @@ public sealed class ActionDescriptor : MemberDescriptor
             validation.Add(attributes);
             var options = ValueConversion.GetEnumOptions(parameter.ParameterType);
             var range = attributes.OfType<RangeAttribute>()
-                .Select(static attribute => new ValueRange(attribute.Minimum, attribute.Maximum))
+                .Select(static attribute =>
+                    new ValueRange<object>(attribute.Minimum, attribute.Maximum))
                 .FirstOrDefault();
             parameters.Add(new ActionParameter(
                 parameter.Name ?? $"arg{parameter.Position}",

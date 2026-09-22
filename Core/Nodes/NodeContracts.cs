@@ -1,6 +1,9 @@
 namespace UIEngine.Core;
 
-/// <summary>One frontend-neutral occurrence of an exposed object or member.</summary>
+/// <summary>
+/// One frontend-neutral occurrence of an exposed object or member. Query occurrence-specific
+/// semantic facets with C# interface pattern matching.
+/// </summary>
 public abstract class ObjectNode
 {
     internal ObjectNode(UIEngineHost host, string id, Type valueType)
@@ -74,7 +77,7 @@ public interface IWritableValueNode
 {
     IReadOnlyList<SelectionOption> Options { get; }
 
-    ValueRange? Range { get; }
+    IValueRange? Range { get; }
 
     Task<InteractionResult<object?>> WriteValueAsync(object? value);
 }
@@ -119,7 +122,7 @@ public sealed record MethodParameter(
     bool HasDefaultValue,
     object? DefaultValue,
     IReadOnlyList<SelectionOption> Options,
-    ValueRange? Range);
+    IValueRange? Range);
 
 /// <summary>Exposes reflected method metadata and starts host-owned invocations.</summary>
 public interface IMethodNode : IMemberNode

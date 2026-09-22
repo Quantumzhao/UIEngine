@@ -70,6 +70,26 @@ public sealed class RuntimeBehaviorTests
     }
 
     [Fact]
+    public void ProgrammaticExposureRetainsItsTypedRange()
+    {
+        var range = new ValueRange<decimal>(0m, 10m);
+        var exposure = new ValueExposure<EconomicProfile, decimal>(
+            "GrossDomesticProduct",
+            static profile => profile.GrossDomesticProduct,
+            range: range);
+
+        var exposedRange = Assert.IsType<ValueRange<decimal>>(exposure.Range);
+        Assert.Same(range, exposedRange);
+        Assert.Equal(0m, exposedRange.Minimum);
+        Assert.Equal(10m, exposedRange.Maximum);
+        Assert.Same(range, ((ValueExposure)exposure).Range);
+        Assert.Throws<ArgumentException>(() => new ValueExposure<EconomicProfile, decimal>(
+            "GrossDomesticProduct",
+            static profile => profile.GrossDomesticProduct,
+            range: new ValueRange<decimal>(10m, 0m)));
+    }
+
+    [Fact]
     public async Task CollectionReadsAreBoundedAndUseClosedEntryTypes()
     {
         var model = new _CollectionModel();
@@ -254,6 +274,7 @@ public sealed class RuntimeBehaviorTests
                 "IReferenceNode",
                 "IStableDomainIdentity",
                 "IStringNode",
+                "IValueRange",
                 "IWritableValueNode",
             ],
             interfaces);

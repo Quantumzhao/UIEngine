@@ -827,7 +827,7 @@ internal sealed class CliSession : IDisposable
     private static string _FormatObservationValue(ObservationValue value) =>
         value.IsSupplied ? _FormatValue(value.Value) : "unspecified";
 
-    private static string _FormatRange(ValueRange? range) => range is null
+    private static string _FormatRange(IValueRange? range) => range is null
         ? "none"
         : $"{_FormatValue(range.Minimum)}..{_FormatValue(range.Maximum)}";
 

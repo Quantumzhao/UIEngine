@@ -106,15 +106,12 @@ public sealed class NodeAndNavigationContractTests
         public IReadOnlyList<SelectionOption> Options { get; } =
             [new SelectionOption(_State.READY, nameof(_State.READY))];
 
-        public ValueRange? Range => null;
+        public IValueRange? Range => null;
 
-        public Task<InteractionResult<object?>> ReadValueAsync(
-            CancellationToken cancellationToken = default) =>
+        public Task<InteractionResult<object?>> ReadValueAsync() =>
             Task.FromResult(InteractionResult.Success<object?>(_State.READY));
 
-        public Task<InteractionResult<object?>> WriteValueAsync(
-            object? value,
-            CancellationToken cancellationToken = default) =>
+        public Task<InteractionResult<object?>> WriteValueAsync(object? value) =>
             Task.FromResult(InteractionResult.Success(value));
     }
 
@@ -124,8 +121,7 @@ public sealed class NodeAndNavigationContractTests
             IStringNode,
             IReadableValueNode
     {
-        public Task<InteractionResult<object?>> ReadValueAsync(
-            CancellationToken cancellationToken = default) =>
+        public Task<InteractionResult<object?>> ReadValueAsync() =>
             Task.FromResult(InteractionResult.Success<object?>("name"));
     }
 
@@ -150,8 +146,7 @@ public sealed class NodeAndNavigationContractTests
 
         public Task<InteractionResult<CollectionSlice>> ReadEntriesAsync(
             long offset,
-            int limit,
-            CancellationToken cancellationToken = default) => Task.FromResult(
+            int limit) => Task.FromResult(
                 InteractionResult.Success(new CollectionSlice(offset, [], 0, false)));
     }
 
@@ -171,8 +166,7 @@ public sealed class NodeAndNavigationContractTests
         public bool SupportsCancellation => false;
 
         public Task<InteractionResult<ActionInvocation>> InvokeAsync(
-            IReadOnlyDictionary<string, object?> arguments,
-            CancellationToken cancellationToken = default) => throw new NotSupportedException();
+            IReadOnlyDictionary<string, object?> arguments) => throw new NotSupportedException();
     }
 
     private sealed class _Model;
