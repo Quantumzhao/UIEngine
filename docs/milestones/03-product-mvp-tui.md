@@ -97,7 +97,7 @@ do not defer Core or lifetime coverage to the final TUI acceptance pass.
 
 ### Migration assumptions
 
-- `ObjectNode` replaces the public descriptor hierarchy as the frontend-facing model. Temporary
+- `BaseNode` replaces the public descriptor hierarchy as the frontend-facing model. Temporary
   adapters are acceptable while the CLI is migrated, but the completed architecture does not keep
   two parallel public models.
 - Nodes expose language semantics through a small base contract plus composable facets. Avoid a
@@ -128,7 +128,7 @@ the default sequence below assumes a clean migration to nodes.
 
 Before moving behavior, define and test the smallest public contracts needed by both frontends.
 
-1. Define `ObjectNode` and composable language-semantic facets for:
+1. Define `BaseNode` and composable language-semantic facets for:
    - object and reference access;
    - property, field, and method membership;
    - readable, writable, and nullable values;

@@ -13,8 +13,7 @@ public sealed class UIEngineHost : IDisposable
     private readonly Dictionary<ObjectHandle, WeakReference<object>> _Objects = [];
     private readonly Dictionary<string, _RootEntry> _Roots = new(StringComparer.Ordinal);
     private readonly Dictionary<ObjectHandle, string?> _DomainIdentities = [];
-    private readonly Dictionary<string, HashSet<ObjectHandle>> _DomainIdentityIndex =
-        new(StringComparer.Ordinal);
+    private readonly Dictionary<string, HashSet<ObjectHandle>> _DomainIdentityIndex = [];
     private readonly Dictionary<ObjectHandle, LogicalPath> _CanonicalPaths = [];
     private readonly HashSet<ObservationSubscription> _Subscriptions = [];
     private readonly HashSet<ActionInvocation> _Invocations = [];
@@ -543,7 +542,7 @@ public sealed class UIEngineHost : IDisposable
     }
 
     public Task<InteractionResult<ObservationSubscription>> ObserveAsync(
-        ObjectNode node,
+        BaseNode node,
         TimeSpan? pollingInterval = null)
     {
         return node switch

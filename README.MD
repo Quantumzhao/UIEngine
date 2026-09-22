@@ -6,7 +6,7 @@ invocable graph.
 Its target architecture has three frontend-neutral layers:
 
 - `UIEngineHost` owns roots, live domain access, identity, dispatch, observation, and invocation.
-- `ObjectNode` represents an exposed .NET language feature.
+- `BaseNode` represents an exposed .NET language feature.
 - `UIEngineWorkspace` owns independent `Navigator`s and serializable layout state.
 
 Frontends map node semantics to controls. The CLI is the proving frontend, and the reusable TUI is

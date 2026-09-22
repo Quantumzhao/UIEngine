@@ -106,7 +106,7 @@ public sealed class LiveValueNodeTests
         Assert.Equal(12.5m, read.Value);
     }
 
-    private static async Task<IReadOnlyDictionary<string, ObjectNode>> _ResolveMembersAsync(
+    private static async Task<IReadOnlyDictionary<string, BaseNode>> _ResolveMembersAsync(
         UIEngineHost host,
         string rootIdentifier)
     {

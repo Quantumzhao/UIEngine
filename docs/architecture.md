@@ -1,12 +1,12 @@
 # Architecture
 
-UIEngine presents a live .NET object graph through frontend-neutral `ObjectNode`s. A workspace
+UIEngine presents a live .NET object graph through frontend-neutral `BaseNode`s. A workspace
 holds independent `Navigator`s, and each navigator resolves one path through that graph at a time.
 
 ```mermaid
 flowchart LR
     Domain[Live domain objects] --> Host[UIEngineHost]
-    Host --> Nodes[ObjectNode instances]
+    Host --> Nodes[BaseNode instances]
     Host --> Workspace[UIEngineWorkspace]
     Workspace --> Navigators[Navigator collection]
     Navigators --> Nodes
@@ -43,7 +43,7 @@ key bindings, or a UI dispatcher.
 
 ## Object Nodes
 
-Every exposed root and member resolves to an `ObjectNode`. A node represents one live exposure
+Every exposed root and member resolves to an `BaseNode`. A node represents one live exposure
 occurrence; it is not a recursively copied object tree.
 
 Node types and interfaces describe .NET language semantics. The model includes concepts such as:
@@ -122,7 +122,7 @@ conflicting identity.
 
 `ResolvedNode` is the Core-owned hand-off for that pair. It retains its originating host
 internally so a workspace can reject an occurrence from another host, while neither
-`ObjectNode` nor its semantic facets expose a logical path.
+`BaseNode` nor its semantic facets expose a logical path.
 
 ## Navigators
 
@@ -130,7 +130,7 @@ A `Navigator` is one independent entry point into the graph. It owns a stack of 
 Each entry contains:
 
 - a logical path;
-- the resolved `ObjectNode`, when available; and
+- the resolved `BaseNode`, when available; and
 - structured resolution state.
 
 Navigation has destructive stack semantics:
@@ -141,7 +141,7 @@ Navigation has destructive stack semantics:
 4. There is no forward history.
 5. Removing a navigator disposes all of its entries.
 
-A navigator may start from a registered root or a specific resolved `ObjectNode`. The workspace
+A navigator may start from a registered root or a specific resolved `BaseNode`. The workspace
 captures the node's current location and resolves a navigator-owned instance. Duplicating a
 navigator follows the same rule at the current path, so the two navigators do not share nodes.
 

@@ -5,7 +5,7 @@ namespace UIEngine.Core;
 
 // Facets vary per occurrence. Dynamic interface casting keeps one concrete node type while
 // preserving normal C# interface pattern matching and avoiding a class for every combination.
-internal sealed class LiveValueNode : ObjectNode, IDynamicInterfaceCastable
+internal sealed class LiveValueNode : BaseNode, IDynamicInterfaceCastable
 {
     private readonly ValueNodeSource _Source;
     private readonly ValueNodeShape _Shape;

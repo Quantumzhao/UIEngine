@@ -4,9 +4,9 @@ namespace UIEngine.Core;
 /// One frontend-neutral occurrence of an exposed object or member. Query occurrence-specific
 /// semantic facets with C# interface pattern matching.
 /// </summary>
-public abstract class ObjectNode
+public abstract class BaseNode
 {
-    internal ObjectNode(UIEngineHost host, string id, Type valueType)
+    internal BaseNode(UIEngineHost host, string id, Type valueType)
     {
         Host = host;
         Id = id;
@@ -37,7 +37,7 @@ public interface IObjectNode : INavigableNode
 
     string? Summary { get; }
 
-    IReadOnlyList<ObjectNode> Members { get; }
+    IReadOnlyList<BaseNode> Members { get; }
 }
 
 /// <summary>Identifies a node backed by a reflected member.</summary>

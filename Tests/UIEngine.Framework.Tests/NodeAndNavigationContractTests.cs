@@ -16,8 +16,8 @@ public sealed class NodeAndNavigationContractTests
         Assert.IsAssignableFrom<IWritableValueNode>(node);
         Assert.IsAssignableFrom<INullableValueNode>(node);
         Assert.IsAssignableFrom<IEnumNode>(node);
-        Assert.False((ObjectNode)node is IFieldNode);
-        Assert.False((ObjectNode)node is IProgrammaticValueNode);
+        Assert.False((BaseNode)node is IFieldNode);
+        Assert.False((BaseNode)node is IProgrammaticValueNode);
         Assert.True(node.IsTerminal);
     }
 
@@ -30,7 +30,7 @@ public sealed class NodeAndNavigationContractTests
         Assert.IsAssignableFrom<IProgrammaticValueNode>(node);
         Assert.IsAssignableFrom<IStringNode>(node);
         Assert.IsAssignableFrom<IReadableValueNode>(node);
-        Assert.False((ObjectNode)node is IMemberNode);
+        Assert.False((BaseNode)node is IMemberNode);
         Assert.True(node.IsTerminal);
     }
 
@@ -57,7 +57,7 @@ public sealed class NodeAndNavigationContractTests
         Assert.NotSame(first.Node, second.Node);
         Assert.Same(host, first.Host);
         Assert.DoesNotContain(
-            typeof(ObjectNode).GetProperties(),
+            typeof(BaseNode).GetProperties(),
             static property => property.PropertyType == typeof(LogicalPath));
     }
 
@@ -94,7 +94,7 @@ public sealed class NodeAndNavigationContractTests
     }
 
     private sealed class _EnumPropertyNode(UIEngineHost host)
-        : ObjectNode(host, "State", typeof(_State)),
+        : BaseNode(host, "State", typeof(_State)),
             IPropertyNode,
             IReadableValueNode,
             IWritableValueNode,
@@ -116,7 +116,7 @@ public sealed class NodeAndNavigationContractTests
     }
 
     private sealed class _ProgrammaticStringNode(UIEngineHost host)
-        : ObjectNode(host, "Name", typeof(string)),
+        : BaseNode(host, "Name", typeof(string)),
             IProgrammaticValueNode,
             IStringNode,
             IReadableValueNode
@@ -126,7 +126,7 @@ public sealed class NodeAndNavigationContractTests
     }
 
     private sealed class _ObjectNode(UIEngineHost host)
-        : ObjectNode(host, "model", typeof(_Model)), IObjectNode
+        : BaseNode(host, "model", typeof(_Model)), IObjectNode
     {
         public ObjectHandle Handle { get; } = new(Guid.NewGuid());
 
@@ -134,11 +134,11 @@ public sealed class NodeAndNavigationContractTests
 
         public string? Summary => null;
 
-        public IReadOnlyList<ObjectNode> Members => [];
+        public IReadOnlyList<BaseNode> Members => [];
     }
 
     private sealed class _CollectionNode(UIEngineHost host)
-        : ObjectNode(host, "Items", typeof(IReadOnlyList<string>)), ICollectionNode
+        : BaseNode(host, "Items", typeof(IReadOnlyList<string>)), ICollectionNode
     {
         public Type ElementType => typeof(string);
 
@@ -151,7 +151,7 @@ public sealed class NodeAndNavigationContractTests
     }
 
     private sealed class _MethodNode(UIEngineHost host)
-        : ObjectNode(host, "Run", typeof(void)), IMethodNode
+        : BaseNode(host, "Run", typeof(void)), IMethodNode
     {
         public Type DeclaringType => typeof(_Model);
 

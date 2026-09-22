@@ -14,9 +14,9 @@ prototypes that need generated user interfaces over live state.
 `UIEngineHost` owns registered roots and access to the live domain graph. An
 `UIEngineWorkspace` owns an ordered collection of independent `Navigator`s. Each navigator holds
 one navigation stack whose current entry contains a logical path and a freshly resolved
-`ObjectNode`.
+`BaseNode`.
 
-`ObjectNode` is frontend-neutral. Its concrete types and semantic interfaces describe .NET
+`BaseNode` is frontend-neutral. Its concrete types and semantic interfaces describe .NET
 language features rather than controls. Names follow those features—for example, `PropertyNode`,
 `MethodNode`, `NumberNode`, and `EnumNode`. A node may combine several semantics; an enum-valued
 property is both a property and an enum.
@@ -26,7 +26,7 @@ toolkit types in Core.
 
 ## Settled Decisions
 
-- Every exposed root or member resolves to an `ObjectNode`.
+- Every exposed root or member resolves to an `BaseNode`.
 - Every node can be the current node of a navigator. Scalar and method nodes are terminal.
 - Nodes are live operation endpoints, not copied domain state.
 - Nodes do not own logical paths or UI controls.
@@ -37,7 +37,7 @@ toolkit types in Core.
 - Started domain invocations remain owned by the host and continue after their control is removed.
 - A workspace may contain several navigators at the same path. Each resolves separate node and
   presentation instances while sharing the same domain object.
-- A navigator can start from a registered root or a specific resolved `ObjectNode`. The workspace
+- A navigator can start from a registered root or a specific resolved `BaseNode`. The workspace
   captures that node's location and resolves a navigator-owned instance.
 - An unresolved persisted path remains as a broken navigator entry. The user can navigate back
   until a valid node is reached.
@@ -72,7 +72,7 @@ validation, observation, dispatch, and synchronous or asynchronous invocation. T
 those capabilities. The TUI has a reusable hosting boundary and independent frontend operation
 scopes.
 
-The next architecture work is the `ObjectNode`, `UIEngineWorkspace`, and `Navigator` model,
+The next architecture work is the `BaseNode`, `UIEngineWorkspace`, and `Navigator` model,
 followed by the multi-navigator TUI.
 
 ## Repository Structure

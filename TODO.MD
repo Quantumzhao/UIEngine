@@ -14,7 +14,7 @@
 
 ## Object Nodes
 
-- [x] Define the frontend-neutral `ObjectNode` contract.
+- [x] Define the frontend-neutral `BaseNode` contract.
 - [x] Model property, field, object, reference, collection, method, string, boolean, number, and
   enum semantics.
 - [x] Support overlapping language-semantic facets.

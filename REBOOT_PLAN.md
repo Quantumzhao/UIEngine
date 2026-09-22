@@ -2,7 +2,7 @@
 
 ## Objective
 
-Expose live .NET objects through frontend-neutral `ObjectNode`s and let users work through one or
+Expose live .NET objects through frontend-neutral `BaseNode`s and let users work through one or
 more independent `Navigator`s. Preserve the existing guarantees for identity, paths, bounded work,
 validation, observation, dispatch, and invocation lifetime.
 
@@ -14,13 +14,13 @@ UIEngineHost
 
 UIEngineWorkspace
 ├── Navigator 1
-│   └── navigation stack -> current ObjectNode
+│   └── navigation stack -> current BaseNode
 ├── Navigator 2
-│   └── navigation stack -> current ObjectNode
+│   └── navigation stack -> current BaseNode
 └── serializable layout configuration
 ```
 
-`ObjectNode` semantics follow .NET language concepts. Names such as `PropertyNode`, `MethodNode`,
+`BaseNode` semantics follow .NET language concepts. Names such as `PropertyNode`, `MethodNode`,
 `NumberNode`, and `EnumNode` describe those concepts directly. Nodes may combine overlapping
 facets, and frontends choose controls from those semantics.
 
@@ -28,7 +28,7 @@ facets, and frontends choose controls from those semantics.
 
 ### Nodes
 
-- Resolve every exposed root and member as an `ObjectNode`.
+- Resolve every exposed root and member as an `BaseNode`.
 - Allow every node to be the current node of a navigator.
 - Treat scalar and method nodes as terminal.
 - Keep node instances local to one navigator occurrence.
@@ -67,7 +67,7 @@ facets, and frontends choose controls from those semantics.
 
 ### 1. Establish the node model
 
-- Define the minimal `ObjectNode` base contract and language-semantic variants or interfaces.
+- Define the minimal `BaseNode` base contract and language-semantic variants or interfaces.
 - Map reflection and programmatic exposure to nodes.
 - Preserve conversion, validation, identity, dispatch, collection bounds, observation, and method
   invocation.

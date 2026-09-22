@@ -1,6 +1,6 @@
 namespace UIEngine.Core;
 
-internal sealed class LiveObjectNode : ObjectNode, IObjectNode
+internal sealed class LiveObjectNode : BaseNode, IObjectNode
 {
     public LiveObjectNode(
         UIEngineHost host,
@@ -17,7 +17,7 @@ internal sealed class LiveObjectNode : ObjectNode, IObjectNode
         Members = descriptor.Members.Select(member => member switch
         {
             ValueDescriptor value when programmaticValueIds.Contains(value.Id) =>
-                (ObjectNode)new LiveValueNode(value),
+                (BaseNode)new LiveValueNode(value),
             ValueDescriptor value => new LiveValueNode(value, reflected[value.Id]),
             ReferenceDescriptor reference =>
                 new LiveReferenceNode(reference, reflected[reference.Id]),
@@ -34,7 +34,7 @@ internal sealed class LiveObjectNode : ObjectNode, IObjectNode
 
     public string? Summary => Descriptor.Summary;
 
-    public IReadOnlyList<ObjectNode> Members { get; }
+    public IReadOnlyList<BaseNode> Members { get; }
 
     internal ObjectDescriptor Descriptor { get; }
 }

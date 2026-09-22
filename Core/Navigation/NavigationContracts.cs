@@ -6,7 +6,7 @@ namespace UIEngine.Core;
 /// </summary>
 public sealed class ResolvedNode
 {
-    internal ResolvedNode(LogicalPath canonicalPath, ObjectNode node)
+    internal ResolvedNode(LogicalPath canonicalPath, BaseNode node)
     {
         CanonicalPath = canonicalPath;
         Node = node;
@@ -14,7 +14,7 @@ public sealed class ResolvedNode
 
     public LogicalPath CanonicalPath { get; }
 
-    public ObjectNode Node { get; }
+    public BaseNode Node { get; }
 
     internal UIEngineHost Host => Node.Host;
 }
@@ -22,7 +22,7 @@ public sealed class ResolvedNode
 /// <summary>A navigator stack entry containing either a resolved node or one structured failure.</summary>
 public sealed class NavigationEntry
 {
-    internal NavigationEntry(LogicalPath path, ObjectNode node)
+    internal NavigationEntry(LogicalPath path, BaseNode node)
     {
         Path = path;
         Node = node;
@@ -36,7 +36,7 @@ public sealed class NavigationEntry
 
     public LogicalPath Path { get; }
 
-    public ObjectNode? Node { get; }
+    public BaseNode? Node { get; }
 
     public InteractionError? Error { get; }
 

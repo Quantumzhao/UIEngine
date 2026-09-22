@@ -26,7 +26,7 @@ navigator at a time. Resize must preserve navigator identity, paths, drafts, and
 
 ## Node-to-Control Mapping
 
-Controls are selected from language semantics exposed by the current `ObjectNode`:
+Controls are selected from language semantics exposed by the current `BaseNode`:
 
 | Node semantics | TUI presentation |
 |---|---|

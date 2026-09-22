@@ -3,7 +3,7 @@ using System.Runtime.InteropServices;
 
 namespace UIEngine.Core;
 
-internal abstract class LiveReflectedMemberNode : ObjectNode, IDynamicInterfaceCastable
+internal abstract class LiveReflectedMemberNode : BaseNode, IDynamicInterfaceCastable
 {
     private readonly MemberNodeSource _Source;
 
