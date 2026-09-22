@@ -32,8 +32,8 @@ host.SetRoot("model", model);
 ```
 
 Domain members opt in with `[Expose]`, `[Children]`, and `[Action]`. `[Summary]` supplies an
-optional summary. `IStableDomainIdentity` or `[DomainIdentitySource]` supplies an optional identity
-that can survive compatible object replacement.
+optional summary. `[DomainIdentitySource]` supplies an optional identity that can survive
+compatible object replacement.
 
 ## Minimal TUI Host
 

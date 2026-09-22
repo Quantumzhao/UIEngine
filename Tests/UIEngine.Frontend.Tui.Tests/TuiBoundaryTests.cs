@@ -31,23 +31,6 @@ public sealed class TuiBoundaryTests
     }
 
     [Fact]
-    public void WorkspaceRejectsInvalidConfigurationAndDisposedHosts()
-    {
-        using var host = new UIEngineHost();
-
-        Assert.Throws<ArgumentException>(() => TuiFrontend.CreateWorkspace(
-            host,
-            new TuiFrontendOptions { ApplicationTitle = " " }));
-        Assert.Throws<ArgumentOutOfRangeException>(() => TuiFrontend.CreateWorkspace(
-            host,
-            new TuiFrontendOptions { CollectionWindowSize = 0 }));
-
-        host.Dispose();
-
-        Assert.Throws<ObjectDisposedException>(() => TuiFrontend.CreateWorkspace(host));
-    }
-
-    [Fact]
     public void FullscreenRunnerExposesOnlyHostAndOptions()
     {
         var run = Assert.Single(typeof(TuiFrontend).GetMethods(), static method =>

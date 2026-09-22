@@ -43,7 +43,7 @@ public static class CyclicWorldFactory
 }
 
 /// <summary>Provides a deterministic root for the cyclic sample domain.</summary>
-public sealed class World : IStableDomainIdentity
+public sealed class World
 {
     public World(string name)
     {
@@ -51,6 +51,7 @@ public sealed class World : IStableDomainIdentity
         Economy = new EconomicProfile(name, 1_000m);
     }
 
+    [DomainIdentitySource]
     public string DomainIdentity => $"world/{Name}";
 
     [Expose]
@@ -72,7 +73,7 @@ public sealed class World : IStableDomainIdentity
 }
 
 /// <summary>Represents a nation that owns cities and refers to its capital.</summary>
-public sealed class Nation : INotifyPropertyChanged, IStableDomainIdentity
+public sealed class Nation : INotifyPropertyChanged
 {
     private City? _Capital;
     private string _Motto = "Forward";
@@ -87,6 +88,7 @@ public sealed class Nation : INotifyPropertyChanged, IStableDomainIdentity
 
     public event PropertyChangedEventHandler? PropertyChanged;
 
+    [DomainIdentitySource]
     public string DomainIdentity => $"nation/{Code}";
 
     [Expose]

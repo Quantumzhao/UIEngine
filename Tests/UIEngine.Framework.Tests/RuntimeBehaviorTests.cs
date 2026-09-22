@@ -267,7 +267,6 @@ public sealed class RuntimeBehaviorTests
                 "IPropertyNode",
                 "IReadableValueNode",
                 "IReferenceNode",
-                "IStableDomainIdentity",
                 "IStringNode",
                 "IValueRange",
                 "IWritableValueNode",
@@ -344,8 +343,9 @@ public sealed class RuntimeBehaviorTests
         }
     }
 
-    private sealed class _Identified(string id) : IStableDomainIdentity
+    private sealed class _Identified(string id)
     {
+        [DomainIdentitySource]
         public string DomainIdentity => $"item/{Id}";
 
         [Expose]

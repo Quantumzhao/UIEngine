@@ -745,16 +745,7 @@ public sealed class UIEngineHost : IDisposable
             }
         }
 
-        var fromInterface = (instance as IStableDomainIdentity)?.DomainIdentity;
-        if (fromInterface is not null && attributed is not null &&
-            !StringComparer.Ordinal.Equals(fromInterface, attributed))
-        {
-            return InteractionResult.Failure<string?>(
-                InteractionErrorCode.AMBIGUOUS,
-                "The object supplies conflicting domain identities.");
-        }
-
-        return _NormalizeIdentity(fromInterface ?? attributed);
+        return _NormalizeIdentity(attributed);
     }
 
     private InteractionResult<ObjectDescriptor> _CreateDescriptor(
