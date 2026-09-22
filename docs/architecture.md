@@ -1,154 +1,191 @@
 # Architecture
 
-UIEngine presents a live .NET object graph through a small concrete descriptor model. Frontends
-hold handles, paths, bindings, and descriptors; they do not own a recursively copied object tree.
+UIEngine presents a live .NET object graph through frontend-neutral `ObjectNode`s. A workspace
+holds independent `Navigator`s, and each navigator resolves one path through that graph at a time.
 
 ```mermaid
 flowchart LR
     Domain[Live domain objects] --> Host[UIEngineHost]
-    Attributes[Opt-in attributes] --> Host
-    Exposure[Immutable scalar exposures] --> Host
-    Host --> Descriptor[ObjectDescriptor and Members]
-    Descriptor --> Frontend[CLI or another frontend]
-    Frontend --> Operations[Read / write / navigate / invoke / observe]
-    Operations --> Host
-    Host --> Domain
+    Host --> Nodes[ObjectNode instances]
+    Host --> Workspace[UIEngineWorkspace]
+    Workspace --> Navigators[Navigator collection]
+    Navigators --> Nodes
+    Nodes --> Frontends[CLI, TUI, or another frontend]
 ```
 
-## Dependency Direction
+## Boundaries
 
-```text
-Frontend/Cli ---------------------> Core
-       |                             ^
-       +----> Examples/CyclicDomain-+
+### `UIEngineHost`
 
-Tests ----------------------------> implementation projects
-```
+The host owns:
 
-Core has no frontend dependency. The example depends only on Core. Tests exercise the public
-runtime and CLI behavior rather than provider precedence or decorator implementation details.
+- registered domain roots;
+- runtime handles and optional stable domain identities;
+- reflection and programmatic exposure;
+- path resolution and live operations;
+- domain dispatch;
+- observation subscriptions; and
+- started invocation lifetime.
 
-## Host and Identity
+Hosts are isolated and disposable. They contain no process-global registry or frontend state.
 
-`UIEngineHost` owns roots, object handles, optional domain-identity indexes, canonical paths,
-active action invocations, observation subscriptions, dispatch, and bounded-work settings.
-`SetRoot` registers or replaces a named root; `RemoveRoot` removes it.
+### `UIEngineWorkspace`
 
-Every encountered reference object receives one `ObjectHandle(Guid Id)` for the host lifetime.
-`DomainIdentity` is optional semantic identity that can survive compatible replacement.
-`LogicalPath` is a human-readable graph route. Keeping these concepts separate lets the runtime
-represent cycles and shared references without recursively wrapping objects.
+A workspace is a frontend-neutral navigation and layout session over one host. It owns an ordered
+collection of `Navigator`s and produces a serializable layout snapshot. A host can support more
+than one workspace without sharing navigation state between them.
 
-The host has one optional-options constructor. Options contain immutable scalar exposures, an
-`IInteractionDispatcher`, collection and stream bounds, and logging configuration. The host copies
-configuration internally and implements `IDisposable`.
+### Frontends
 
-## Discovery and Descriptors
+A frontend maps node semantics to controls and owns all toolkit state. It may create a workspace,
+or present a caller-supplied workspace. Core never references controls, focus, colors, geometry,
+key bindings, or a UI dispatcher.
 
-Reflection is built into the host and remains opt-in:
+## Object Nodes
 
-- `[Expose]` marks scalar values or references.
-- `[Children]` marks collections.
-- `[Action]` marks instance methods.
-- `[Summary]` marks a readable summary member.
-- `IStableDomainIdentity` or `[DomainIdentitySource]` supplies domain identity.
+Every exposed root and member resolves to an `ObjectNode`. A node represents one live exposure
+occurrence; it is not a recursively copied object tree.
 
-Unannotated exact types can use immutable `TypeExposure<T>` definitions containing
-`ValueExposure<T,TValue>` scalar values, plus optional identity and summary delegates.
+Node types and interfaces describe .NET language semantics. The model includes concepts such as:
 
-`ObjectDescriptor` contains `Handle`, optional `DomainIdentity`, `TypeName`, optional `Summary`,
-and one `Members` list. Its closed concrete member roles are:
+- object and reference;
+- property and field;
+- method;
+- collection and element;
+- string, boolean, number, and enum; and
+- nullability, mutability, and validation metadata.
 
-| Type | Responsibility |
+Names follow those concepts—for example, `PropertyNode`, `MethodNode`, `NumberNode`, and
+`EnumNode`—rather than presentation archetypes. Concrete variants and semantic interfaces may be
+combined where the language concepts overlap.
+
+Semantic facets may overlap. For example, a writable enum property has property, enum, and
+writable semantics. Its frontend chooses an appropriate editor from those semantics without Core
+naming a widget such as a choice control.
+
+Nodes expose the live operations appropriate to their semantics:
+
+- readable nodes read the current value;
+- writable nodes convert, validate, and write;
+- reference and object nodes expose navigable members;
+- collection nodes return bounded windows and expose navigable reference elements; and
+- method nodes bind parameters and start invocations.
+
+Every node may be displayed as a navigator's current node. Scalar and method nodes are terminal.
+A method result is presented by the method node and does not implicitly create a navigation edge.
+
+Node instances are not shared between navigators. Two navigators at the same path have independent
+node and presentation instances while operating on the same live domain object.
+
+## Identity and Paths
+
+UIEngine keeps three concepts separate:
+
+| Concept | Purpose |
 |---|---|
-| `ValueDescriptor` | Live scalar read/write plus nullability, enum options, and range. |
-| `ReferenceDescriptor` | Live nullable edge returned as an `ObjectHandle`. |
-| `CollectionDescriptor` | Bounded collection slices and internal selector lookup. |
-| `ActionDescriptor` | Parameter binding and creation of an `ActionInvocation`. |
+| `ObjectHandle` | Identifies one live reference within a host lifetime. |
+| `DomainIdentity` | Optionally identifies a domain entity across compatible replacement. |
+| `LogicalPath` | Identifies how a navigator reached an exposed node. |
 
-`ActionParameter` remains a separate metadata record. Descriptors hold their host and owner handle,
-so both reflection and programmatic values use the same dispatch, target resolution, conversion,
-validation, cancellation, and error normalization.
-
-## Paths and Bindings
-
-Logical paths are absolute, case-sensitive, and percent-escaped. A collection edge may use one
-canonical selector:
+Logical paths are absolute, case-sensitive, and percent-escaped. Collection elements use an
+explicit index, key, or domain-identity selector.
 
 ```text
+/world
+/world/Name
+/world/Nations
 /world/Nations[index=0]
 /catalog/Items[key=SKU-42]
 /world/Nations[identity=nation%2FN1]
 ```
 
-`ResolvePathAsync` returns `InteractionResult<ResolvedPath>`. Successful object resolution retains
-the traversed `PathLocation` values, which support breadcrumbs and parent navigation.
+A path can end at any node, not only a reference object. Parent traversal follows navigation
+semantics: the parent of a selected collection element is its collection node, and the parent of a
+member is its containing node.
 
-`ResolveBindingAsync` accepts a `BindingReference` containing a required object path, member ID,
-expected `MemberKind`, and optional domain identity. It may recover an unavailable path through a
-known identity, but it rejects a path that resolves to a conflicting identity.
+Path resolution returns a fresh node plus its canonical path. Resolution may use stable domain
+identity to survive compatible replacement, but it must reject a path that resolves to a
+conflicting identity.
 
-## Values and Validation
+## Navigators
 
-Value writes and action arguments use invariant conversion followed by nullability, enum-option,
-range, and DataAnnotations validation. Read-only writes return a validation issue. Expected
-failures return `InteractionResult<T>` with one consolidated `InteractionErrorCode` and optional
-`ValidationIssue` values carrying the member or parameter ID.
+A `Navigator` is one independent entry point into the graph. It owns a stack of navigation entries.
+Each entry contains:
 
-The stable error categories are invalid input, not found, unavailable, ambiguous, type mismatch,
-unsupported, conversion, validation, permission, cancellation, disposed, and unexpected fault.
+- a logical path;
+- the resolved `ObjectNode`, when available; and
+- structured resolution state.
 
-## Collections
+Navigation has destructive stack semantics:
 
-`CollectionDescriptor.ReadAsync(long offset, int limit, CancellationToken)` is the only public
-collection operation. It returns a `CollectionSlice` with offset, entries, optional total count,
-and `HasMore`. Host limits bound indexed and lazy-enumerable work.
+1. Starting a navigator resolves its initial node and pushes the first entry.
+2. Activating a navigable child resolves a fresh node and pushes a new entry.
+3. Going back removes and disposes the current entry, then reveals the previous entry.
+4. There is no forward history.
+5. Removing a navigator disposes all of its entries.
 
-Entries form a closed hierarchy: `NullCollectionEntry`, `ScalarCollectionEntry`, and
-`ReferenceCollectionEntry`. Position and optional dictionary key live on the base record. Paging
-tokens, modes, and capability flags are intentionally absent.
+A navigator may start from a registered root or a specific resolved `ObjectNode`. The workspace
+captures the node's current location and resolves a navigator-owned instance. Duplicating a
+navigator follows the same rule at the current path, so the two navigators do not share nodes.
 
-## Actions
+If a path cannot resolve, the current entry remains present with its structured failure. Back
+navigation remains available. A restored broken path therefore stays visible and can be unwound
+until a valid node is reached.
 
-Reflection supports synchronous methods and `Task`/`Task<T>` methods. User parameters precede
-optional injected `IProgress<T>` and `CancellationToken` parameters. `ValueTask` is not supported.
+## Layout Persistence
 
-Every invocation returns concrete `ActionInvocation` with running, succeeded, failed, or cancelled
-status; a completion result; a bounded progress stream; an optional trusted `Fault`; and
-`bool Cancel()`. The host tracks running invocations and completes them as disposed during host
-shutdown.
+A workspace serializes a versioned layout containing:
 
-## Observation
+- navigator order and identifiers;
+- each navigator's current logical path; and
+- stable presentation configuration such as placement or size.
 
-`ObserveAsync` returns concrete `ObservationSubscription : IDisposable`. Without a polling
-interval, the target must provide `INotifyPropertyChanged` or `INotifyCollectionChanged`. Supplying
-a positive interval explicitly selects polling for one readable value or reference.
+Each navigator produces its own serializable path and stable configuration. The workspace
+aggregates those records into the layout snapshot.
 
-Notification observation follows replacement of an observable collection. Subscriptions detach
-handlers deterministically. Observation and invocation progress share one internal bounded stream;
-observation overflow is emitted as `BUFFER_OVERFLOW` with a dropped-record count.
+The snapshot does not contain domain values, runtime handles, node instances, control instances,
+edit drafts, subscriptions, invocation progress, or running work.
 
-## Dispatch and Diagnostics
+Deserialization reconstructs navigation entries from each saved path and its semantic parent
+locations. Resolution failures create broken current entries rather than dropping saved
+navigators. Serialization produces data; file storage remains the caller's responsibility.
 
-All live operations flow through the host. The default `InlineInteractionDispatcher` runs them
-immediately; an application can provide the sole dispatch extension interface for thread-affine
-domains. Reentrant access is allowed when `CheckAccess()` is true.
+## Operations and Lifetime
 
-Expected structured failures are not logged. The host logs only unexpected discovery, dispatch,
-observation, and invocation faults, with sensitive exception details disabled unless explicitly
-enabled.
+All live operations flow through the host and its `IInteractionDispatcher`. Expected outcomes use
+`InteractionResult<T>` with stable error codes and validation issues.
 
-## Example Graph
+Collection access is always bounded. Collection windows retain positions, optional keys, nulls,
+scalar values, references, optional total counts, and whether more data is available.
+
+Method invocation returns an `ActionInvocation` with terminal status, completion, bounded ordered
+progress, and optional cancellation support. Once started, an invocation is owned by the host.
+Removing a node or control stops only frontend observation of that invocation.
+
+Observation uses domain notifications or explicit polling. Streams are bounded, overflow is
+visible, and subscriptions detach deterministically.
+
+## Frontend Lifetime
+
+For every active navigation entry, a frontend creates a control and an independent frontend
+operation scope. The scope owns reads, observation subscriptions, and progress readers started by
+that control.
+
+When an entry is removed, the frontend disposes its control and scope. This cancels frontend work
+and prevents updates to a detached visual tree. It does not dispose the host, stop the domain
+object, or cancel a started invocation.
+
+Removing one navigator cannot cancel work owned by another navigator, even when both point to the
+same path.
+
+## Dependency Direction
 
 ```text
-world (World)
-  Nations[index=0] (Nation)
-    Capital (City)
-      OwnerNation ----------> same Nation handle
-    Cities[index=0] --------> same City handle
-  Economy (EconomicProfile, immutable scalar exposure)
-  PopulationForecast (10,000 computed scalar entries)
+Domain application ----------> Core
+Frontend/Cli ----------------> Core
+Frontend/Tui ----------------> Core + XenoAtom.Terminal.UI
+Examples --------------------> domain + selected frontend
+Tests -----------------------> implementation projects
 ```
 
-This graph exercises cycles, shared references, replacement, programmatic exposure, bounded
-collection reads, observation, validation, and actions.
+Core has no frontend dependency. Frontends do not depend on a specific domain assembly.

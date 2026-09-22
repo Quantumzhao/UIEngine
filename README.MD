@@ -1,8 +1,16 @@
 # UIEngine
 
 UIEngine is a .NET 10 framework for exposing live domain objects as a navigable, editable, and
-invocable object graph. It provides a small concrete Core runtime, a descriptor-driven CLI, and an
-in-progress reusable TUI frontend.
+invocable graph.
+
+Its target architecture has three frontend-neutral layers:
+
+- `UIEngineHost` owns roots, live domain access, identity, dispatch, observation, and invocation.
+- `ObjectNode` represents an exposed .NET language feature.
+- `UIEngineWorkspace` owns independent `Navigator`s and serializable layout state.
+
+Frontends map node semantics to controls. The CLI is the proving frontend, and the reusable TUI is
+in progress.
 
 ## Build, Test, and Run
 
@@ -14,28 +22,18 @@ dotnet run --project Frontend/Cli/Cli.csproj
 dotnet run --project Examples/CyclicWorld.Tui/CyclicWorld.Tui.csproj
 ```
 
-The CLI demonstrates graph navigation, reflection and third-party scalar exposure, validation,
-bounded collection reads, replacement-safe bindings, dispatch, observation, and synchronous or
-asynchronous actions with progress and cancellation.
-
-The TUI executable currently proves the reusable library, ownership, hosting, and independent
-operation-lifetime boundaries. Its interactive graph workspace is implemented in the later Product
-MVP steps.
-
 ## Minimal Host
 
 ```csharp
 using UIEngine.Core;
 
 using var host = new UIEngineHost();
-var registered = host.SetRoot("model", model);
-var descriptor = await host.DescribeAsync(registered.Value);
+host.SetRoot("model", model);
 ```
 
 Domain members opt in with `[Expose]`, `[Children]`, and `[Action]`. `[Summary]` supplies an
-optional object summary, while `IStableDomainIdentity` or `[DomainIdentitySource]` supplies an
-optional replacement-stable identity. Unannotated third-party scalar types can use immutable
-`TypeExposure<T>` and `ValueExposure<T,TValue>` definitions in `UIEngineHostOptions.Exposures`.
+optional summary. `IStableDomainIdentity` or `[DomainIdentitySource]` supplies an optional identity
+that can survive compatible object replacement.
 
 ## Minimal TUI Host
 
@@ -49,26 +47,18 @@ host.SetRoot("model", model);
 await TuiFrontend.RunAsync(host, cancellationToken: stoppingToken);
 ```
 
-`TuiFrontend.RunAsync` and `TuiFrontend.CreateWorkspace` both leave the supplied host under caller
-ownership. An embedding application owns and disposes the returned `TuiWorkspace`, then composes
-its `Visual` into an existing XenoAtom visual tree.
+The caller owns the host. Closing the TUI disposes frontend work without stopping the domain
+runtime or a method invocation that has already started.
 
-## Repository Guide
+## Documentation
 
-- [Project context](PROJECT_CONTEXT.md) — settled scope, decisions, and invariants.
-- [Architecture, reboot audit, and plan](REBOOT_PLAN.md) — migration rationale, streamlining
-  decisions, current design, risks, and roadmap.
-- [Progress tracker](TODO.MD) — completed work and remaining product milestones.
-- [Architecture](docs/architecture.md) — runtime flow and concrete public model.
-- [CLI command reference](docs/cli-command-reference.md) — commands, paths, and output.
-- [Milestone records](docs/milestones/README.md) — historical plans and acceptance records for the
-  architecture runway and Framework MVP hardening.
-- `Core/` — runtime implementation and public API.
-- `Frontend/Cli/` — proving frontend.
-- `Frontend/Tui/` — reusable XenoAtom-based TUI library.
-- `Examples/CyclicDomain/` — deterministic cyclic example.
-- `Examples/CyclicWorld.Tui/` — thin TUI composition executable.
-- `Tests/` — framework, CLI, and TUI boundary/operation-scope tests.
+- [Project context](PROJECT_CONTEXT.md) — product scope and settled decisions.
+- [Architecture](docs/architecture.md) — nodes, navigators, workspaces, paths, and lifetime.
+- [Architecture and delivery plan](REBOOT_PLAN.md) — implementation sequence and acceptance.
+- [TUI frontend architecture](docs/tui-frontend-architecture.md) — TUI control and lifetime model.
+- [Progress tracker](TODO.MD) — completed foundation and remaining work.
+- [CLI command reference](docs/cli-command-reference.md) — current CLI commands and paths.
+- [Milestone records](docs/milestones/README.md) — delivery plans and acceptance records.
 
-Package publication remains disabled until compatibility, licensing, release policy, and support
-expectations are established.
+Package publication remains disabled until compatibility, licensing, release, and support policy
+are defined.

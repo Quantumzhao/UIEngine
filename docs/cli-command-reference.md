@@ -28,7 +28,7 @@ Output is human-readable and is not a machine protocol.
 | `ls <collection> [offset=<n>] [limit=<n>]` | Read one bounded collection slice. |
 | `cd <absolute-path>` | Navigate to an object. |
 | `cd ..` | Return to the previous object location. |
-| `inspect` | Show current descriptor metadata. |
+| `inspect` | Show current object metadata. |
 | `get <member>` | Read a scalar value. |
 | `set <member> <value>` | Convert, validate, and write a scalar value. |
 | `call <action> [name=value ...]` | Invoke an action and stream progress. |

@@ -1,99 +1,76 @@
 # UIEngine Progress
 
-See [REBOOT_PLAN.md](REBOOT_PLAN.md) for architectural rationale, migration history, risks, and
-the future roadmap. Completed milestone records remain under [docs/milestones](docs/milestones/).
+## Runtime Foundation
 
-## Reboot and Safety Baseline
+- [x] Host-scoped roots and runtime identity.
+- [x] Stable domain identity and canonical logical paths.
+- [x] Live reads, writes, conversion, and validation.
+- [x] Bounded collection access.
+- [x] Synchronous and asynchronous invocation with progress and cancellation.
+- [x] Notification and polling observation with visible overflow.
+- [x] Explicit domain dispatch.
+- [x] Structured interaction failures.
+- [x] CLI coverage of the live graph workflow.
 
-- [x] Define the graph-oriented target architecture and MVP boundaries.
-- [x] Audit the legacy implementation and choose a clean public API break.
-- [x] Standardize the repository on .NET 10 with nullable analysis and analyzers.
-- [x] Remove credential-bearing package configuration and revoke the credential.
-- [x] Disable package generation until release policy exists.
-- [x] Add clean restore, build, test, secret-scan, and no-package CI checks.
-- [x] Prove the initial host-scoped graph runtime and CLI vertical slice.
-- [x] Harden the Framework MVP with identity, paths, bindings, dispatch, validation, bounded
-  collections, observation, asynchronous actions, progress, and cancellation.
+## Object Nodes
 
-## Core Streamlining
+- [ ] Define the frontend-neutral `ObjectNode` contract.
+- [ ] Model property, field, object, reference, collection, method, string, boolean, number, and
+  enum semantics.
+- [ ] Support overlapping language-semantic facets.
+- [ ] Resolve every exposed root and member to a fresh node instance.
+- [ ] Preserve validation, observation, dispatch, collection bounds, and invocation behavior.
+- [ ] Resolve logical paths to terminal as well as navigable nodes.
+- [ ] Define semantic parent traversal for members and selected collection elements.
+- [ ] Cover cycles, shared references, replacement, nulls, and unavailable targets.
 
-- [x] Replace descriptor interfaces and dispatch decorators with one concrete member hierarchy.
-- [x] Retain only `IInteractionDispatcher` and `IStableDomainIdentity` as public extension
-  interfaces.
-- [x] Collapse runtime identity into `ObjectHandle(Guid Id)`.
-- [x] Replace mutable programmatic registration with immutable scalar `TypeExposure<T>` and
-  `ValueExposure<T,TValue>` definitions.
-- [x] Replace parallel member collections with `ObjectDescriptor.Members`.
-- [x] Replace collection modes, capability flags, and continuations with bounded slices.
-- [x] Use closed null, scalar, and reference collection-entry records.
-- [x] Return resolved paths and bindings directly through `InteractionResult<T>`.
-- [x] Reduce binding recovery to optional identity plus required path with conflict refusal.
-- [x] Reduce observation to built-in notifications or explicit polling with synchronous disposal.
-- [x] Replace invocation interfaces and wrappers with concrete `ActionInvocation`.
-- [x] Remove unused presentation metadata, provider policies, factories, and adapters.
-- [x] Consolidate structured error categories and retain IDs on validation issues.
-- [x] Standardize public asynchronous operations on `Task`.
-- [x] Remove redundant runtime null guards covered by nullable contracts.
-- [x] Simplify the serial CLI by removing unnecessary locking and async disposal.
-- [x] Replace implementation-coupled tests with black-box framework and CLI behavior tests.
-- [x] Retire the v0.2.3 project, its assets, and characterization suite.
-- [x] Reconcile the README, project context, architecture, CLI reference, reboot plan, progress
-  tracker, and historical milestone records.
+## Workspaces and Navigators
 
-## Current Acceptance
+- [ ] Add `UIEngineWorkspace` over a caller-owned `UIEngineHost`.
+- [ ] Add and remove independent navigators.
+- [ ] Initialize a navigator from a registered root or specific resolved node.
+- [ ] Navigate deeper by pushing a fresh node entry.
+- [ ] Navigate back by permanently removing the current entry.
+- [ ] Duplicate a navigator at the same path with independent node instances.
+- [ ] Keep broken paths as visible entries that can navigate back.
+- [ ] Prove that one navigator cannot cancel or mutate another navigator's presentation state.
 
-- [x] Debug solution build completes with zero warnings and errors.
-- [x] Release solution build completes with zero warnings and errors.
-- [x] All 14 framework behavior tests pass.
-- [x] All 8 CLI behavior tests pass.
-- [x] API-shape tests prevent removed provider, factory, policy, and identity types from returning.
-- [x] Redirected CLI coverage includes navigation, mutation, bounded collections, observation,
-  asynchronous progress, cancellation, and structured failures.
-- [X] Confirm the streamlined runtime in GitHub Actions after publication.
+## Layout Persistence
+
+- [ ] Define a versioned workspace layout snapshot.
+- [ ] Persist navigator identifiers, order, paths, and stable presentation configuration.
+- [ ] Restore each navigator independently.
+- [ ] Preserve broken paths during restore.
+- [ ] Verify that live state, handles, nodes, controls, drafts, and running work are never persisted.
 
 ## Product MVP — TUI
 
-- [x] Select and qualify XenoAtom.Terminal.UI 3.9.0 without coupling it to Core.
-- [x] Establish the reusable TUI library, test, dependency, ownership, hosting, and thin consumer
-  boundaries.
-- [x] Keep toolkit capability handling frontend-local; no Core negotiation contract was required.
-- [x] Replace the provisional intent pump and global generation with direct Core calls, native UI
-  dispatch, and independent operation scopes with deterministic task/resource disposal.
-- [ ] Build graph browsing with navigation history or breadcrumbs.
-- [ ] Generate value editors and action forms from the concrete descriptors.
+- [x] Qualify and pin XenoAtom.Terminal.UI 3.9.0.
+- [x] Establish reusable fullscreen and embedded hosting.
+- [x] Add independent frontend operation scopes with deterministic cleanup.
+- [ ] Present several navigators in one workspace.
+- [ ] Add root selection, navigator duplication, removal, and destructive back navigation.
+- [ ] Generate controls from node language semantics.
+- [ ] Add scalar editors and method forms.
 - [ ] Add bounded collection browsing.
-- [ ] Present asynchronous progress, observation, and structured errors without action
-  cancellation or undo controls.
-- [ ] Show unavailable, missing, ambiguous, and mismatched targets explicitly.
-- [ ] Verify keyboard-first operation and terminal resizing.
-- [ ] Prove the TUI against the same cyclic-world workflow as the CLI.
+- [ ] Present observation, progress, and structured failures.
+- [ ] Save and restore navigator layouts.
+- [ ] Show broken entries and allow back navigation to a valid node.
+- [ ] Verify keyboard-only operation and terminal resizing.
+- [ ] Complete the cyclic-world acceptance workflow.
 
 ## Product Release
 
 - [ ] Pass Core, CLI, and TUI acceptance from a clean checkout.
 - [ ] Define licensing, versioning, package metadata, and release policy.
-- [ ] Define supported platforms and public API compatibility/support policy.
-- [ ] Enable package generation only after those policies are settled.
-
-## Post-MVP Layouts
-
-- [ ] Add component creation, deletion, duplication, movement, containment, and rebinding.
-- [ ] Persist versioned component configuration and bindings rather than domain state.
-- [ ] Visualize and repair broken bindings.
-- [ ] Add layout migrations and reusable templates only with acceptance fixtures.
-
-## Post-MVP Batch Operations
-
-- [ ] Snapshot targets and support predefined member filters.
-- [ ] Analyze compatibility and show a preview before mutation.
-- [ ] Add value assignment and action invocation with explicit confirmation and dry-run behavior.
-- [ ] Execute sequentially by default with explicit continue/stop policy and cancellation.
-- [ ] Record one terminal result per item and cover partial, non-transactional failure.
+- [ ] Define supported platforms and compatibility policy.
+- [ ] Enable package generation after those policies are settled.
 
 ## Later Capabilities
 
-- [ ] Add source generation only with a defined AOT matrix.
-- [ ] Add search and indexing.
-- [ ] Add tables, charts, and safe derived values.
-- [ ] Design an authenticated, authorized, and auditable remote protocol.
-- [ ] Add other frontends only when justified by a concrete consumer.
+- [ ] Batch operations with preview and explicit failure policy.
+- [ ] Search and indexing.
+- [ ] Tables, charts, and safe derived values.
+- [ ] Source generation with an explicit AOT matrix.
+- [ ] Authenticated remote access and auditing.
+- [ ] Additional frontends backed by concrete consumers.
