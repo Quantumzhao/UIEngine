@@ -28,7 +28,7 @@ internal sealed class LiveObjectNode : BaseNode, IObjectNode
         }).ToArray();
     }
 
-    public ObjectHandle Handle => Descriptor.Handle;
+    public Guid Handle => Descriptor.Handle;
 
     public string? DomainIdentity => Descriptor.DomainIdentity;
 

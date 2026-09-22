@@ -96,7 +96,7 @@ UIEngine keeps three concepts separate:
 
 | Concept | Purpose |
 |---|---|
-| `ObjectHandle` | Identifies one live reference within a host lifetime. |
+| `Guid` | Identifies one live reference within a host lifetime. |
 | Domain identity string | Optionally identifies a domain entity across compatible replacement. |
 | `LogicalPath` | Identifies how a navigator reached an exposed node. |
 

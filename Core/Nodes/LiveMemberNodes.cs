@@ -81,7 +81,7 @@ internal sealed class LiveReferenceNode(
 {
     public Type ReferenceType => descriptor.ReferenceType;
 
-    public Task<InteractionResult<ObjectHandle?>> ReadReferenceAsync() => descriptor.ReadAsync();
+    public Task<InteractionResult<Guid?>> ReadReferenceAsync() => descriptor.ReadAsync();
 }
 
 internal sealed class LiveCollectionNode(

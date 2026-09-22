@@ -23,12 +23,10 @@ public sealed class TuiBoundaryTests
 
         Assert.NotSame(options, workspace.Options);
         Assert.Equal(options, workspace.Options);
-        Assert.False(workspace.IsDisposed);
         Assert.False(host.IsDisposed);
 
         workspace.Dispose();
 
-        Assert.True(workspace.IsDisposed);
         Assert.False(host.IsDisposed);
     }
 

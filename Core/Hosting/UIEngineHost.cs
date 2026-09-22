@@ -10,11 +10,11 @@ public sealed class UIEngineHost : IDisposable
 {
     private readonly object _Gate = new();
     private readonly ConditionalWeakTable<object, _HandleHolder> _Handles = new();
-    private readonly Dictionary<ObjectHandle, WeakReference<object>> _Objects = [];
+    private readonly Dictionary<Guid, WeakReference<object>> _Objects = [];
     private readonly Dictionary<string, _RootEntry> _Roots = new(StringComparer.Ordinal);
-    private readonly Dictionary<ObjectHandle, string?> _DomainIdentities = [];
-    private readonly Dictionary<string, HashSet<ObjectHandle>> _DomainIdentityIndex = [];
-    private readonly Dictionary<ObjectHandle, LogicalPath> _CanonicalPaths = [];
+    private readonly Dictionary<Guid, string?> _DomainIdentities = [];
+    private readonly Dictionary<string, HashSet<Guid>> _DomainIdentityIndex = [];
+    private readonly Dictionary<Guid, LogicalPath> _CanonicalPaths = [];
     private readonly HashSet<ObservationSubscription> _Subscriptions = [];
     private readonly HashSet<ActionInvocation> _Invocations = [];
     private readonly HostSettings _Settings;
@@ -42,23 +42,23 @@ public sealed class UIEngineHost : IDisposable
 
     internal int MaxCollectionItems => _Settings.MaxCollectionItems;
 
-    public InteractionResult<ObjectHandle> SetRoot(string identifier, object instance)
+    public InteractionResult<Guid> SetRoot(string identifier, object instance)
     {
         if (IsDisposed)
         {
-            return _DisposedFailure<ObjectHandle>();
+            return _DisposedFailure<Guid>();
         }
 
         if (string.IsNullOrWhiteSpace(identifier))
         {
-            return InteractionResult.Failure<ObjectHandle>(
+            return InteractionResult.Failure<Guid>(
                 InteractionErrorCode.INVALID_INPUT,
                 "A root identifier cannot be empty or whitespace.");
         }
 
         if (instance.GetType().IsValueType)
         {
-            return InteractionResult.Failure<ObjectHandle>(
+            return InteractionResult.Failure<Guid>(
                 InteractionErrorCode.TYPE_MISMATCH,
                 "A root must be a reference type.");
         }
@@ -67,7 +67,7 @@ public sealed class UIEngineHost : IDisposable
         {
             if (IsDisposed)
             {
-                return _DisposedFailure<ObjectHandle>();
+                return _DisposedFailure<Guid>();
             }
 
             var handle = _GetOrCreateHandle(instance);
@@ -102,7 +102,7 @@ public sealed class UIEngineHost : IDisposable
         }
     }
 
-    public ObjectHandle GetOrCreateHandle(object instance)
+    public Guid GetOrCreateHandle(object instance)
     {
         ObjectDisposedException.ThrowIf(IsDisposed, this);
         if (instance.GetType().IsValueType)
@@ -117,7 +117,7 @@ public sealed class UIEngineHost : IDisposable
         }
     }
 
-    public async Task<InteractionResult<string?>> GetDomainIdentityAsync(ObjectHandle handle)
+    public async Task<InteractionResult<string?>> GetDomainIdentityAsync(Guid handle)
     {
         if (IsDisposed)
         {
@@ -169,16 +169,16 @@ public sealed class UIEngineHost : IDisposable
         return discovered;
     }
 
-    public InteractionResult<ObjectHandle> ResolveDomainIdentity(string identity)
+    public InteractionResult<Guid> ResolveDomainIdentity(string identity)
     {
         if (IsDisposed)
         {
-            return _DisposedFailure<ObjectHandle>();
+            return _DisposedFailure<Guid>();
         }
 
         if (string.IsNullOrWhiteSpace(identity))
         {
-            return InteractionResult.Failure<ObjectHandle>(
+            return InteractionResult.Failure<Guid>(
                 InteractionErrorCode.INVALID_INPUT,
                 "A domain identity cannot be empty or whitespace.");
         }
@@ -200,13 +200,13 @@ public sealed class UIEngineHost : IDisposable
 
             return handles.Count == 1
                 ? InteractionResult.Success(handles.Single())
-                : InteractionResult.Failure<ObjectHandle>(
+                : InteractionResult.Failure<Guid>(
                     InteractionErrorCode.AMBIGUOUS,
                     $"Domain identity '{identity}' matches multiple live objects.");
         }
     }
 
-    public async Task<InteractionResult<ObjectDescriptor>> DescribeAsync(ObjectHandle handle)
+    public async Task<InteractionResult<ObjectDescriptor>> DescribeAsync(Guid handle)
     {
         var target = ResolveTarget(handle);
         if (!target.IsSuccess)
@@ -300,7 +300,7 @@ public sealed class UIEngineHost : IDisposable
             return InteractionResult.Failure<ResolvedBinding>(parsed.Error!);
         }
 
-        ObjectHandle? identityHandle = null;
+        Guid? identityHandle = null;
         ObjectDescriptor? identityDescriptor = null;
         LogicalPath? identityPath = null;
         if (binding.DomainIdentity is not null)
@@ -326,7 +326,7 @@ public sealed class UIEngineHost : IDisposable
         }
 
         var resolvedPath = await ResolvePathAsync(parsed.Value);
-        ObjectHandle owner;
+        Guid owner;
         ObjectDescriptor descriptor;
         LogicalPath canonical;
         if (resolvedPath.IsSuccess && resolvedPath.Value.IsObject)
@@ -393,7 +393,7 @@ public sealed class UIEngineHost : IDisposable
     }
 
     public async Task<InteractionResult<ObservationSubscription>> ObserveAsync(
-        ObjectHandle handle,
+        Guid handle,
         string? memberId = null,
         TimeSpan? pollingInterval = null)
     {
@@ -605,7 +605,7 @@ public sealed class UIEngineHost : IDisposable
         }
     }
 
-    internal InteractionResult<object> ResolveTarget(ObjectHandle handle)
+    internal InteractionResult<object> ResolveTarget(Guid handle)
     {
         if (IsDisposed)
         {
@@ -684,7 +684,7 @@ public sealed class UIEngineHost : IDisposable
         return invocation;
     }
 
-    internal void RecordCanonicalPath(ObjectHandle handle, LogicalPath path)
+    internal void RecordCanonicalPath(Guid handle, LogicalPath path)
     {
         lock (_Gate)
         {
@@ -695,7 +695,7 @@ public sealed class UIEngineHost : IDisposable
         }
     }
 
-    internal bool TryGetCanonicalPath(ObjectHandle handle, out LogicalPath? path)
+    internal bool TryGetCanonicalPath(Guid handle, out LogicalPath? path)
     {
         lock (_Gate)
         {
@@ -703,14 +703,14 @@ public sealed class UIEngineHost : IDisposable
         }
     }
 
-    private ObjectHandle _GetOrCreateHandle(object instance)
+    private Guid _GetOrCreateHandle(object instance)
     {
         if (_Handles.TryGetValue(instance, out var existing))
         {
             return existing.Handle;
         }
 
-        var handle = new ObjectHandle(Guid.NewGuid());
+        var handle = Guid.NewGuid();
         _Handles.Add(instance, new _HandleHolder(handle));
         _Objects.Add(handle, new WeakReference<object>(instance));
         return handle;
@@ -759,7 +759,7 @@ public sealed class UIEngineHost : IDisposable
 
     private InteractionResult<ObjectDescriptor> _CreateDescriptor(
         object instance,
-        ObjectHandle handle,
+        Guid handle,
         string? identity)
     {
         var metadata = ReflectionMetadata.Get(instance.GetType());
@@ -936,8 +936,8 @@ public sealed class UIEngineHost : IDisposable
             $"The {operation} operation failed unexpectedly.");
     }
 
-    private static InteractionResult<ObjectHandle> _DomainIdentityNotFound(string identity) =>
-        InteractionResult.Failure<ObjectHandle>(
+    private static InteractionResult<Guid> _DomainIdentityNotFound(string identity) =>
+        InteractionResult.Failure<Guid>(
             InteractionErrorCode.NOT_FOUND,
             $"No live object has domain identity '{identity}'.");
 
@@ -945,7 +945,7 @@ public sealed class UIEngineHost : IDisposable
         InteractionErrorCode.DISPOSED,
         "The UIEngine host has been disposed.");
 
-    private sealed record _HandleHolder(ObjectHandle Handle);
+    private sealed record _HandleHolder(Guid Handle);
 
     private sealed record _RootEntry(RootRegistration Registration, object Instance);
 }

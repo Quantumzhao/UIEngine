@@ -31,7 +31,7 @@ public interface INavigableNode;
 /// <summary>Exposes one live object and its opted-in members.</summary>
 public interface IObjectNode : INavigableNode
 {
-    ObjectHandle Handle { get; }
+    Guid Handle { get; }
 
     string? DomainIdentity { get; }
 
@@ -63,7 +63,7 @@ public interface IReferenceNode : INavigableNode
 {
     Type ReferenceType { get; }
 
-    Task<InteractionResult<ObjectHandle?>> ReadReferenceAsync();
+    Task<InteractionResult<Guid?>> ReadReferenceAsync();
 }
 
 /// <summary>Identifies a node with a readable scalar value.</summary>

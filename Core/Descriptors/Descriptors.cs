@@ -16,7 +16,7 @@ public abstract class MemberDescriptor
 {
     private protected MemberDescriptor(
         UIEngineHost host,
-        ObjectHandle owner,
+        Guid owner,
         string id,
         MemberKind kind)
     {
@@ -28,7 +28,7 @@ public abstract class MemberDescriptor
 
     internal UIEngineHost Host { get; }
 
-    internal ObjectHandle Owner { get; }
+    internal Guid Owner { get; }
 
     public string Id { get; }
 
@@ -38,7 +38,7 @@ public abstract class MemberDescriptor
 public sealed class ObjectDescriptor
 {
     internal ObjectDescriptor(
-        ObjectHandle handle,
+        Guid handle,
         string? domainIdentity,
         string typeName,
         string? summary,
@@ -51,7 +51,7 @@ public sealed class ObjectDescriptor
         Members = members.ToArray();
     }
 
-    public ObjectHandle Handle { get; }
+    public Guid Handle { get; }
 
     public string? DomainIdentity { get; }
 
@@ -66,7 +66,7 @@ public sealed class ValueDescriptor : MemberDescriptor
 {
     internal ValueDescriptor(
         UIEngineHost host,
-        ObjectHandle owner,
+        Guid owner,
         string id,
         Type valueType,
         bool canRead,
@@ -116,12 +116,12 @@ public sealed class ValueDescriptor : MemberDescriptor
 public sealed class ReferenceDescriptor : MemberDescriptor
 {
     private readonly UIEngineHost _Host;
-    private readonly ObjectHandle _Owner;
+    private readonly Guid _Owner;
     private readonly Func<object, object?> _Read;
 
     internal ReferenceDescriptor(
         UIEngineHost host,
-        ObjectHandle owner,
+        Guid owner,
         string id,
         Type referenceType,
         Func<object, object?> read)
@@ -135,25 +135,25 @@ public sealed class ReferenceDescriptor : MemberDescriptor
 
     public Type ReferenceType { get; }
 
-    public Task<InteractionResult<ObjectHandle?>> ReadAsync() => _Host.ExecuteAsync(
+    public Task<InteractionResult<Guid?>> ReadAsync() => _Host.ExecuteAsync(
         $"read reference {Id}",
         async () =>
         {
             var target = _Host.ResolveTarget(_Owner);
             if (!target.IsSuccess)
             {
-                return InteractionResult.Failure<ObjectHandle?>(target.Error!);
+                return InteractionResult.Failure<Guid?>(target.Error!);
             }
 
             var value = _Read(target.Value);
             if (value is null)
             {
-                return InteractionResult.Success<ObjectHandle?>(null);
+                return InteractionResult.Success<Guid?>(null);
             }
 
             if (value.GetType().IsValueType)
             {
-                return InteractionResult.Failure<ObjectHandle?>(
+                return InteractionResult.Failure<Guid?>(
                     InteractionErrorCode.TYPE_MISMATCH,
                     $"Reference '{Id}' returned a value type.");
             }
@@ -161,8 +161,8 @@ public sealed class ReferenceDescriptor : MemberDescriptor
             var encountered = _Host.GetOrCreateHandle(value);
             var indexed = await _Host.GetDomainIdentityAsync(encountered);
             return indexed.IsSuccess
-                ? InteractionResult.Success<ObjectHandle?>(encountered)
-                : InteractionResult.Failure<ObjectHandle?>(indexed.Error!);
+                ? InteractionResult.Success<Guid?>(encountered)
+                : InteractionResult.Failure<Guid?>(indexed.Error!);
         });
 }
 
@@ -176,7 +176,7 @@ public sealed record ScalarCollectionEntry(long Position, object Value, object? 
 
 public sealed record ReferenceCollectionEntry(
     long Position,
-    ObjectHandle Handle,
+    Guid Handle,
     string? DomainIdentity,
     object? Key = null)
     : CollectionEntry(Position, Key);
@@ -190,12 +190,12 @@ public sealed record CollectionSlice(
 public sealed class CollectionDescriptor : MemberDescriptor
 {
     private readonly UIEngineHost _Host;
-    private readonly ObjectHandle _Owner;
+    private readonly Guid _Owner;
     private readonly Func<object, object?> _Read;
 
     internal CollectionDescriptor(
         UIEngineHost host,
-        ObjectHandle owner,
+        Guid owner,
         string id,
         Type collectionType,
         Func<object, object?> read)
@@ -251,7 +251,7 @@ public sealed class CollectionDescriptor : MemberDescriptor
         $"read collection source {Id}",
         _ReadSourceCoreAsync);
 
-    internal async Task<InteractionResult<IReadOnlyList<ObjectHandle>>> SelectAsync(
+    internal async Task<InteractionResult<IReadOnlyList<Guid>>> SelectAsync(
         CollectionSelector selector)
     {
         if (selector.Kind == CollectionSelectorKind.INDEX)
@@ -259,24 +259,24 @@ public sealed class CollectionDescriptor : MemberDescriptor
             var index = long.Parse(selector.Value, NumberStyles.None, CultureInfo.InvariantCulture);
             if (index > int.MaxValue)
             {
-                return InteractionResult.Success<IReadOnlyList<ObjectHandle>>([]);
+                return InteractionResult.Success<IReadOnlyList<Guid>>([]);
             }
 
             var slice = await ReadAsync(index, 1);
             return slice.IsSuccess
                 ? _ReferenceHandles(slice.Value.Entries)
-                : InteractionResult.Failure<IReadOnlyList<ObjectHandle>>(slice.Error!);
+                : InteractionResult.Failure<IReadOnlyList<Guid>>(slice.Error!);
         }
 
         var snapshot = await ReadAsync(0, _Host.MaxCollectionItems);
         if (!snapshot.IsSuccess)
         {
-            return InteractionResult.Failure<IReadOnlyList<ObjectHandle>>(snapshot.Error!);
+            return InteractionResult.Failure<IReadOnlyList<Guid>>(snapshot.Error!);
         }
 
         if (snapshot.Value.HasMore)
         {
-            return InteractionResult.Failure<IReadOnlyList<ObjectHandle>>(
+            return InteractionResult.Failure<IReadOnlyList<Guid>>(
                 InteractionErrorCode.UNSUPPORTED,
                 $"Collection '{Id}' is too large for bounded selector lookup.");
         }
@@ -295,7 +295,7 @@ public sealed class CollectionDescriptor : MemberDescriptor
             })
             .Select(static entry => entry.Handle)
             .ToArray();
-        return InteractionResult.Success<IReadOnlyList<ObjectHandle>>(matches);
+        return InteractionResult.Success<IReadOnlyList<Guid>>(matches);
     }
 
     private Task<InteractionResult<IEnumerable>> _ReadSourceCoreAsync()
@@ -396,18 +396,18 @@ public sealed class CollectionDescriptor : MemberDescriptor
         return new ReferenceCollectionEntry(position, handle, identity.Value, key);
     }
 
-    private static InteractionResult<IReadOnlyList<ObjectHandle>> _ReferenceHandles(
+    private static InteractionResult<IReadOnlyList<Guid>> _ReferenceHandles(
         IReadOnlyList<CollectionEntry> entries)
     {
         if (entries.Count == 0)
         {
-            return InteractionResult.Success<IReadOnlyList<ObjectHandle>>([]);
+            return InteractionResult.Success<IReadOnlyList<Guid>>([]);
         }
 
         return entries.All(static entry => entry is ReferenceCollectionEntry)
-            ? InteractionResult.Success<IReadOnlyList<ObjectHandle>>(
+            ? InteractionResult.Success<IReadOnlyList<Guid>>(
                 entries.Cast<ReferenceCollectionEntry>().Select(static entry => entry.Handle).ToArray())
-            : InteractionResult.Failure<IReadOnlyList<ObjectHandle>>(
+            : InteractionResult.Failure<IReadOnlyList<Guid>>(
                 InteractionErrorCode.TYPE_MISMATCH,
                 "The collection selector does not identify a reference object.");
     }

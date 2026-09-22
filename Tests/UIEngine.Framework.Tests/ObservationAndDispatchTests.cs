@@ -196,7 +196,7 @@ public sealed class ObservationAndDispatchTests
     private sealed class _ReentrantModel
     {
         private UIEngineHost? _Host;
-        private ObjectHandle _Handle;
+        private Guid _Handle;
 
         public bool ReentrantDescribeSucceeded { get; private set; }
 
@@ -213,7 +213,7 @@ public sealed class ObservationAndDispatchTests
             }
         }
 
-        public void Attach(UIEngineHost host, ObjectHandle handle)
+        public void Attach(UIEngineHost host, Guid handle)
         {
             _Host = host;
             _Handle = handle;

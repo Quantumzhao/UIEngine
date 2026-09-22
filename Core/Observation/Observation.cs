@@ -35,7 +35,7 @@ public readonly record struct ObservationValue
 }
 
 public sealed record ChangeRecord(
-    ObjectHandle Source,
+    Guid Source,
     string? DomainIdentity,
     string? MemberId,
     ChangeKind Kind,
@@ -59,7 +59,7 @@ public sealed class ObservationSubscription : IDisposable
     private int _Disposed;
 
     internal ObservationSubscription(
-        ObjectHandle source,
+        Guid source,
         string? memberId,
         int capacity,
         Func<long, ChangeRecord> createOverflow,
@@ -73,7 +73,7 @@ public sealed class ObservationSubscription : IDisposable
         _ReportFailure = reportFailure;
     }
 
-    public ObjectHandle Source { get; }
+    public Guid Source { get; }
 
     public string? MemberId { get; }
 

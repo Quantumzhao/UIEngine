@@ -128,7 +128,7 @@ public sealed class NodeAndNavigationContractTests
     private sealed class _ObjectNode(UIEngineHost host)
         : BaseNode(host, "model", typeof(_Model)), IObjectNode
     {
-        public ObjectHandle Handle { get; } = new(Guid.NewGuid());
+        public Guid Handle { get; } = Guid.NewGuid();
 
         public string? DomainIdentity => null;
 

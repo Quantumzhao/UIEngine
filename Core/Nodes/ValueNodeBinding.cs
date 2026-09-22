@@ -9,7 +9,7 @@ namespace UIEngine.Core;
 /// </summary>
 internal sealed class ValueNodeBinding(
     UIEngineHost host,
-    ObjectHandle owner,
+    Guid owner,
     string id,
     Type valueType,
     bool canRead,
@@ -22,7 +22,7 @@ internal sealed class ValueNodeBinding(
     Action<object, object?>? write)
 {
     private readonly UIEngineHost _Host = host;
-    private readonly ObjectHandle _Owner = owner;
+    private readonly Guid _Owner = owner;
     private readonly Func<object, object?> _Read = read;
     private readonly Action<object, object?>? _Write = write;
     private readonly IReadOnlyList<ValidationAttribute> _ValidationAttributes = validationAttributes;

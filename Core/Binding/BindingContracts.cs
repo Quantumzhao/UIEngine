@@ -6,10 +6,10 @@ public sealed record BindingReference(
     MemberKind ExpectedKind,
     string? DomainIdentity = null);
 
-public sealed record PathLocation(ObjectHandle Handle, LogicalPath Path);
+public sealed record PathLocation(Guid Handle, LogicalPath Path);
 
 public sealed record ResolvedPath(
-    ObjectHandle OwnerHandle,
+    Guid OwnerHandle,
     ObjectDescriptor OwnerDescriptor,
     MemberDescriptor? Member,
     LogicalPath CanonicalPath,
@@ -19,7 +19,7 @@ public sealed record ResolvedPath(
 }
 
 public sealed record ResolvedBinding(
-    ObjectHandle OwnerHandle,
+    Guid OwnerHandle,
     ObjectDescriptor OwnerDescriptor,
     MemberDescriptor Member,
     LogicalPath CanonicalPath);

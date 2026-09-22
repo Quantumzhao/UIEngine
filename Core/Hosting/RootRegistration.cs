@@ -1,3 +1,3 @@
 namespace UIEngine.Core;
 
-public sealed record RootRegistration(string Identifier, ObjectHandle Handle);
+public sealed record RootRegistration(string Identifier, Guid Handle);

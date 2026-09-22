@@ -114,13 +114,13 @@ internal sealed class ReflectedAction
 public sealed class ActionDescriptor : MemberDescriptor
 {
     private readonly UIEngineHost _Host;
-    private readonly ObjectHandle _Owner;
+    private readonly Guid _Owner;
     private readonly ReflectedAction _Action;
     private readonly List<IReadOnlyList<ValidationAttribute>> _ValidationAttributes;
 
     internal ActionDescriptor(
         UIEngineHost host,
-        ObjectHandle owner,
+        Guid owner,
         string id,
         ReflectedAction action)
         : base(host, owner, id, MemberKind.ACTION)

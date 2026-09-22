@@ -25,9 +25,6 @@ public sealed class TuiWorkspace : IDisposable
     /// <summary>Gets the immutable configuration snapshot used by this workspace.</summary>
     public TuiFrontendOptions Options { get; }
 
-    /// <summary>Gets whether this workspace has been disposed.</summary>
-    public bool IsDisposed => Volatile.Read(ref _Disposed) != 0;
-
     /// <summary>Gets the root visual to compose into a XenoAtom application.</summary>
     public Visual Visual { get; }
 

@@ -30,7 +30,7 @@ internal sealed class CliSession : IDisposable
         _Output = output;
     }
 
-    internal ObjectHandle? CurrentHandle => _Locations.Count == 0
+    internal Guid? CurrentHandle => _Locations.Count == 0
         ? null
         : _Locations[^1].LastResolvedHandle;
 
@@ -210,7 +210,7 @@ internal sealed class CliSession : IDisposable
                 NullCollectionEntry => "null",
                 ScalarCollectionEntry scalar => $"value={_FormatValue(scalar.Value)}",
                 ReferenceCollectionEntry reference =>
-                    $"reference={reference.Handle.Id:D} identity={_FormatValue(reference.DomainIdentity)}",
+                    $"reference={reference.Handle:D} identity={_FormatValue(reference.DomainIdentity)}",
                 _ => throw new InvalidOperationException("Unknown collection entry type."),
             };
             _Output.WriteLine($"[{entry.Position}]{key} {content}");
@@ -280,7 +280,7 @@ internal sealed class CliSession : IDisposable
         var descriptor = described.Value;
         _Output.WriteLine($"path: {CurrentPath}");
         _Output.WriteLine($"type: {descriptor.TypeName}");
-        _Output.WriteLine($"handle: {descriptor.Handle.Id:D}");
+        _Output.WriteLine($"handle: {descriptor.Handle:D}");
         _Output.WriteLine($"domain-identity: {_FormatValue(descriptor.DomainIdentity)}");
         _Output.WriteLine($"summary: {descriptor.Summary ?? "null"}");
 
@@ -720,7 +720,7 @@ internal sealed class CliSession : IDisposable
         LogicalPath Path,
         string? DomainIdentity,
         string TypeName,
-        ObjectHandle LastResolvedHandle);
+        Guid LastResolvedHandle);
 
     private readonly record struct _CollectionOptions(long Offset, int? Limit);
 }
