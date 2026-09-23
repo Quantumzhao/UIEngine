@@ -1,5 +1,6 @@
 using UIEngine.Core;
 using XenoAtom.Terminal.UI;
+using XenoAtom.Terminal.UI.Controls;
 
 namespace UIEngine.Frontend.Tui;
 
@@ -14,12 +15,14 @@ public sealed class TuiWorkspace : IDisposable
 
     internal TuiWorkspace(
         UIEngineHost host,
-        TuiFrontendOptions options,
-        Visual visual)
+        TuiFrontendOptions? options,
+        Visual? visual = null)
     {
         Host = host;
-        Options = options;
-        Visual = visual;
+        Options = options ?? new TuiFrontendOptions();
+        Visual = visual ?? new VStack(
+            new TextBlock(Options.ApplicationTitle),
+            new TextBlock($"Ready at {Options.InitialPath}."));
     }
 
     /// <summary>Gets the immutable configuration snapshot used by this workspace.</summary>
