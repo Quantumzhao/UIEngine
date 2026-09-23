@@ -32,13 +32,6 @@ public sealed class UIEngineHost : IDisposable
 
     public InteractionResult<Guid> SetRoot(string name, object instance)
     {
-        if (string.IsNullOrWhiteSpace(name))
-        {
-            return InteractionResult.Failure<Guid>(
-                InteractionErrorCode.INVALID_INPUT,
-                "A root name cannot be empty or whitespace.");
-        }
-
         if (instance.GetType().IsValueType)
         {
             return InteractionResult.Failure<Guid>(
@@ -54,13 +47,6 @@ public sealed class UIEngineHost : IDisposable
 
     public InteractionResult<RootRegistration> RemoveRoot(string name)
     {
-        if (string.IsNullOrWhiteSpace(name))
-        {
-            return InteractionResult.Failure<RootRegistration>(
-                InteractionErrorCode.INVALID_INPUT,
-                "A root name cannot be empty or whitespace.");
-        }
-
         return _Roots.Remove(name, out var root)
             ? InteractionResult.Success(root.Registration)
             : InteractionResult.Failure<RootRegistration>(
