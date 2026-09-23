@@ -24,7 +24,6 @@ public static class CyclicWorldFactory
                     static (profile, value) => profile.GrossDomesticProduct = value,
                     new ValueRange<decimal>(0m, 10_000_000m)),
             ],
-            identity: static profile => $"economy/{profile.RegionCode}",
             summary: static profile =>
                 $"{profile.RegionCode}: " +
                 $"{profile.GrossDomesticProduct.ToString(CultureInfo.InvariantCulture)} million credits"),
@@ -34,7 +33,7 @@ public static class CyclicWorldFactory
     {
         var world = new World("Earth");
         var nation = new Nation("N1") { Population = 100 };
-        var capital = new City("city/capital", "Capital City", nation);
+        var capital = new City("Capital City", nation);
         nation.Capital = capital;
         nation.Cities.Add(capital);
         world.Nations.Add(nation);
@@ -50,9 +49,6 @@ public sealed class World
         Name = name;
         Economy = new EconomicProfile(name, 1_000m);
     }
-
-    [DomainIdentitySource]
-    public string DomainIdentity => $"world/{Name}";
 
     [Expose]
     public string Name { get; }
@@ -87,9 +83,6 @@ public sealed class Nation : INotifyPropertyChanged
     }
 
     public event PropertyChangedEventHandler? PropertyChanged;
-
-    [DomainIdentitySource]
-    public string DomainIdentity => $"nation/{Code}";
 
     [Expose]
     public string Code { get; }
@@ -149,12 +142,11 @@ public sealed class Nation : INotifyPropertyChanged
         return Population;
     }
 
-    /// <summary>Replaces the capital instance while preserving its domain identity.</summary>
+    /// <summary>Replaces the capital instance.</summary>
     [Action]
     public City ReplaceCapital(string name)
     {
-        var identity = Capital?.DomainIdentity ?? $"city/{Code}/capital";
-        var replacement = new City(identity, name, this);
+        var replacement = new City(name, this);
         var existingIndex = Capital is null ? -1 : Cities.IndexOf(Capital);
         Capital = replacement;
         if (existingIndex < 0)
@@ -207,19 +199,10 @@ public sealed class Nation : INotifyPropertyChanged
 public sealed class City
 {
     public City(string name, Nation ownerNation)
-        : this($"city/{name}", name, ownerNation)
     {
-    }
-
-    public City(string identity, string name, Nation ownerNation)
-    {
-        DomainIdentity = identity;
         Name = name;
         OwnerNation = ownerNation;
     }
-
-    [DomainIdentitySource]
-    public string DomainIdentity { get; }
 
     [Expose]
     public string Name { get; }

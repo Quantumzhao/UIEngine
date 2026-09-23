@@ -6,7 +6,7 @@ using UIEngine.Core.Attributes;
 
 namespace UIEngine.Core;
 
-/// <summary>Owns roots, runtime identity, live interaction, and action lifetime.</summary>
+/// <summary>Owns roots, runtime handles, live interaction, and action lifetime.</summary>
 /// <remarks>
 /// Live graph operations are synchronous and must be called on the domain model's owning thread.
 /// A frontend on another thread is responsible for arranging that handoff outside Core.
@@ -16,8 +16,6 @@ public sealed class UIEngineHost : IDisposable
     private readonly ConditionalWeakTable<object, _HandleHolder> _Handles = new();
     private readonly Dictionary<Guid, WeakReference<object>> _Objects = [];
     private readonly Dictionary<string, _RootEntry> _Roots = new(StringComparer.Ordinal);
-    private readonly Dictionary<Guid, string?> _DomainIdentities = [];
-    private readonly Dictionary<string, HashSet<Guid>> _DomainIdentityIndex = [];
     private readonly ConcurrentDictionary<ActionInvocation, byte> _Invocations = [];
     private readonly HostSettings _Settings;
     private readonly ILogger _Logger;
@@ -80,62 +78,6 @@ public sealed class UIEngineHost : IDisposable
         return _GetOrCreateHandle(instance);
     }
 
-    public InteractionResult<string?> GetDomainIdentity(Guid handle)
-    {
-        if (_DomainIdentities.TryGetValue(handle, out var cached))
-        {
-            return InteractionResult.Success(cached);
-        }
-
-        var target = ResolveTarget(handle);
-        if (!target.IsSuccess)
-        {
-            return InteractionResult.Failure<string?>(target.Error!);
-        }
-
-        var discovered = _DiscoverDomainIdentity(target.Value);
-        if (!discovered.IsSuccess)
-        {
-            return discovered;
-        }
-
-        _DomainIdentities[handle] = discovered.Value;
-        if (discovered.Value is { } identity)
-        {
-            if (!_DomainIdentityIndex.TryGetValue(identity, out var handles))
-            {
-                handles = [];
-                _DomainIdentityIndex.Add(identity, handles);
-            }
-
-            handles.Add(handle);
-        }
-
-        return discovered;
-    }
-
-    public InteractionResult<Guid> ResolveDomainIdentity(string identity)
-    {
-        if (!_DomainIdentityIndex.TryGetValue(identity, out var handles))
-        {
-            return _DomainIdentityNotFound(identity);
-        }
-
-        handles.RemoveWhere(handle =>
-            !_Objects.TryGetValue(handle, out var reference) || !reference.TryGetTarget(out _));
-        if (handles.Count == 0)
-        {
-            _DomainIdentityIndex.Remove(identity);
-            return _DomainIdentityNotFound(identity);
-        }
-
-        return handles.Count == 1
-            ? InteractionResult.Success(handles.Single())
-            : InteractionResult.Failure<Guid>(
-                InteractionErrorCode.AMBIGUOUS,
-                $"Domain identity '{identity}' matches multiple live objects.");
-    }
-
     public InteractionResult<ResolvedNode> ResolveRootNode(string name)
     {
         if (!_Roots.TryGetValue(name, out var root))
@@ -156,36 +98,18 @@ public sealed class UIEngineHost : IDisposable
             created.Value));
     }
 
-    public InteractionResult<ResolvedPath> ResolvePath(
-        string path,
-        string? expectedDomainIdentity = null)
+    public InteractionResult<ResolvedPath> ResolvePath(string path)
     {
         var parsed = LogicalPath.Parse(path);
         return parsed.IsSuccess
-            ? ResolvePath(parsed.Value, expectedDomainIdentity)
+            ? ResolvePath(parsed.Value)
             : InteractionResult.Failure<ResolvedPath>(parsed.Error!);
     }
 
-    public InteractionResult<ResolvedPath> ResolvePath(
-        LogicalPath path,
-        string? expectedDomainIdentity = null)
-    {
-        var resolved = Execute(
+    public InteractionResult<ResolvedPath> ResolvePath(LogicalPath path) =>
+        Execute(
             "resolve path",
             () => PathResolution.Resolve(this, path));
-        if (!resolved.IsSuccess || expectedDomainIdentity is null)
-        {
-            return resolved;
-        }
-
-        return resolved.Value.Node is IObjectNode objectNode && StringComparer.Ordinal.Equals(
-                objectNode.DomainIdentity,
-                expectedDomainIdentity)
-            ? resolved
-            : InteractionResult.Failure<ResolvedPath>(
-                InteractionErrorCode.NOT_FOUND,
-                "The path resolves to a conflicting domain identity.");
-    }
 
     public void Dispose()
     {
@@ -193,8 +117,6 @@ public sealed class UIEngineHost : IDisposable
         _Invocations.Clear();
         _Roots.Clear();
         _Objects.Clear();
-        _DomainIdentities.Clear();
-        _DomainIdentityIndex.Clear();
         _Handles.Clear();
 
         foreach (var invocation in invocations)
@@ -226,15 +148,9 @@ public sealed class UIEngineHost : IDisposable
             return InteractionResult.Failure<LiveObjectNode>(target.Error!);
         }
 
-        var identity = GetDomainIdentity(handle);
-        if (!identity.IsSuccess)
-        {
-            return InteractionResult.Failure<LiveObjectNode>(identity.Error!);
-        }
-
         return Execute(
             "create object node",
-            () => _CreateObjectNode(target.Value, handle, name, identity.Value));
+            () => _CreateObjectNode(target.Value, handle, name));
     }
 
     internal InteractionResult<T> Execute<T>(string operation, Func<InteractionResult<T>> action)
@@ -274,43 +190,10 @@ public sealed class UIEngineHost : IDisposable
         return handle;
     }
 
-    private InteractionResult<string?> _DiscoverDomainIdentity(object instance)
-    {
-        if (_Settings.Exposures.TryGetValue(instance.GetType(), out var exposure))
-        {
-            return _NormalizeIdentity(exposure.GetDomainIdentity(instance));
-        }
-
-        var metadata = ReflectionMetadata.Get(instance.GetType());
-        string? attributed = null;
-        if (metadata.DomainIdentityMember is { } member)
-        {
-            if (member is PropertyInfo { PropertyType: var propertyType } property &&
-                propertyType == typeof(string) && ReflectionMetadata.CanRead(property))
-            {
-                attributed = (string?)ReflectionMetadata.Read(property, instance);
-            }
-            else if (member is FieldInfo { FieldType: var fieldType } field &&
-                fieldType == typeof(string))
-            {
-                attributed = (string?)ReflectionMetadata.Read(field, instance);
-            }
-            else
-            {
-                return InteractionResult.Failure<string?>(
-                    InteractionErrorCode.INVALID_INPUT,
-                    "A domain identity member must be a readable string field or property.");
-            }
-        }
-
-        return _NormalizeIdentity(attributed);
-    }
-
     private InteractionResult<LiveObjectNode> _CreateObjectNode(
         object instance,
         Guid handle,
-        string name,
-        string? identity)
+        string name)
     {
         var metadata = ReflectionMetadata.Get(instance.GetType());
         _Settings.Exposures.TryGetValue(instance.GetType(), out var exposure);
@@ -405,23 +288,8 @@ public sealed class UIEngineHost : IDisposable
             name,
             instance.GetType(),
             handle,
-            identity,
             summary,
             members.OrderBy(static member => member.Name, StringComparer.Ordinal).ToArray()));
-    }
-
-    private static InteractionResult<string?> _NormalizeIdentity(string? value)
-    {
-        if (value is null)
-        {
-            return InteractionResult.Success<string?>(null);
-        }
-
-        return string.IsNullOrWhiteSpace(value)
-            ? InteractionResult.Failure<string?>(
-                InteractionErrorCode.INVALID_INPUT,
-                "A domain identity cannot be empty or whitespace.")
-            : InteractionResult.Success<string?>(value);
     }
 
     private void _InvocationCompleted(ActionInvocation invocation)
@@ -448,11 +316,6 @@ public sealed class UIEngineHost : IDisposable
             InteractionErrorCode.FAULT,
             $"The {operation} operation failed unexpectedly.");
     }
-
-    private static InteractionResult<Guid> _DomainIdentityNotFound(string identity) =>
-        InteractionResult.Failure<Guid>(
-            InteractionErrorCode.NOT_FOUND,
-            $"No live object has domain identity '{identity}'.");
 
     private sealed record _HandleHolder(Guid Handle);
 

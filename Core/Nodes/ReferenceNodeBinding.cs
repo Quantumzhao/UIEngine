@@ -36,10 +36,6 @@ internal sealed class ReferenceNodeBinding(
                     $"Reference '{Name}' returned a value type.");
             }
 
-            var encountered = Host.GetOrCreateHandle(value);
-            var indexed = Host.GetDomainIdentity(encountered);
-            return indexed.IsSuccess
-                ? InteractionResult.Success<Guid?>(encountered)
-                : InteractionResult.Failure<Guid?>(indexed.Error!);
+            return InteractionResult.Success<Guid?>(Host.GetOrCreateHandle(value));
         });
 }

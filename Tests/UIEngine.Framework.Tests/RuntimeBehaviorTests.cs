@@ -64,7 +64,6 @@ public sealed class RuntimeBehaviorTests
         var write = value.WriteValue("125.5");
         var rejected = value.WriteValue("10000001");
 
-        Assert.Equal("economy/N1", objectNode.DomainIdentity);
         Assert.Equal(125.5m, write.Value);
         Assert.Equal(125.5m, profile.GrossDomesticProduct);
         Assert.Equal(InteractionErrorCode.VALIDATION_FAILED, rejected.Error?.Code);
@@ -116,7 +115,7 @@ public sealed class RuntimeBehaviorTests
     }
 
     [Fact]
-    public void PathsPreserveCyclesAndIdentityChecksSurviveCompatibleReplacement()
+    public void PathsPreserveCyclesAndFollowReplacementObjects()
     {
         using var host = _CreateWorldHost();
         var nation = host.ResolvePath("/world/Nations[index=0]");
@@ -134,41 +133,46 @@ public sealed class RuntimeBehaviorTests
             cycled.Value.CanonicalPath.ToString());
         Assert.False(legacyAlias.IsSuccess);
 
-        var original = host.ResolvePath(
-            "/world/Nations[index=0]",
-            "nation/N1");
+        var original = host.ResolvePath("/world/Nations[index=0]");
         host.SetRoot("world", CyclicWorldFactory.Create());
-        var replacement = host.ResolvePath(
-            "/world/Nations[index=0]",
-            "nation/N1");
+        var replacement = host.ResolvePath("/world/Nations[index=0]");
 
         Assert.True(original.IsSuccess);
         Assert.True(replacement.IsSuccess);
         Assert.NotEqual(
             ((IObjectNode)original.Value.Node).Handle,
             ((IObjectNode)replacement.Value.Node).Handle);
-
-        host.SetRoot("world", new World("Mars"));
-        var conflict = host.ResolvePath("/world", "world/Earth");
-        Assert.Equal(InteractionErrorCode.NOT_FOUND, conflict.Error?.Code);
     }
 
     [Fact]
-    public void KeyAndIdentitySelectorsResolveReferenceEntries()
+    public void IndexSelectorsFollowOrderAndKeySelectorsFollowCorrespondence()
     {
         var first = new _DomainObject("first");
-        var model = new _SelectorModel(first);
+        var second = new _DomainObject("second");
+        var model = new _SelectorModel(first, second);
         using var host = new UIEngineHost();
         host.SetRoot("model", model);
 
-        var byKey = host.ResolvePath("/model/ByKey[key=a]");
-        var byIdentity = host.ResolvePath("/model/Items[identity=item%2Ffirst]");
+        var initialByKey = host.ResolvePath("/model/ByKey[key=a]");
+        var initialByIndex = host.ResolvePath("/model/Items[index=0]");
+        model.ByKey["a"] = second;
+        model.Items.Reverse();
+        var remappedByKey = host.ResolvePath("/model/ByKey[key=a]");
+        var reorderedByIndex = host.ResolvePath("/model/Items[index=0]");
 
-        Assert.True(byKey.IsSuccess);
-        Assert.True(byIdentity.IsSuccess);
+        Assert.True(initialByKey.IsSuccess);
+        Assert.True(initialByIndex.IsSuccess);
+        Assert.True(remappedByKey.IsSuccess);
+        Assert.True(reorderedByIndex.IsSuccess);
         Assert.Equal(
-            ((IObjectNode)byKey.Value.Node).Handle,
-            ((IObjectNode)byIdentity.Value.Node).Handle);
+            ((IObjectNode)initialByKey.Value.Node).Handle,
+            ((IObjectNode)initialByIndex.Value.Node).Handle);
+        Assert.Equal(
+            ((IObjectNode)remappedByKey.Value.Node).Handle,
+            ((IObjectNode)reorderedByIndex.Value.Node).Handle);
+        Assert.NotEqual(
+            ((IObjectNode)initialByIndex.Value.Node).Handle,
+            ((IObjectNode)reorderedByIndex.Value.Node).Handle);
     }
 
     [Fact]
@@ -282,7 +286,6 @@ public sealed class RuntimeBehaviorTests
             "ObjectIdentity",
             "ReferenceDescriptor",
             "ResolvedBinding",
-            "DomainIdentity",
             "BindingResolution",
             "PathResolutionState",
             "ValueDescriptor",
@@ -411,20 +414,17 @@ public sealed class RuntimeBehaviorTests
 
     private sealed class _DomainObject(string key)
     {
-        [DomainIdentitySource]
-        public string DomainIdentity => $"item/{Key}";
-
         [Expose]
         public string Key { get; } = key;
     }
 
-    private sealed class _SelectorModel(_DomainObject item)
+    private sealed class _SelectorModel(_DomainObject first, _DomainObject second)
     {
         [Children]
-        public Dictionary<string, _DomainObject> ByKey { get; } = new() { ["a"] = item };
+        public Dictionary<string, _DomainObject> ByKey { get; } = new() { ["a"] = first };
 
         [Children]
-        public IReadOnlyList<_DomainObject> Items { get; } = [item];
+        public List<_DomainObject> Items { get; } = [first, second];
     }
 
     private sealed class _ActionModel

@@ -12,8 +12,6 @@ public abstract class TypeExposure
 
     public Type ObjectType { get; }
 
-    internal abstract string? GetDomainIdentity(object instance);
-
     internal abstract string? GetSummary(object instance);
 
     internal abstract IReadOnlyList<ValueExposure> Values { get; }
@@ -22,12 +20,10 @@ public abstract class TypeExposure
 public sealed class TypeExposure<T> : TypeExposure
     where T : class
 {
-    private readonly Func<T, string?>? _GetDomainIdentity;
     private readonly Func<T, string?>? _GetSummary;
 
     public TypeExposure(
         IReadOnlyList<ValueExposure>? values = null,
-        Func<T, string?>? identity = null,
         Func<T, string?>? summary = null)
         : base(typeof(T))
     {
@@ -50,14 +46,10 @@ public sealed class TypeExposure<T> : TypeExposure
         }
 
         Values = new ReadOnlyCollection<ValueExposure>(snapshot);
-        _GetDomainIdentity = identity;
         _GetSummary = summary;
     }
 
     internal override IReadOnlyList<ValueExposure> Values { get; }
-
-    internal override string? GetDomainIdentity(object instance) =>
-        _GetDomainIdentity?.Invoke((T)instance);
 
     internal override string? GetSummary(object instance) => _GetSummary?.Invoke((T)instance);
 }

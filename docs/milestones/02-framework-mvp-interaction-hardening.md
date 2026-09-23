@@ -9,9 +9,9 @@ collections, and structured failures.
 
 ## Delivered
 
-- Optional stable domain identity distinct from runtime handles and logical paths.
-- Canonical percent-escaped paths with index, key, and identity collection selectors.
-- Replacement-aware path and member resolution with identity conflict detection.
+- Runtime handles distinct from logical paths.
+- Canonical percent-escaped paths with index and key collection selectors.
+- Replacement-aware path and member resolution that follows the current graph.
 - Invariant conversion, nullability, enum, range, and DataAnnotations validation.
 - Bounded collection windows for indexed and lazy sources.
 - Structured entries for null, scalar, reference, and dictionary values.
@@ -22,8 +22,7 @@ collections, and structured failures.
 
 ## Acceptance
 
-- Compatible replacement can recover by path and stable identity.
-- Conflicting or ambiguous identities fail explicitly.
+- Replacement objects are resolved through their current paths.
 - Ordinary browsing never performs an unbounded collection read.
 - Expected failures return structured codes and validation issues.
 - Invocation completion remains deterministic.

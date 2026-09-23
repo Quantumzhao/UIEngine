@@ -84,9 +84,6 @@ internal sealed class CollectionNodeBinding(
                 CollectionSelectorKind.KEY => StringComparer.Ordinal.Equals(
                     Convert.ToString(entry.Key, CultureInfo.InvariantCulture),
                     selector.Value),
-                CollectionSelectorKind.DOMAIN_IDENTITY => StringComparer.Ordinal.Equals(
-                    entry.DomainIdentity,
-                    selector.Value),
                 _ => false,
             })
             .Select(static entry => entry.Handle)
@@ -179,14 +176,7 @@ internal sealed class CollectionNodeBinding(
             return new ScalarCollectionEntry(position, value, key);
         }
 
-        var handle = Host.GetOrCreateHandle(value);
-        var identity = Host.GetDomainIdentity(handle);
-        if (!identity.IsSuccess)
-        {
-            throw new InvalidOperationException(identity.Error!.Message);
-        }
-
-        return new ReferenceCollectionEntry(position, handle, identity.Value, key);
+        return new ReferenceCollectionEntry(position, Host.GetOrCreateHandle(value), key);
     }
 
     private static InteractionResult<IReadOnlyList<Guid>> _ReferenceHandles(

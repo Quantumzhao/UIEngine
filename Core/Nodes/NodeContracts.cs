@@ -33,8 +33,6 @@ public interface IObjectNode : INavigableNode
 {
     Guid Handle { get; }
 
-    string? DomainIdentity { get; }
-
     string? Summary { get; }
 
     IReadOnlyList<BaseNode> Members { get; }

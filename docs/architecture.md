@@ -20,7 +20,7 @@ flowchart LR
 The host owns:
 
 - registered domain roots;
-- runtime handles and optional stable domain identities;
+- runtime handles;
 - reflection and programmatic exposure;
 - path resolution and live operations;
 - domain-thread-affine interaction; and
@@ -91,18 +91,17 @@ A method result is presented by the method node and does not implicitly create a
 Node instances are not shared between navigators. Two navigators at the same path have independent
 node and presentation instances while operating on the same live domain object.
 
-## Identity and Paths
+## Handles and Paths
 
-UIEngine keeps three concepts separate:
+UIEngine keeps two concepts separate:
 
 | Concept | Purpose |
 |---|---|
 | `Guid` | Identifies one live reference within a host lifetime. |
-| Domain identity string | Optionally identifies a domain entity across compatible replacement. |
 | `LogicalPath` | Identifies how a navigator reached an exposed node. |
 
 Logical paths are absolute, case-sensitive, and percent-escaped. Collection elements use an
-explicit index, key, or domain-identity selector.
+explicit index or key selector.
 
 ```text
 /world
@@ -110,16 +109,15 @@ explicit index, key, or domain-identity selector.
 /world/Nations
 /world/Nations[index=0]
 /catalog/Items[key=SKU-42]
-/world/Nations[identity=nation%2FN1]
 ```
 
 A path can end at any node, not only a reference object. Parent traversal follows navigation
 semantics: the parent of a selected collection element is its collection node, and the parent of a
 member is its containing node.
 
-Path resolution returns a fresh node plus its canonical path. Resolution may use stable domain
-identity to survive compatible replacement, but it must reject a path that resolves to a
-conflicting identity.
+Path resolution returns a fresh node plus its canonical path. It follows the current graph, so a
+path naturally resolves to a replacement object when the corresponding root, member, or collection
+entry changes.
 
 `ResolvedNode` is the Core-owned hand-off for that pair. It retains its originating host
 internally so a workspace can reject an occurrence from another host, while neither

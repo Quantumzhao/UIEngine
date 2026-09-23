@@ -5,7 +5,7 @@ invocable graph.
 
 Its target architecture has three frontend-neutral layers:
 
-- `UIEngineHost` owns roots, live domain access, identity, dispatch, and invocation.
+- `UIEngineHost` owns roots, live domain access, runtime handles, dispatch, and invocation.
 - `BaseNode` represents an exposed .NET language feature.
 - `UIEngineWorkspace` owns independent `Navigator`s and serializable layout state.
 
@@ -32,8 +32,7 @@ host.SetRoot("model", model);
 ```
 
 Domain members opt in with `[Expose]`, `[Children]`, and `[Action]`. `[Summary]` supplies an
-optional summary. `[DomainIdentitySource]` supplies an optional identity that can survive
-compatible object replacement.
+optional summary.
 
 ## Minimal TUI Host
 

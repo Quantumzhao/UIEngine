@@ -27,8 +27,7 @@ internal sealed record ReflectedMember(
 
 internal sealed record ReflectedType(
     IReadOnlyList<ReflectedMember> Members,
-    MemberInfo? SummaryMember,
-    MemberInfo? DomainIdentityMember);
+    MemberInfo? SummaryMember);
 
 internal static class ReflectionMetadata
 {
@@ -159,18 +158,7 @@ internal static class ReflectionMetadata
         var allMembers = type.GetMembers(FLAGS);
         var summary = allMembers.FirstOrDefault(
             static member => member.IsDefined(typeof(SummaryAttribute), inherit: true));
-        var identities = allMembers
-            .Where(static member => member.IsDefined(
-                typeof(DomainIdentitySourceAttribute),
-                inherit: true))
-            .ToArray();
-        if (identities.Length > 1)
-        {
-            throw new InvalidOperationException(
-                $"Type '{type.FullName}' has multiple domain identity members.");
-        }
-
-        return new ReflectedType(members, summary, identities.SingleOrDefault());
+        return new ReflectedType(members, summary);
     }
 
     private static bool _IsNullable(MemberInfo member, Type memberType)

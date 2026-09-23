@@ -44,15 +44,14 @@ cd /world
 cd /world/Economy
 cd /world/Nations[index=0]/Capital
 cd /world/Nations[index=0]/Capital/OwnerNation
-cd /world/Nations[identity=nation%2FN1]
 ```
 
-Selectors are `[index=<non-negative integer>]`, `[key=<value>]`, and `[identity=<domain identity>]`.
-The old `/Collection/0` form is deliberately unsupported. `cd` must end at an object, not a scalar,
-action, or unselected collection.
+Selectors are `[index=<non-negative integer>]` and `[key=<value>]`. The old `/Collection/0` form
+is deliberately unsupported. `cd` must end at an object, not a scalar, action, or unselected
+collection.
 
-The session re-resolves its canonical path before each operation. Optional domain identity permits
-compatible replacement recovery but prevents attachment to a conflicting object.
+The session re-resolves its canonical path before each operation and follows the object currently
+located there.
 
 ## Collection Output
 
@@ -64,13 +63,13 @@ collection PopulationForecast offset=9998 count=2 total=10000 hasMore=False
 ```
 
 The default limit is 20. The host maximum remains authoritative. Entries show their position,
-optional key, and exactly one of null, scalar value, or reference handle/domain identity.
+optional key, and exactly one of null, scalar value, or reference handle.
 
 ## Inspection, Values, and Actions
 
-`inspect` prints the canonical path, CLR type, runtime handle, optional domain identity, summary,
-and role-specific member metadata. It includes nullability, enum options, ranges, collection
-element/key types, and action parameter/default/status information.
+`inspect` prints the canonical path, CLR type, runtime handle, summary, and role-specific member
+metadata. It includes nullability, enum options, ranges, collection element/key types, and action
+parameter/default/status information.
 
 Examples:
 

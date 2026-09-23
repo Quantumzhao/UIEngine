@@ -43,7 +43,6 @@ public sealed class CliBehaviorTests
 
         var transcript = output.ToString();
         Assert.Contains("root world", transcript, StringComparison.Ordinal);
-        Assert.Contains("domain-identity: world/Earth", transcript, StringComparison.Ordinal);
         Assert.Contains(
             "collection PopulationForecast offset=9998 count=2 total=10000 hasMore=False",
             transcript,

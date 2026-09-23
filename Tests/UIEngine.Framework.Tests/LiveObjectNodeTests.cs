@@ -116,9 +116,9 @@ public sealed class LiveObjectNodeTests
         public int InvocationCount => _InvocationCount;
     }
 
-    private sealed class _Child(string identity)
+    private sealed class _Child(string name)
     {
-        [DomainIdentitySource]
-        public string DomainIdentity => $"child/{identity}";
+        [Summary]
+        public string Summary => name;
     }
 }

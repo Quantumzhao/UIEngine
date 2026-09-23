@@ -130,8 +130,6 @@ public sealed class NodeAndNavigationContractTests
     {
         public Guid Handle { get; } = Guid.NewGuid();
 
-        public string? DomainIdentity => null;
-
         public string? Summary => null;
 
         public IReadOnlyList<BaseNode> Members => [];

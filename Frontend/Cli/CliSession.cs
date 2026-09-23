@@ -213,7 +213,7 @@ internal sealed class CliSession : IDisposable
                 NullCollectionEntry => "null",
                 ScalarCollectionEntry scalar => $"value={_FormatValue(scalar.Value)}",
                 ReferenceCollectionEntry reference =>
-                    $"reference={reference.Handle:D} identity={_FormatValue(reference.DomainIdentity)}",
+                    $"reference={reference.Handle:D}",
                 _ => throw new InvalidOperationException("Unknown collection entry type."),
             };
             _Output.WriteLine($"[{entry.Position}]{key} {content}");
@@ -285,7 +285,6 @@ internal sealed class CliSession : IDisposable
         _Output.WriteLine($"path: {CurrentPath}");
         _Output.WriteLine($"type: {node.ValueType.FullName ?? node.ValueType.Name}");
         _Output.WriteLine($"handle: {objectNode.Handle:D}");
-        _Output.WriteLine($"domain-identity: {_FormatValue(objectNode.DomainIdentity)}");
         _Output.WriteLine($"summary: {objectNode.Summary ?? "null"}");
 
         foreach (var member in objectNode.Members.OrderBy(static member => member.Name, StringComparer.Ordinal))
@@ -537,13 +536,6 @@ internal sealed class CliSession : IDisposable
                 "The current path no longer identifies a navigable object.");
         }
 
-        if (location.DomainIdentity != objectNode.DomainIdentity)
-        {
-            return InteractionResult.Failure<BaseNode>(
-                InteractionErrorCode.NOT_FOUND,
-                "The current path resolved to a different domain identity.");
-        }
-
         var typeName = resolution.Value.Node.ValueType.FullName ?? resolution.Value.Node.ValueType.Name;
         if (!StringComparer.Ordinal.Equals(location.TypeName, typeName))
         {
@@ -616,7 +608,6 @@ internal sealed class CliSession : IDisposable
 
             captured.Add(new _LocationBinding(
                 location.Path,
-                objectNode.DomainIdentity,
                 resolved.Value.Node.ValueType.FullName ?? resolved.Value.Node.ValueType.Name,
                 objectNode.Handle));
         }
@@ -758,7 +749,6 @@ internal sealed class CliSession : IDisposable
 
     private sealed record _LocationBinding(
         LogicalPath Path,
-        string? DomainIdentity,
         string TypeName,
         Guid LastResolvedHandle);
 

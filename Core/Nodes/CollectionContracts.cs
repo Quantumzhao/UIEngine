@@ -11,7 +11,6 @@ public sealed record ScalarCollectionEntry(long Position, object Value, object? 
 public sealed record ReferenceCollectionEntry(
     long Position,
     Guid Handle,
-    string? DomainIdentity,
     object? Key = null)
     : CollectionEntry(Position, Key);
 

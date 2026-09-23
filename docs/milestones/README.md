@@ -16,5 +16,5 @@ document, update the outline before implementation continues.
 | Milestone | Status | Summary |
 |---|---|---|
 | [01 — Architecture Runway and CLI Walking Skeleton](01-architecture-runway-cli-walking-skeleton.md) | Complete | Establish the safety baseline and prove live graph access through the CLI. |
-| [02 — Framework MVP Interaction Hardening](02-framework-mvp-interaction-hardening.md) | Complete | Add identity, paths, validation, bounded work, dispatch, and invocation. |
+| [02 — Framework MVP Interaction Hardening](02-framework-mvp-interaction-hardening.md) | Complete | Add runtime handles, paths, validation, bounded work, dispatch, and invocation. |
 | [03 — Product MVP TUI](03-product-mvp-tui.md) | In Progress | Build the reusable multi-navigator TUI and layout workflow. |

@@ -20,7 +20,7 @@ frontend.
 
 ## Acceptance
 
-- Repeated references resolve to the same host-scoped runtime identity.
+- Repeated references resolve to the same host-scoped runtime handle.
 - Cycles terminate without copying the graph.
 - Separate hosts remain isolated.
 - Domain objects remain authoritative during reads and writes.

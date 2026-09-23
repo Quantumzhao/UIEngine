@@ -108,7 +108,7 @@ do not defer Core or lifetime coverage to the final TUI acceptance pass.
   may be owned by `TuiWorkspace`; a caller-supplied Core workspace remains caller-owned.
 - Core produces versioned layout data but does not choose a file, perform file I/O, or persist live
   state. The TUI owns its stable presentation fields and maps them into that data contract.
-- The existing conversion, validation, identity, domain-thread affinity, bounded-collection, and
+- The existing conversion, validation, runtime-handle, domain-thread affinity, bounded-collection, and
   invocation implementations are behavior to preserve, not subsystems to redesign.
 
 ### Completed foundation
@@ -148,7 +148,7 @@ Before moving behavior, define and test the smallest public contracts needed by 
 
 Verification:
 
-- Add contract tests for overlapping facets, fresh occurrence identity, terminal nodes, structured
+- Add contract tests for overlapping facets, fresh occurrences, terminal nodes, structured
   broken entries, and host/workspace ownership.
 - Keep Core free of XenoAtom references and presentation terminology.
 
@@ -161,8 +161,8 @@ Build nodes from exposure metadata while preserving the live-domain guarantees.
 2. Resolve a registered root to an object node and every exposed member to a node with the correct
    overlapping facets. Continue to expose only opted-in reflection members and configured
    programmatic values.
-3. Create new node instances on each resolution. Nodes may share the same host, live target, runtime
-   handle, and domain identity, but never the same node occurrence across navigator entries.
+3. Create new node instances on each resolution. Nodes may share the same host, live target, and
+   runtime handle, but never the same node occurrence across navigator entries.
 4. Keep live operations host-mediated:
    - reads and writes resolve the current owner synchronously on the domain thread;
    - writes use the existing invariant conversion and validation pipeline;
@@ -191,7 +191,7 @@ roots, members, collections, selected elements, scalars, and methods.
    resolved reference can expose object semantics for its current live target while retaining its
    reference and property/field semantics.
 3. Resolve a collection path to its collection node and a selector path to the selected reference
-   element. Keep selector lookup bounded and retain index, key, and domain-identity selectors.
+   element. Keep selector lookup bounded and retain index and key selectors.
 4. Define semantic parent calculation rather than only removing the final path segment:
    - the parent of `/world/Name` is `/world`;
    - the parent of `/world/Nations[index=0]` is `/world/Nations`; and
@@ -199,18 +199,18 @@ roots, members, collections, selected elements, scalars, and methods.
      `/world/Nations[index=0]`.
 5. Return enough semantic ancestor information to initialize a navigator or rebuild its destructive
    stack from one saved current path.
-6. Preserve canonical escaping, case sensitivity, cycles, shared references, compatible identity
-   recovery, and conflicting-identity refusal.
+6. Preserve canonical escaping, case sensitivity, cycles, shared references, and replacement
+   through current path resolution.
 7. Keep path results node-based and remove legacy member-kind and binding-specific resolution once
    all consumers use resolved nodes.
 
 Verification:
 
 - Cover every node kind as the end of a path.
-- Cover all three selector kinds, collection-to-element parent traversal, cycles, shared references,
-  compatible replacement, identity conflict, null, missing, ambiguous, and unavailable targets.
-- Assert that resolving the same path twice returns distinct nodes with the expected shared domain
-  handle or identity.
+- Cover both selector kinds, collection-to-element parent traversal, cycles, shared references,
+  replacement, null, missing, ambiguous, and unavailable targets.
+- Assert that resolving the same path twice returns distinct nodes with the expected shared runtime
+  handle.
 
 ### 4. Implement `UIEngineWorkspace` and `Navigator`
 
@@ -354,7 +354,7 @@ shape.
 1. Add one control factory with documented precedence for overlapping facets. For example, enum
    editing takes precedence over the generic scalar editor, while property and field facets supply
    labels/metadata rather than choosing a widget.
-2. Add object/reference presentation with summary, runtime identity information where useful, and
+2. Add object/reference presentation with summary, runtime handles where useful, and
    activatable child nodes. Do not recursively render descendants.
 3. Add read-only scalar display and writable editors for string/character, boolean, number, and
    enum values.
@@ -400,16 +400,15 @@ Verification:
 1. Provide an explicit refresh action for controls backed by live values.
 2. Re-read through the current node without applying completed work to a detached control.
 3. Never overwrite a dirty draft. Let the user keep, reload, or commit the draft.
-4. Re-resolve through the navigator after compatible replacement so the active entry receives a
-   fresh node. Refuse conflicting identity instead of silently rebinding.
+4. Re-resolve through the navigator after replacement so the active entry receives a fresh node
+   for the object currently at that path.
 5. Provide valid recovery commands for null, unavailable, not found, ambiguous, type mismatch,
    permission, disposed, fault, and broken-restored-path states without parsing error
    messages.
 
 Verification:
 
-- Test explicit refresh, dirty-draft handling, collection replacement, compatible replacement,
-  and conflicting replacement.
+- Test explicit refresh, dirty-draft handling, and collection and object replacement.
 - Remove one of two same-path navigators and prove the remaining navigator still refreshes.
 - Assert that no disposed control receives a later posted update.
 

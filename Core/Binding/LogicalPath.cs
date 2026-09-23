@@ -7,7 +7,6 @@ public enum CollectionSelectorKind
 {
     INDEX,
     KEY,
-    DOMAIN_IDENTITY,
 }
 
 public sealed record CollectionSelector
@@ -182,7 +181,6 @@ public sealed class LogicalPath : IEquatable<LogicalPath>
         {
             "index" => CollectionSelectorKind.INDEX,
             "key" => CollectionSelectorKind.KEY,
-            "identity" => CollectionSelectorKind.DOMAIN_IDENTITY,
             _ => (CollectionSelectorKind?)null,
         };
         if (kind is null)
@@ -220,7 +218,6 @@ public sealed class LogicalPath : IEquatable<LogicalPath>
         {
             CollectionSelectorKind.INDEX => "index",
             CollectionSelectorKind.KEY => "key",
-            CollectionSelectorKind.DOMAIN_IDENTITY => "identity",
             _ => throw new InvalidOperationException("Unknown collection selector kind."),
         };
         return $"{name}[{selector}={Escape(segment.Selector.Value)}]";

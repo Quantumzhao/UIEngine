@@ -43,7 +43,7 @@ toolkit types in Core.
   until a valid node is reached.
 - Layout persistence stores logical paths and stable presentation configuration only. It never
   stores domain values, runtime handles, node instances, edit drafts, or running operations.
-- Runtime handles, optional stable domain identity, and logical paths remain distinct concepts.
+- Runtime handles and logical paths remain distinct concepts.
 - Collections are read in bounded windows.
 - Expected failures use structured results. Unexpected faults remain available only for trusted
   diagnostics.
@@ -66,7 +66,7 @@ toolkit types in Core.
 
 ## Current Delivery State
 
-The host already provides synchronous live graph access, canonical paths, identity, bounded
+The host already provides synchronous live graph access, canonical paths, runtime handles, bounded
 collections, validation, and synchronous or asynchronous domain invocation. The CLI exercises
 those capabilities. The TUI has a reusable hosting boundary and independent frontend operation
 scopes.
@@ -76,7 +76,7 @@ followed by the multi-navigator TUI.
 
 ## Repository Structure
 
-- `Core/` — host, exposure, identity, paths, nodes, workspaces, and navigation.
+- `Core/` — host, exposure, handles, paths, nodes, workspaces, and navigation.
 - `Frontend/Cli/` — command-line frontend.
 - `Frontend/Tui/` — reusable XenoAtom-based TUI frontend.
 - `Examples/CyclicDomain/` — cyclic and shared-reference acceptance model.

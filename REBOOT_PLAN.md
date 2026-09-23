@@ -3,14 +3,14 @@
 ## Objective
 
 Expose live .NET objects through frontend-neutral `BaseNode`s and let users work through one or
-more independent `Navigator`s. Preserve the existing guarantees for identity, paths, bounded work,
-validation, dispatch, and invocation lifetime.
+more independent `Navigator`s. Preserve the existing guarantees for runtime handles, paths,
+bounded work, validation, dispatch, and invocation lifetime.
 
 ## Target Model
 
 ```text
 UIEngineHost
-└── live roots, identity, resolution, and operations
+└── live roots, handles, resolution, and operations
 
 UIEngineWorkspace
 ├── Navigator 1
@@ -68,7 +68,7 @@ facets, and frontends choose controls from those semantics.
 
 - Define the minimal `BaseNode` base contract and language-semantic variants or interfaces.
 - Map reflection and programmatic exposure to nodes.
-- Preserve conversion, validation, identity, dispatch, collection bounds, and method
+- Preserve conversion, validation, runtime handles, dispatch, collection bounds, and method
   invocation.
 - Cover scalar, enum, property, field, reference, collection, and method semantics with black-box
   tests.
@@ -77,7 +77,7 @@ facets, and frontends choose controls from those semantics.
 
 - Resolve roots, members, collections, and selected collection elements to fresh nodes.
 - Define parent traversal for member and collection-selector paths.
-- Preserve canonical escaping, identity recovery, and conflict detection.
+- Preserve canonical escaping and resolve replacements through their current paths.
 - Test cycles, shared references, replacement, nulls, and unavailable targets.
 
 ### 3. Add workspace and navigator state

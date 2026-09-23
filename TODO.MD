@@ -2,8 +2,8 @@
 
 ## Runtime Foundation
 
-- [x] Host-scoped roots and runtime identity.
-- [x] Stable domain identity and canonical logical paths.
+- [x] Host-scoped roots and runtime handles.
+- [x] Canonical logical paths.
 - [x] Live reads, writes, conversion, and validation.
 - [x] Bounded collection access.
 - [x] Synchronous and asynchronous invocation with lifecycle status.

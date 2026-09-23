@@ -7,20 +7,16 @@ internal sealed class LiveObjectNode : BaseNode, IObjectNode
         string name,
         Type valueType,
         Guid handle,
-        string? domainIdentity,
         string? summary,
         IReadOnlyList<BaseNode> members)
         : base(host, name, valueType)
     {
         Handle = handle;
-        DomainIdentity = domainIdentity;
         Summary = summary;
         Members = members;
     }
 
     public Guid Handle { get; }
-
-    public string? DomainIdentity { get; }
 
     public string? Summary { get; }
 
