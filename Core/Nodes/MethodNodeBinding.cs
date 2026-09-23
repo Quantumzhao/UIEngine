@@ -8,16 +8,12 @@ internal sealed class ReflectedAction
     private ReflectedAction(
         MethodInfo method,
         ParameterInfo[] userParameters,
-        ParameterInfo? progressParameter,
-        Type? resultType,
-        Type? progressType)
+        Type? resultType)
     {
         Method = method;
         MethodParameters = method.GetParameters();
         UserParameters = userParameters;
-        ProgressParameter = progressParameter;
         ResultType = resultType;
-        ProgressType = progressType;
     }
 
     public MethodInfo Method { get; }
@@ -26,11 +22,7 @@ internal sealed class ReflectedAction
 
     public ParameterInfo[] UserParameters { get; }
 
-    public ParameterInfo? ProgressParameter { get; }
-
     public Type? ResultType { get; }
-
-    public Type? ProgressType { get; }
 
     public bool IsAsynchronous => typeof(Task).IsAssignableFrom(Method.ReturnType);
 
@@ -47,27 +39,6 @@ internal sealed class ReflectedAction
             return _Unsupported(method, "ref and out parameters are not supported");
         }
 
-        var infrastructureStart = Array.FindIndex(parameters, static parameter =>
-            _IsProgress(parameter.ParameterType));
-        if (infrastructureStart < 0)
-        {
-            infrastructureStart = parameters.Length;
-        }
-
-        if (parameters.Skip(infrastructureStart).Any(static parameter =>
-                !_IsProgress(parameter.ParameterType)))
-        {
-            return _Unsupported(method, "user parameters must precede the progress parameter");
-        }
-
-        var progressParameters = parameters.Where(
-            static parameter => _IsProgress(parameter.ParameterType)).ToArray();
-        if (progressParameters.Length > 1)
-        {
-            return _Unsupported(method, "only one progress parameter is supported");
-        }
-
-        var progress = progressParameters.SingleOrDefault();
         var returnType = method.ReturnType;
         if (returnType.IsGenericType && returnType.GetGenericTypeDefinition() == typeof(ValueTask<>) ||
             returnType == typeof(ValueTask))
@@ -95,14 +66,9 @@ internal sealed class ReflectedAction
 
         return InteractionResult.Success(new ReflectedAction(
             method,
-            parameters.Take(infrastructureStart).ToArray(),
-            progress,
-            resultType,
-            progress?.ParameterType.GetGenericArguments()[0]));
+            parameters,
+            resultType));
     }
-
-    private static bool _IsProgress(Type type) =>
-        type.IsGenericType && type.GetGenericTypeDefinition() == typeof(IProgress<>);
 
     private static InteractionResult<ReflectedAction> _Unsupported(MethodInfo method, string reason) =>
         InteractionResult.Failure<ReflectedAction>(
@@ -116,6 +82,8 @@ internal sealed class MethodNodeBinding
     private readonly Guid _Owner;
     private readonly ReflectedAction _Action;
     private readonly List<IReadOnlyList<ValidationAttribute>> _ValidationAttributes;
+    private readonly object _InvocationGate = new();
+    private ActionInvocation? _CurrentInvocation;
 
     public MethodNodeBinding(
         UIEngineHost host,
@@ -167,7 +135,16 @@ internal sealed class MethodNodeBinding
 
     public bool IsAsynchronous => _Action.IsAsynchronous;
 
-    public Type? ProgressType => _Action.ProgressType;
+    public InvocationStatus? Status
+    {
+        get
+        {
+            lock (_InvocationGate)
+            {
+                return _CurrentInvocation?.Status;
+            }
+        }
+    }
 
     public InteractionResult<ActionInvocation> Invoke(
         IReadOnlyDictionary<string, object?> arguments) => _Host.Execute(
@@ -240,10 +217,9 @@ internal sealed class MethodNodeBinding
             }
 
             var invocation = _Host.CreateInvocation();
-            if (_Action.ProgressParameter is not null)
+            lock (_InvocationGate)
             {
-                bound[_Action.ProgressParameter.Position] =
-                    invocation.CreateProgressReporter(_Action.ProgressType!);
+                _CurrentInvocation = invocation;
             }
 
             try

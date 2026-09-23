@@ -116,13 +116,6 @@ public sealed class UIEngineHost : IDisposable
 
     public InteractionResult<Guid> ResolveDomainIdentity(string identity)
     {
-        if (string.IsNullOrWhiteSpace(identity))
-        {
-            return InteractionResult.Failure<Guid>(
-                InteractionErrorCode.INVALID_INPUT,
-                "A domain identity cannot be empty or whitespace.");
-        }
-
         if (!_DomainIdentityIndex.TryGetValue(identity, out var handles))
         {
             return _DomainIdentityNotFound(identity);
@@ -145,13 +138,6 @@ public sealed class UIEngineHost : IDisposable
 
     public InteractionResult<ResolvedNode> ResolveRootNode(string identifier)
     {
-        if (string.IsNullOrWhiteSpace(identifier))
-        {
-            return InteractionResult.Failure<ResolvedNode>(
-                InteractionErrorCode.INVALID_INPUT,
-                "A root identifier cannot be empty or whitespace.");
-        }
-
         if (!_Roots.TryGetValue(identifier, out var root))
         {
             return InteractionResult.Failure<ResolvedNode>(
@@ -248,11 +234,7 @@ public sealed class UIEngineHost : IDisposable
 
         return Execute(
             "create object node",
-            () => _CreateObjectNode(
-                target.Value,
-                handle,
-                id,
-                identity.Value));
+            () => _CreateObjectNode(target.Value, handle, id, identity.Value));
     }
 
     internal InteractionResult<T> Execute<T>(string operation, Func<InteractionResult<T>> action)
@@ -260,12 +242,6 @@ public sealed class UIEngineHost : IDisposable
         try
         {
             return action();
-        }
-        catch (UnauthorizedAccessException exception)
-        {
-            return InteractionResult.Failure<T>(
-                InteractionErrorCode.PERMISSION_DENIED,
-                exception.Message);
         }
         catch (TargetInvocationException exception) when (exception.InnerException is not null)
         {
@@ -279,9 +255,7 @@ public sealed class UIEngineHost : IDisposable
 
     internal ActionInvocation CreateInvocation()
     {
-        var invocation = new ActionInvocation(
-            _Settings.InvocationProgressBufferCapacity,
-            _InvocationCompleted);
+        var invocation = new ActionInvocation(_InvocationCompleted);
         _Invocations.TryAdd(invocation, 0);
 
         return invocation;

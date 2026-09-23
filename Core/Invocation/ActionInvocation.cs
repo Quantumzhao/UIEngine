@@ -7,26 +7,19 @@ public enum InvocationStatus
     FAILED,
 }
 
-public sealed record InvocationProgress(long OrderingToken, object? Value, Type ValueType);
-
 /// <summary>One running or completed domain action.</summary>
 public sealed class ActionInvocation
 {
     private readonly object _Gate = new();
-    private readonly BoundedAsyncStream<InvocationProgress> _Progress;
     private readonly TaskCompletionSource<InteractionResult<object?>> _Completion =
         new(TaskCreationOptions.RunContinuationsAsynchronously);
     private readonly Action<ActionInvocation> _OnCompleted;
     private int _Terminal;
-    private long _OrderingToken;
     private InvocationStatus _Status = InvocationStatus.RUNNING;
     private Exception? _Fault;
 
-    internal ActionInvocation(
-        int progressCapacity,
-        Action<ActionInvocation> onCompleted)
+    internal ActionInvocation(Action<ActionInvocation> onCompleted)
     {
-        _Progress = new BoundedAsyncStream<InvocationProgress>(progressCapacity);
         _OnCompleted = onCompleted;
     }
 
@@ -53,9 +46,6 @@ public sealed class ActionInvocation
     }
 
     public Task<InteractionResult<object?>> Completion => _Completion.Task;
-
-    internal object CreateProgressReporter(Type progressType) =>
-        Activator.CreateInstance(typeof(_ProgressReporter<>).MakeGenericType(progressType), this)!;
 
     internal void CompleteSuccess(object? value) => _Complete(
         InvocationStatus.SUCCEEDED,
@@ -84,11 +74,6 @@ public sealed class ActionInvocation
             null);
     }
 
-    public IAsyncEnumerable<InvocationProgress> ReadProgressAsync() => _Progress.ReadAllAsync();
-
-    internal void ReportProgress(object? value, Type valueType) => _Progress.Publish(
-        new InvocationProgress(Interlocked.Increment(ref _OrderingToken), value, valueType));
-
     private void _Complete(
         InvocationStatus status,
         InteractionResult<object?> result,
@@ -105,13 +90,7 @@ public sealed class ActionInvocation
             _Fault = fault;
         }
 
-        _Progress.Complete();
         _Completion.TrySetResult(result);
         _OnCompleted(this);
-    }
-
-    private sealed class _ProgressReporter<T>(ActionInvocation owner) : IProgress<T>
-    {
-        public void Report(T value) => owner.ReportProgress(value, typeof(T));
     }
 }

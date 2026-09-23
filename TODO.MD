@@ -6,7 +6,7 @@
 - [x] Stable domain identity and canonical logical paths.
 - [x] Live reads, writes, conversion, and validation.
 - [x] Bounded collection access.
-- [x] Synchronous and asynchronous invocation with progress.
+- [x] Synchronous and asynchronous invocation with lifecycle status.
 - [x] Explicit domain dispatch.
 - [x] Structured interaction failures.
 - [x] CLI coverage of the live graph workflow.

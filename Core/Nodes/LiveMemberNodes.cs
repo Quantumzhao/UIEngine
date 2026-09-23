@@ -114,7 +114,7 @@ internal sealed class LiveMethodNode : LiveReflectedMemberNode, IMethodNode
 
     public bool IsAsynchronous => _Binding.IsAsynchronous;
 
-    public Type? ProgressType => _Binding.ProgressType;
+    public InvocationStatus? Status => _Binding.Status;
 
     public InteractionResult<ActionInvocation> Invoke(
         IReadOnlyDictionary<string, object?> arguments) => _Binding.Invoke(arguments);

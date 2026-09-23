@@ -70,7 +70,7 @@ The source of an exposure and its value shape are independent facets:
 |---|---|---|
 | Reflected property | `IPropertyNode` | Readable/writable/nullability and value-shape facets |
 | Reflected field | `IFieldNode` | Readable/writable/nullability and value-shape facets |
-| Reflected method | `IMethodNode` | Parameter, result, and progress metadata |
+| Reflected method | `IMethodNode` | Parameter, result, and invocation-status metadata |
 | Programmatic scalar | `IProgrammaticValueNode` | Readable/writable/nullability and value-shape facets |
 
 A programmatic scalar is deliberately not an `IPropertyNode` or `IFieldNode`; it is an exposed
@@ -167,7 +167,7 @@ Each navigator produces its own serializable path and stable configuration. The 
 aggregates those records into the layout snapshot.
 
 The snapshot does not contain domain values, runtime handles, node instances, control instances,
-edit drafts, invocation progress, or running work.
+edit drafts, invocation state, or running work.
 
 Deserialization reconstructs navigation entries from each saved path and its semantic parent
 locations. Resolution failures create broken current entries rather than dropping saved
@@ -183,17 +183,18 @@ domain thread; Core does not marshal work to or from UI threads.
 Collection access is always bounded. Collection windows retain positions, optional keys, nulls,
 scalar values, references, optional total counts, and whether more data is available.
 
-Method invocation returns an `ActionInvocation` with terminal status, completion, and bounded
-ordered progress. Once started, an invocation is owned by the host.
-Removing a node or control prevents that frontend from applying later invocation updates.
+Method invocation returns an `ActionInvocation` with lifecycle status and completion. The method
+node exposes the latest invocation status so synchronous execution is observable as running. Once
+started, an invocation is owned by the host. Removing a node or control prevents that frontend
+from applying later completion updates.
 
 ## Frontend Lifetime
 
 For every active navigation entry, a frontend creates a control. Invocation updates are applied
 only while that entry is still current.
 
-When an entry is removed, the frontend removes its control and detaches from its invocation
-updates. Already-started domain tasks may finish, but they cannot update a detached visual tree.
+When an entry is removed, the frontend removes its control and detaches from its invocation.
+Already-started domain tasks may finish, but they cannot update a detached visual tree.
 Removal does not stop the domain object or a started invocation.
 
 Removing one navigator cannot interfere with work owned by another navigator, even when both point

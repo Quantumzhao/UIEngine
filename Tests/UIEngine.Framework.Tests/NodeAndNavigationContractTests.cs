@@ -160,7 +160,7 @@ public sealed class NodeAndNavigationContractTests
 
         public bool IsAsynchronous => false;
 
-        public Type? ProgressType => null;
+        public InvocationStatus? Status => null;
 
         public InteractionResult<ActionInvocation> Invoke(
             IReadOnlyDictionary<string, object?> arguments) => throw new NotSupportedException();

@@ -31,7 +31,7 @@ Output is human-readable and is not a machine protocol.
 | `inspect` | Show current object metadata. |
 | `get <member>` | Read a scalar value. |
 | `set <member> <value>` | Convert, validate, and write a scalar value. |
-| `call <action> [name=value ...]` | Invoke an action and stream progress. |
+| `call <action> [name=value ...]` | Invoke an action and report its result. |
 | `exit` | Dispose the session and host. |
 
 ## Paths
@@ -70,7 +70,7 @@ optional key, and exactly one of null, scalar value, or reference handle/domain 
 
 `inspect` prints the canonical path, CLR type, runtime handle, optional domain identity, summary,
 and role-specific member metadata. It includes nullability, enum options, ranges, collection
-element/key types, and action parameter/default/progress information.
+element/key types, and action parameter/default/status information.
 
 Examples:
 
@@ -82,7 +82,8 @@ call AdvanceTurn populationDelta=5
 call SimulateGrowthAsync years=3 populationPerYear=2
 ```
 
-Arguments are named and may appear in any order. Progress reporters are supplied by the framework.
+Arguments are named and may appear in any order. Asynchronous actions remain host-owned until they
+complete.
 
 ## Errors
 

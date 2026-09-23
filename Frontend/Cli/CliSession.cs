@@ -304,8 +304,7 @@ internal sealed class CliSession : IDisposable
                             $" options={(parameter.Options.Count == 0 ? "none" : string.Join('|', parameter.Options.Select(static option => _FormatValue(option.Value))))}"));
                     _Output.WriteLine(
                         $"action {member.Id}({parameters}) result={method.ResultType?.Name ?? "void"} " +
-                        $"async={method.IsAsynchronous} " +
-                        $"progress={method.ProgressType?.Name ?? "none"}");
+                        $"async={method.IsAsynchronous} status={method.Status?.ToString() ?? "never-run"}");
                     break;
                 case ICollectionNode collection:
                     _Output.WriteLine(
@@ -421,13 +420,6 @@ internal sealed class CliSession : IDisposable
         }
 
         var invocation = started.Value;
-        await foreach (var progress in invocation.ReadProgressAsync())
-        {
-            _Output.WriteLine(
-                $"progress {resolved.Value.Id} token={progress.OrderingToken} " +
-                $"value={_FormatValue(progress.Value)}");
-        }
-
         var completion = await invocation.Completion;
         if (!completion.IsSuccess)
         {

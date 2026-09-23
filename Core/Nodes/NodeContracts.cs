@@ -133,7 +133,8 @@ public interface IMethodNode : IMemberNode
 
     bool IsAsynchronous { get; }
 
-    Type? ProgressType { get; }
+    /// <summary>The status of the most recently started invocation, or null before invocation.</summary>
+    InvocationStatus? Status { get; }
 
     InteractionResult<ActionInvocation> Invoke(
         IReadOnlyDictionary<string, object?> arguments);

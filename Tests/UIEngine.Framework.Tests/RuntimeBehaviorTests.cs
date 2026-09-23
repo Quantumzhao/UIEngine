@@ -193,7 +193,7 @@ public sealed class RuntimeBehaviorTests
     }
 
     [Fact]
-    public async Task ActionsSupportSyncTaskProgressAndDomainFaults()
+    public async Task ActionsSupportSyncTaskStatusAndDomainFaults()
     {
         var model = new _ActionModel();
         using var host = new UIEngineHost();
@@ -202,6 +202,12 @@ public sealed class RuntimeBehaviorTests
         var actions = ((IObjectNode)resolved.Value.Node).Members
             .Where(static member => member is IMethodNode)
             .ToDictionary(static member => member.Id, static member => (IMethodNode)member);
+
+        Assert.Null(actions["ObserveStatus"].Status);
+        model.ReadInvocationStatus = () => actions["ObserveStatus"].Status;
+        var observed = actions["ObserveStatus"].Invoke(new Dictionary<string, object?>());
+        Assert.Equal(InvocationStatus.RUNNING, (await observed.Value.Completion).Value);
+        Assert.Equal(InvocationStatus.SUCCEEDED, actions["ObserveStatus"].Status);
 
         var added = actions["Add"].Invoke(new Dictionary<string, object?>
         {
@@ -214,20 +220,17 @@ public sealed class RuntimeBehaviorTests
         {
             ["steps"] = 3,
         });
-        var progress = new List<InvocationProgress>();
-        await foreach (var update in worked.Value.ReadProgressAsync())
-        {
-            progress.Add(update);
-        }
-
-        Assert.Equal([1, 2, 3], progress.Select(static update => (int)update.Value!).ToArray());
+        Assert.Equal(InvocationStatus.RUNNING, actions["WorkAsync"].Status);
+        model.CompleteWork();
         Assert.Equal(3, (await worked.Value.Completion).Value);
+        Assert.Equal(InvocationStatus.SUCCEEDED, actions["WorkAsync"].Status);
 
         var failed = actions["Fail"].Invoke(new Dictionary<string, object?>());
         var fault = await failed.Value.Completion;
         Assert.Equal(InvocationStatus.FAILED, failed.Value.Status);
         Assert.Equal(InteractionErrorCode.FAULT, fault.Error?.Code);
         Assert.IsType<InvalidOperationException>(failed.Value.Fault);
+        Assert.Equal(InvocationStatus.FAILED, actions["Fail"].Status);
     }
 
     [Fact]
@@ -327,9 +330,18 @@ public sealed class RuntimeBehaviorTests
         Assert.Equal(
             typeof(InteractionResult<ActionInvocation>),
             typeof(IMethodNode).GetMethod(nameof(IMethodNode.Invoke))!.ReturnType);
+        Assert.Equal(
+            typeof(InvocationStatus?),
+            typeof(IMethodNode).GetProperty(nameof(IMethodNode.Status))!.PropertyType);
+        Assert.Null(typeof(IMethodNode).GetProperty("ProgressType"));
+        Assert.Null(typeof(ActionInvocation).GetMethod("ReadProgressAsync"));
         Assert.Null(typeof(UIEngineHostOptions).GetProperty("Dispatcher"));
         Assert.Null(typeof(UIEngineHost).GetProperty("IsDisposed"));
         Assert.Null(typeof(UIEngineHostOptions).GetProperty("ObservationBufferCapacity"));
+        Assert.Null(typeof(UIEngineHostOptions).GetProperty("InvocationProgressBufferCapacity"));
+        Assert.DoesNotContain(
+            assembly.GetExportedTypes(),
+            static type => type.Name == "InvocationProgress");
     }
 
     private static UIEngineHost _CreateWorldHost()
@@ -418,6 +430,19 @@ public sealed class RuntimeBehaviorTests
     private sealed class _ActionModel
     {
         private int _InvocationCount;
+        private readonly TaskCompletionSource _WorkCompletion = new(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public Func<InvocationStatus?> ReadInvocationStatus { get; set; } = () => null;
+
+        public void CompleteWork() => _WorkCompletion.TrySetResult();
+
+        [Action]
+        public InvocationStatus? ObserveStatus()
+        {
+            _InvocationCount++;
+            return ReadInvocationStatus();
+        }
 
         [Action]
         public int Add(int left, int right = 1)
@@ -428,15 +453,10 @@ public sealed class RuntimeBehaviorTests
 
         [Action]
         public async Task<int> WorkAsync(
-            [Range(1, 5)] int steps,
-            IProgress<int> progress)
+            [Range(1, 5)] int steps)
         {
             _InvocationCount++;
-            for (var step = 1; step <= steps; step++)
-            {
-                await Task.Yield();
-                progress.Report(step);
-            }
+            await _WorkCompletion.Task;
 
             return steps;
         }

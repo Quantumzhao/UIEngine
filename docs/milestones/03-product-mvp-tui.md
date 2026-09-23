@@ -62,7 +62,7 @@ The saved layout contains:
 - current logical paths; and
 - stable placement, size, and selection configuration.
 
-It does not contain domain values, handles, nodes, controls, drafts, progress, or
+It does not contain domain values, handles, nodes, controls, drafts, invocation state, or
 running operations. Every saved navigator is recreated, including broken entries.
 
 ## Interaction and Layout
@@ -108,7 +108,7 @@ do not defer Core or lifetime coverage to the final TUI acceptance pass.
   may be owned by `TuiWorkspace`; a caller-supplied Core workspace remains caller-owned.
 - Core produces versioned layout data but does not choose a file, perform file I/O, or persist live
   state. The TUI owns its stable presentation fields and maps them into that data contract.
-- The existing conversion, validation, identity, domain-thread affinity, bounded-stream, and
+- The existing conversion, validation, identity, domain-thread affinity, bounded-collection, and
   invocation implementations are behavior to preserve, not subsystems to redesign.
 
 ### Completed foundation
@@ -128,7 +128,7 @@ Before moving behavior, define and test the smallest public contracts needed by 
    - readable, writable, and nullable values;
    - string/character, boolean, number, and enum values;
    - collections and their bounded entry shapes; and
-   - method parameters, results, and progress metadata.
+   - method parameters, results, and invocation-status metadata.
 2. Record how reflected properties and fields combine with value/reference/collection facets. For
    example, a writable enum property must remain identifiable as a property, enum, readable value,
    and writable value without Core naming a control.
@@ -170,7 +170,7 @@ Build nodes from exposure metadata while preserving the live-domain guarantees.
    - collection reads retain the host maximum and closed entry variants; and
    - method invocation returns the existing host-owned `ActionInvocation` lifetime.
 5. Preserve metadata needed by generated controls: runtime type, summary, read/write capability,
-   nullability, enum members, numeric range, method defaults, result type, and progress type.
+   nullability, enum members, numeric range, method defaults, result type, and invocation status.
 Verification:
 
 - Port the existing Core behavior tests to nodes and delete the legacy model coverage.
@@ -255,7 +255,7 @@ Implement address persistence before building TUI save/restore commands.
    opaque to Core and restrict the initial schema to placement and size fields required by this
    milestone.
 3. Snapshot only stable data. Add explicit tests preventing domain values, runtime handles, node or
-   control instances, drafts, progress, and invocations from entering the contract.
+   control instances, drafts, invocation state, and invocations from entering the contract.
 4. Restore each navigator independently. One invalid record must not discard the remaining valid
    navigators.
 5. Reconstruct each navigation stack from the saved current path and its semantic parents. Include
@@ -384,7 +384,7 @@ Verification:
 4. Generate method fields from parameter value semantics and preserve the distinction among
    omitted, defaulted, explicit-null, and supplied values.
 5. Start a method once per submission, prevent accidental duplicate submission, and present
-   synchronous/asynchronous completion, result, structured failure, and bounded ordered progress.
+   synchronous/asynchronous completion, result, structured failure, and lifecycle status.
 6. On method-control disposal, release its frontend-owned resources without stopping the
    host-owned invocation.
 
@@ -392,7 +392,7 @@ Verification:
 
 - Prove large and lazy collections remain bounded across several windows and selector navigation.
 - Test every collection entry shape and recovery after a source reset.
-- Test method parameter validation/default/null semantics, progress order, success/failure, and
+- Test method parameter validation/default/null semantics, status transitions, success/failure, and
   continued invocation after control removal.
 
 ### 11. Integrate refresh, replacement, and structured recovery

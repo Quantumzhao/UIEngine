@@ -169,12 +169,11 @@ public sealed class Nation : INotifyPropertyChanged
         return replacement;
     }
 
-    /// <summary>Runs deterministic asynchronous turns with normalized progress.</summary>
+    /// <summary>Runs deterministic asynchronous turns.</summary>
     [Action]
     public async Task<int> SimulateGrowthAsync(
         [Range(1, 100)] int years,
-        [Range(0, 10_000)] int populationPerYear,
-        IProgress<SimulationProgress> progress)
+        [Range(0, 10_000)] int populationPerYear)
     {
         for (var year = 1; year <= years; year++)
         {
@@ -182,7 +181,6 @@ public sealed class Nation : INotifyPropertyChanged
             Population += populationPerYear;
             _Turn++;
             _OnPropertyChanged(nameof(Turn));
-            progress.Report(new SimulationProgress(year, Population));
         }
 
         return Population;
@@ -240,9 +238,6 @@ public sealed class EconomicProfile(string regionCode, decimal grossDomesticProd
 
     public decimal GrossDomesticProduct { get; set; } = grossDomesticProduct;
 }
-
-/// <summary>Reports one deterministic step from the asynchronous simulation action.</summary>
-public readonly record struct SimulationProgress(int Year, int Population);
 
 /// <summary>Computes a large indexed series without storing or enumerating all values.</summary>
 public sealed class PopulationProjectionSeries : IReadOnlyList<int>
