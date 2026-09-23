@@ -237,12 +237,16 @@ public sealed class RuntimeBehaviorTests
             .ToArray();
         var removed = new[]
         {
+            "ChangeKind",
+            "ChangeRecord",
             "IObjectDescriptorProvider",
             "IObjectDescriptorFactory",
             "IObservationAdapter",
             "IObjectIdentityProvider",
             "IPathSelector",
             "IInteractionDispatchPolicy",
+            "ObservationSubscription",
+            "ObservationValue",
             "ObjectIdentity",
             "DomainIdentity",
             "BindingResolution",
@@ -276,6 +280,11 @@ public sealed class RuntimeBehaviorTests
         {
             Assert.DoesNotContain(assembly.GetExportedTypes(), type => type.Name == name);
         }
+
+        Assert.DoesNotContain(
+            typeof(UIEngineHost).GetMethods(),
+            static method => method.Name == "ObserveAsync");
+        Assert.Null(typeof(UIEngineHostOptions).GetProperty("ObservationBufferCapacity"));
     }
 
     private static UIEngineHost _CreateWorldHost()

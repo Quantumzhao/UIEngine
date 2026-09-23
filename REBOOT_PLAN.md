@@ -4,7 +4,7 @@
 
 Expose live .NET objects through frontend-neutral `BaseNode`s and let users work through one or
 more independent `Navigator`s. Preserve the existing guarantees for identity, paths, bounded work,
-validation, observation, dispatch, and invocation lifetime.
+validation, dispatch, and invocation lifetime.
 
 ## Target Model
 
@@ -32,7 +32,7 @@ facets, and frontends choose controls from those semantics.
 - Allow every node to be the current node of a navigator.
 - Treat scalar and method nodes as terminal.
 - Keep node instances local to one navigator occurrence.
-- Perform reads, writes, validation, bounded collection access, observation, and invocation
+- Perform reads, writes, validation, bounded collection access, and invocation
   through the host.
 - Keep paths and toolkit controls out of nodes.
 
@@ -53,8 +53,7 @@ facets, and frontends choose controls from those semantics.
 - Add, duplicate, remove, and reorder navigators.
 - Serialize current paths and stable presentation configuration.
 - Restore missing or incompatible paths as visible broken entries.
-- Never persist domain state, runtime handles, node instances, drafts, subscriptions, or running
-  operations.
+- Never persist domain state, runtime handles, node instances, drafts, or running operations.
 
 ### Lifetime
 
@@ -69,7 +68,7 @@ facets, and frontends choose controls from those semantics.
 
 - Define the minimal `BaseNode` base contract and language-semantic variants or interfaces.
 - Map reflection and programmatic exposure to nodes.
-- Preserve conversion, validation, identity, dispatch, collection bounds, observation, and method
+- Preserve conversion, validation, identity, dispatch, collection bounds, and method
   invocation.
 - Cover scalar, enum, property, field, reference, collection, and method semantics with black-box
   tests.

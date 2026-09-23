@@ -5,7 +5,7 @@ using UIEngine.Core.Attributes;
 
 namespace UIEngine.Core;
 
-/// <summary>Owns roots, runtime identity, dispatch, observation, and action lifetime.</summary>
+/// <summary>Owns roots, runtime identity, dispatch, and action lifetime.</summary>
 public sealed class UIEngineHost : IDisposable
 {
     private readonly object _Gate = new();
@@ -15,7 +15,6 @@ public sealed class UIEngineHost : IDisposable
     private readonly Dictionary<Guid, string?> _DomainIdentities = [];
     private readonly Dictionary<string, HashSet<Guid>> _DomainIdentityIndex = [];
     private readonly Dictionary<Guid, LogicalPath> _CanonicalPaths = [];
-    private readonly HashSet<ObservationSubscription> _Subscriptions = [];
     private readonly HashSet<ActionInvocation> _Invocations = [];
     private readonly HostSettings _Settings;
     private readonly ILogger _Logger;
@@ -392,178 +391,6 @@ public sealed class UIEngineHost : IDisposable
             canonical));
     }
 
-    public async Task<InteractionResult<ObservationSubscription>> ObserveAsync(
-        Guid handle,
-        string? memberId = null,
-        TimeSpan? pollingInterval = null)
-    {
-        if (pollingInterval is { } interval && interval <= TimeSpan.Zero)
-        {
-            return InteractionResult.Failure<ObservationSubscription>(
-                InteractionErrorCode.INVALID_INPUT,
-                "A polling interval must be positive.");
-        }
-
-        var target = ResolveTarget(handle);
-        if (!target.IsSuccess)
-        {
-            return InteractionResult.Failure<ObservationSubscription>(target.Error!);
-        }
-
-        var described = await DescribeAsync(handle);
-        if (!described.IsSuccess)
-        {
-            return InteractionResult.Failure<ObservationSubscription>(described.Error!);
-        }
-
-        MemberDescriptor? member = null;
-        if (memberId is not null)
-        {
-            member = described.Value.Members.FirstOrDefault(candidate =>
-                StringComparer.Ordinal.Equals(candidate.Id, memberId));
-            if (member is null)
-            {
-                return InteractionResult.Failure<ObservationSubscription>(
-                    InteractionErrorCode.NOT_FOUND,
-                    $"Member '{memberId}' was not found.");
-            }
-
-            if (member is ActionDescriptor)
-            {
-                return InteractionResult.Failure<ObservationSubscription>(
-                    InteractionErrorCode.UNSUPPORTED,
-                    "Actions cannot be observed.");
-            }
-        }
-
-        if (pollingInterval is not null && member is not ValueDescriptor and not ReferenceDescriptor)
-        {
-            return InteractionResult.Failure<ObservationSubscription>(
-                InteractionErrorCode.UNSUPPORTED,
-                "Polling requires one value or reference member.");
-        }
-
-        var identity = described.Value.DomainIdentity;
-        long ordering = 0;
-        ChangeRecord CreateChange(
-            string? changedMember,
-            ChangeKind kind,
-            ObservationValue oldValue,
-            ObservationValue newValue,
-            int? oldIndex,
-            int? newIndex) => new(
-                handle,
-                identity,
-                changedMember,
-                kind,
-                oldValue,
-                newValue,
-                Interlocked.Increment(ref ordering))
-            {
-                OldIndex = oldIndex,
-                NewIndex = newIndex,
-            };
-
-        var subscription = new ObservationSubscription(
-            handle,
-            memberId,
-            _Settings.ObservationBufferCapacity,
-            dropped => CreateChange(
-                memberId,
-                ChangeKind.BUFFER_OVERFLOW,
-                ObservationValue.NotSupplied,
-                ObservationValue.NotSupplied,
-                null,
-                null) with { DroppedChangeCount = dropped },
-            _UntrackSubscription,
-            exception => _ReportUnexpected("observation", exception));
-
-        IDisposable sourceSubscription;
-        if (pollingInterval is { } polling)
-        {
-            var initial = await _ReadObservableAsync(member!);
-            if (!initial.IsSuccess)
-            {
-                subscription.Dispose();
-                return InteractionResult.Failure<ObservationSubscription>(initial.Error!);
-            }
-
-            sourceSubscription = new PollingObserver(
-                initial.Value,
-                polling,
-                () => _ReadObservableAsync(member!),
-                (oldValue, newValue) => subscription.Publish(CreateChange(
-                    memberId,
-                    ChangeKind.MEMBER_CHANGED,
-                    ObservationValue.Supplied(oldValue),
-                    ObservationValue.Supplied(newValue),
-                    null,
-                    null)),
-                exception => _ReportUnexpected("observation polling", exception));
-        }
-        else
-        {
-            var source = await NotificationObserver.CreateAsync(
-                target.Value,
-                memberId,
-                described.Value,
-                member,
-                (changedMember, kind, oldValue, newValue, oldIndex, newIndex) =>
-                    subscription.Publish(CreateChange(
-                        changedMember,
-                        kind,
-                        oldValue,
-                        newValue,
-                        oldIndex,
-                        newIndex)),
-                exception => _ReportUnexpected("observation notification", exception));
-            if (!source.IsSuccess)
-            {
-                subscription.Dispose();
-                return InteractionResult.Failure<ObservationSubscription>(source.Error!);
-            }
-
-            sourceSubscription = source.Value;
-        }
-
-        subscription.SetSourceSubscription(sourceSubscription);
-        lock (_Gate)
-        {
-            if (IsDisposed)
-            {
-                subscription.Dispose();
-                return _DisposedFailure<ObservationSubscription>();
-            }
-
-            _Subscriptions.Add(subscription);
-        }
-
-        return InteractionResult.Success(subscription);
-    }
-
-    public Task<InteractionResult<ObservationSubscription>> ObserveAsync(
-        BaseNode node,
-        TimeSpan? pollingInterval = null)
-    {
-        return node switch
-        {
-            LiveObjectNode objectNode => ObserveAsync(
-                objectNode.Handle,
-                pollingInterval: pollingInterval),
-            LiveValueNode valueNode => ObserveAsync(
-                valueNode.Descriptor.Owner,
-                valueNode.Id,
-                pollingInterval),
-            LiveReflectedMemberNode memberNode => ObserveAsync(
-                memberNode.Descriptor.Owner,
-                memberNode.Id,
-                pollingInterval),
-            _ => Task.FromResult(InteractionResult.Failure<ObservationSubscription>(
-                InteractionErrorCode.UNSUPPORTED,
-                "Only live object and member nodes can be observed.")),
-        };
-    }
-
     public void Dispose()
     {
         if (Interlocked.Exchange(ref _Disposed, 1) != 0)
@@ -571,13 +398,10 @@ public sealed class UIEngineHost : IDisposable
             return;
         }
 
-        ObservationSubscription[] subscriptions;
         ActionInvocation[] invocations;
         lock (_Gate)
         {
-            subscriptions = _Subscriptions.ToArray();
             invocations = _Invocations.ToArray();
-            _Subscriptions.Clear();
             _Invocations.Clear();
             _Roots.Clear();
             _Objects.Clear();
@@ -585,11 +409,6 @@ public sealed class UIEngineHost : IDisposable
             _DomainIdentityIndex.Clear();
             _CanonicalPaths.Clear();
             _Handles.Clear();
-        }
-
-        foreach (var subscription in subscriptions)
-        {
-            subscription.Dispose();
         }
 
         foreach (var invocation in invocations)
@@ -847,25 +666,6 @@ public sealed class UIEngineHost : IDisposable
                 .ToArray()));
     }
 
-    private static async Task<InteractionResult<object?>> _ReadObservableAsync(
-        MemberDescriptor member) => member switch
-    {
-        ValueDescriptor value => await value.ReadAsync(),
-        ReferenceDescriptor reference => await _ReadReferenceAsync(reference),
-        _ => InteractionResult.Failure<object?>(
-            InteractionErrorCode.UNSUPPORTED,
-            $"Member '{member.Id}' cannot be polled."),
-    };
-
-    private static async Task<InteractionResult<object?>> _ReadReferenceAsync(
-        ReferenceDescriptor reference)
-    {
-        var read = await reference.ReadAsync();
-        return read.IsSuccess
-            ? InteractionResult.Success<object?>(read.Value)
-            : InteractionResult.Failure<object?>(read.Error!);
-    }
-
     private static InteractionResult<string?> _NormalizeIdentity(string? value)
     {
         if (value is null)
@@ -901,14 +701,6 @@ public sealed class UIEngineHost : IDisposable
         if (invocation.Fault is not null)
         {
             _ReportUnexpected("action invocation", invocation.Fault);
-        }
-    }
-
-    private void _UntrackSubscription(ObservationSubscription subscription)
-    {
-        lock (_Gate)
-        {
-            _Subscriptions.Remove(subscription);
         }
     }
 

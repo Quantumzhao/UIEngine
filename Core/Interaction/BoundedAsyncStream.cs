@@ -2,7 +2,7 @@ using System.Threading.Channels;
 
 namespace UIEngine.Core;
 
-/// <summary>Small single-reader bounded stream shared by progress and observation.</summary>
+/// <summary>Small single-reader bounded stream for invocation progress.</summary>
 internal sealed class BoundedAsyncStream<T>
 {
     private readonly object _Gate = new();

@@ -5,7 +5,7 @@
 ## Goal
 
 Make live graph interaction safe under replacement, asynchronous work, thread affinity, large
-collections, and observable change.
+collections, and structured failures.
 
 ## Delivered
 
@@ -16,9 +16,8 @@ collections, and observable change.
 - Bounded collection windows for indexed and lazy sources.
 - Structured entries for null, scalar, reference, and dictionary values.
 - Synchronous and asynchronous method invocation with bounded progress.
-- Notification and explicit polling observation with visible overflow.
 - `IInteractionDispatcher` for domain thread affinity and reentrant access.
-- Deterministic host, invocation, and subscription lifetime.
+- Deterministic host and invocation lifetime.
 - Black-box framework and CLI coverage of the complete cyclic-world workflow.
 
 ## Acceptance
@@ -27,7 +26,6 @@ collections, and observable change.
 - Conflicting or ambiguous identities fail explicitly.
 - Ordinary browsing never performs an unbounded collection read.
 - Expected failures return structured codes and validation issues.
-- Observation and progress streams remain bounded.
-- Disposing subscriptions detaches handlers.
+- Progress streams remain bounded.
 - Disposing the host completes owned work deterministically.
 - Core and CLI tests pass with a zero-warning build.

@@ -46,7 +46,7 @@ selection and styling stay in the TUI.
 ## Operations
 
 Controls call node operations directly. Core remains responsible for conversion, validation,
-dispatch, bounded reads, observation, and invocation.
+dispatch, bounded reads, and invocation.
 
 - Read a value before presenting or editing it.
 - Keep uncommitted drafts frontend-local.
@@ -55,11 +55,9 @@ dispatch, bounded reads, observation, and invocation.
 - Generate method fields from parameter semantics and preserve omitted, default, and explicit-null
   states.
 - Present structured failures without parsing messages.
-- Refresh from property changes surfaced by the current node.
+- Re-read authoritative state when a control refreshes.
 
 ## Lifetime
-
-Property-observation subscriptions belong to nodes and follow their lifetime. 
 
 Going back removes the departed control. Removing a navigator removes all controls belonging to
 it. Closing the TUI leaves the caller-owned host and domain objects alive.
@@ -69,7 +67,7 @@ A started `ActionInvocation` continues under host ownership after its method con
 ## Layout Persistence
 
 The TUI contributes stable placement, size, and selection configuration to the workspace layout
-snapshot. It does not persist drafts, focus, loaded values, controls, subscriptions, or running
+snapshot. It does not persist drafts, focus, loaded values, controls, or running
 invocations.
 
 Loading a layout creates all saved navigators. A path that no longer resolves is shown as a broken
@@ -96,7 +94,7 @@ Tests cover:
 - scalar editing, validation, and dirty drafts;
 - bounded collection windows;
 - method invocation and continued execution after control disposal;
-- node-provided property-change refresh;
+- refresh from authoritative live values;
 - independent navigator lifetimes;
 - layout round trips;
 - keyboard-only workflows and resize; and

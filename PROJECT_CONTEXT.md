@@ -4,7 +4,7 @@
 
 UIEngine exposes a running .NET application's live objects as a navigable, editable, and
 invocable graph. Domain objects remain authoritative; UIEngine provides frontend-neutral nodes,
-navigation, paths, validation, observation, and invocation lifetime.
+navigation, paths, validation, and invocation lifetime.
 
 The framework targets simulations, engines, services, research systems, internal tools, and
 prototypes that need generated user interfaces over live state.
@@ -42,8 +42,7 @@ toolkit types in Core.
 - An unresolved persisted path remains as a broken navigator entry. The user can navigate back
   until a valid node is reached.
 - Layout persistence stores logical paths and stable presentation configuration only. It never
-  stores domain values, runtime handles, node instances, edit drafts, subscriptions, or running
-  operations.
+  stores domain values, runtime handles, node instances, edit drafts, or running operations.
 - Runtime handles, optional stable domain identity, and logical paths remain distinct concepts.
 - Collections are read in bounded windows.
 - Expected failures use structured results. Unexpected faults remain available only for trusted
@@ -62,13 +61,12 @@ toolkit types in Core.
 6. Core contains no frontend or toolkit types.
 7. Frontends branch on structured failures rather than parsing messages.
 8. Every public collection read is bounded.
-9. Observation overflow is visible, and subscriptions detach deterministically.
-10. Persisted layouts contain addresses and stable presentation configuration, not live state.
+9. Persisted layouts contain addresses and stable presentation configuration, not live state.
 
 ## Current Delivery State
 
 The host already provides live graph access, canonical paths, identity, bounded collections,
-validation, observation, dispatch, and synchronous or asynchronous invocation. The CLI exercises
+validation, dispatch, and synchronous or asynchronous invocation. The CLI exercises
 those capabilities. The TUI has a reusable hosting boundary and independent frontend operation
 scopes.
 

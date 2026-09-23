@@ -11,8 +11,6 @@ public sealed record UIEngineHostOptions
 
     public int MaxCollectionItems { get; init; } = 1_000;
 
-    public int ObservationBufferCapacity { get; init; } = 256;
-
     public int InvocationProgressBufferCapacity { get; init; } = 256;
 
     public ILoggerFactory LoggerFactory { get; init; } = NullLoggerFactory.Instance;
@@ -25,7 +23,6 @@ internal sealed class HostSettings
     public HostSettings(UIEngineHostOptions options)
     {
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(options.MaxCollectionItems);
-        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(options.ObservationBufferCapacity);
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(options.InvocationProgressBufferCapacity);
 
         var exposures = options.Exposures.ToArray();
@@ -42,7 +39,6 @@ internal sealed class HostSettings
         Exposures = exposures.ToDictionary(static exposure => exposure.ObjectType);
         Dispatcher = options.Dispatcher;
         MaxCollectionItems = options.MaxCollectionItems;
-        ObservationBufferCapacity = options.ObservationBufferCapacity;
         InvocationProgressBufferCapacity = options.InvocationProgressBufferCapacity;
         LoggerFactory = options.LoggerFactory;
         IncludeSensitiveDiagnosticData = options.IncludeSensitiveDiagnosticData;
@@ -53,8 +49,6 @@ internal sealed class HostSettings
     public IInteractionDispatcher Dispatcher { get; }
 
     public int MaxCollectionItems { get; }
-
-    public int ObservationBufferCapacity { get; }
 
     public int InvocationProgressBufferCapacity { get; }
 

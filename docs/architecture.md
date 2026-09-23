@@ -24,7 +24,6 @@ The host owns:
 - reflection and programmatic exposure;
 - path resolution and live operations;
 - domain dispatch;
-- observation subscriptions; and
 - started invocation lifetime.
 
 Hosts are isolated and disposable. They contain no process-global registry or frontend state.
@@ -169,7 +168,7 @@ Each navigator produces its own serializable path and stable configuration. The 
 aggregates those records into the layout snapshot.
 
 The snapshot does not contain domain values, runtime handles, node instances, control instances,
-edit drafts, subscriptions, invocation progress, or running work.
+edit drafts, invocation progress, or running work.
 
 Deserialization reconstructs navigation entries from each saved path and its semantic parent
 locations. Resolution failures create broken current entries rather than dropping saved
@@ -185,16 +184,12 @@ scalar values, references, optional total counts, and whether more data is avail
 
 Method invocation returns an `ActionInvocation` with terminal status, completion, and bounded
 ordered progress. Once started, an invocation is owned by the host.
-Removing a node or control stops only frontend observation of that invocation.
-
-Observation uses domain notifications or explicit polling. Streams are bounded, overflow is
-visible, and subscriptions detach deterministically.
+Removing a node or control prevents that frontend from applying later invocation updates.
 
 ## Frontend Lifetime
 
-For every active navigation entry, a frontend creates a control. Property-observation
-subscriptions belong to nodes and follow their lifetime; completed async work is applied only
-while that entry's generation remains current.
+For every active navigation entry, a frontend creates a control. Completed async work is applied
+only while that entry's generation remains current.
 
 When an entry is removed, the frontend removes its control. Already-started tasks may finish, but
 generation checks prevent them from updating a detached visual tree. Removal does not stop the

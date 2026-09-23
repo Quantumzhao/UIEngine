@@ -5,7 +5,7 @@ invocable graph.
 
 Its target architecture has three frontend-neutral layers:
 
-- `UIEngineHost` owns roots, live domain access, identity, dispatch, observation, and invocation.
+- `UIEngineHost` owns roots, live domain access, identity, dispatch, and invocation.
 - `BaseNode` represents an exposed .NET language feature.
 - `UIEngineWorkspace` owns independent `Navigator`s and serializable layout state.
 

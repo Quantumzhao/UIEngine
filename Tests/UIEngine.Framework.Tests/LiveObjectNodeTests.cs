@@ -1,4 +1,3 @@
-using System.ComponentModel;
 using UIEngine.Core;
 using UIEngine.Core.Attributes;
 using Xunit;
@@ -75,29 +74,6 @@ public sealed class LiveObjectNodeTests
     }
 
     [Fact]
-    public async Task ObservationAcceptsTheApplicableNodeOccurrence()
-    {
-        var model = new _Model();
-        using var host = new UIEngineHost();
-        host.SetRoot("model", model);
-        var resolved = await host.ResolveRootNodeAsync("model");
-        var name = Assert.Single(
-            ((IObjectNode)resolved.Value.Node).Members,
-            static node => node.Id == nameof(_Model.Name));
-
-        var observed = await host.ObserveAsync(name);
-        Assert.True(observed.IsSuccess);
-        using var subscription = observed.Value;
-        await using var changes = subscription.ReadAllAsync().GetAsyncEnumerator();
-
-        model.Name = "updated";
-
-        Assert.True(await changes.MoveNextAsync().AsTask().WaitAsync(TimeSpan.FromSeconds(5)));
-        Assert.Equal(nameof(_Model.Name), changes.Current.MemberId);
-        Assert.Equal(ChangeKind.MEMBER_CHANGED, changes.Current.Kind);
-    }
-
-    [Fact]
     public async Task RootResolutionReturnsStructuredFailures()
     {
         using var host = new UIEngineHost();
@@ -109,22 +85,16 @@ public sealed class LiveObjectNodeTests
         Assert.Equal(InteractionErrorCode.NOT_FOUND, missing.Error?.Code);
     }
 
-    private sealed class _Model : INotifyPropertyChanged
+    private sealed class _Model
     {
         private int _InvocationCount;
         private string _Name = "initial";
-
-        public event PropertyChangedEventHandler? PropertyChanged;
 
         [Expose]
         public string Name
         {
             get => _Name;
-            set
-            {
-                _Name = value;
-                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(Name)));
-            }
+            set => _Name = value;
         }
 
         [Expose]

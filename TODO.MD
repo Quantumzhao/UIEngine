@@ -7,7 +7,6 @@
 - [x] Live reads, writes, conversion, and validation.
 - [x] Bounded collection access.
 - [x] Synchronous and asynchronous invocation with progress.
-- [x] Notification and polling observation with visible overflow.
 - [x] Explicit domain dispatch.
 - [x] Structured interaction failures.
 - [x] CLI coverage of the live graph workflow.
@@ -19,7 +18,7 @@
   enum semantics.
 - [x] Support overlapping language-semantic facets.
 - [x] Resolve every exposed root and member to a fresh node instance.
-- [x] Preserve validation, observation, dispatch, collection bounds, and invocation behavior.
+- [x] Preserve validation, dispatch, collection bounds, and invocation behavior.
 - [ ] Resolve logical paths to terminal as well as navigable nodes.
 - [ ] Define semantic parent traversal for members and selected collection elements.
 - [ ] Cover cycles, shared references, replacement, nulls, and unavailable targets.
@@ -52,7 +51,7 @@
 - [ ] Generate controls from node language semantics.
 - [ ] Add scalar editors and method forms.
 - [ ] Add bounded collection browsing.
-- [ ] Present node-provided property changes and structured failures.
+- [ ] Refresh controls from live node operations and present structured failures.
 - [ ] Save and restore navigator layouts.
 - [ ] Show broken entries and allow back navigation to a valid node.
 - [ ] Verify keyboard-only operation and terminal resizing.

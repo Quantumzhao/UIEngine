@@ -10,7 +10,7 @@
 
 Deliver a reusable TUI that presents a `UIEngineWorkspace` as one or more independent
 navigators. It must browse and edit the exposed graph, invoke methods, display bounded collections,
-observe changes, and save or restore navigator layouts without domain-specific screens.
+and save or restore navigator layouts without domain-specific screens.
 
 ## Boundaries
 
@@ -41,7 +41,7 @@ observe changes, and save or restore navigator layouts without domain-specific s
 - Writes use Core conversion and validation, then re-read authoritative state.
 - Collections use bounded windows with position, key, null, scalar, and reference entries.
 - Method nodes generate parameter forms and present result, completion, and structured failure.
-- Observation refreshes only affected controls and preserves dirty drafts.
+- Refresh re-reads authoritative values and preserves dirty drafts.
 - Every structured target state has a distinct presentation and valid recovery commands.
 
 ## Lifetime Requirements
@@ -62,7 +62,7 @@ The saved layout contains:
 - current logical paths; and
 - stable placement, size, and selection configuration.
 
-It does not contain domain values, handles, nodes, controls, drafts, subscriptions, progress, or
+It does not contain domain values, handles, nodes, controls, drafts, progress, or
 running operations. Every saved navigator is recreated, including broken entries.
 
 ## Interaction and Layout
@@ -109,7 +109,7 @@ do not defer Core or lifetime coverage to the final TUI acceptance pass.
   may be owned by `TuiWorkspace`; a caller-supplied Core workspace remains caller-owned.
 - Core produces versioned layout data but does not choose a file, perform file I/O, or persist live
   state. The TUI owns its stable presentation fields and maps them into that data contract.
-- The existing conversion, validation, identity, dispatch, bounded-stream, observation, and
+- The existing conversion, validation, identity, dispatch, bounded-stream, and
   invocation implementations are behavior to preserve, not subsystems to redesign.
 
 If public compatibility with the current descriptor APIs is required, decide that before Step 1;
@@ -177,16 +177,13 @@ Move the current descriptor behavior behind nodes while preserving the live-doma
    - method invocation returns the existing host-owned `ActionInvocation` lifetime.
 5. Preserve metadata needed by generated controls: runtime type, summary, read/write capability,
    nullability, enum members, numeric range, method defaults, result type, and progress type.
-6. Update observation entry points to accept the applicable node occurrence or its internal target
-   binding instead of requiring frontends to reconstruct owner handle/member identifiers.
-
 Verification:
 
 - Port the existing Core behavior tests to nodes before deleting descriptor coverage.
 - Add focused tests for property versus field semantics, enum and numeric overlap, read-only and
   nullable values, null references, programmatic values, and two fresh nodes operating on the same
   live value.
-- Confirm bounded collection, validation, dispatch, observation, and invocation tests retain their
+- Confirm bounded collection, validation, dispatch, and invocation tests retain their
   current behavior.
 
 ### 3. Resolve logical paths to every node kind
@@ -264,7 +261,7 @@ Implement address persistence before building TUI save/restore commands.
    opaque to Core and restrict the initial schema to placement and size fields required by this
    milestone.
 3. Snapshot only stable data. Add explicit tests preventing domain values, runtime handles, node or
-   control instances, drafts, subscriptions, progress, and invocations from entering the contract.
+   control instances, drafts, progress, and invocations from entering the contract.
 4. Restore each navigator independently. One invalid record must not discard the remaining valid
    navigators.
 5. Reconstruct each navigation stack from the saved current path and its semantic parents. Include
@@ -292,7 +289,7 @@ TUI behavior.
 1. Replace `CliSession`'s private location bindings with one `UIEngineWorkspace` and one
    `Navigator`.
 2. Derive the prompt, current path, parent/back behavior, member completion, reads, writes,
-   collection windows, observation, and method invocation from the current node and its facets.
+   collection windows, and method invocation from the current node and its facets.
 3. Preserve existing command grammar and output where the architecture does not require a change.
    Extend navigation/inspection so scalar, collection, and method nodes can be current and terminal.
 4. Use navigator back semantics for `cd ..`; do not reintroduce a CLI-only history model.
@@ -303,7 +300,7 @@ TUI behavior.
 
 Verification:
 
-- Keep the existing redirected cyclic-world, validation, bounded collection, observation,
+- Keep the existing redirected cyclic-world, validation, bounded collection,
   replacement and completion tests.
 - Add CLI cases for terminal current nodes, collection-selector parent traversal, destructive back,
   and a structured broken path where the command workflow can create one.
@@ -405,28 +402,22 @@ Verification:
 - Test method parameter validation/default/null semantics, progress order, success/failure, and
   continued invocation after control removal.
 
-### 11. Integrate observation, replacement, and structured recovery
+### 11. Integrate refresh, replacement, and structured recovery
 
-1. Subscribe only for the current control state that benefits from observation; retain manual
-   refresh where observation is unsupported.
-2. Consume property changes surfaced by the current node and stop handling them when that node is
-   no longer current.
-3. Coalesce ordinary refreshes on the UI dispatcher, refresh only affected state, and keep buffer
-   overflow visible until the user refreshes or acknowledges it.
-4. Never overwrite a dirty draft. Mark authoritative state as changed and let the user keep,
-   reload, or commit the draft.
-5. Re-resolve through the navigator after compatible replacement so the active entry receives a
+1. Provide an explicit refresh action for controls backed by live values.
+2. Re-read through the current node without applying completed work to a detached control.
+3. Never overwrite a dirty draft. Let the user keep, reload, or commit the draft.
+4. Re-resolve through the navigator after compatible replacement so the active entry receives a
    fresh node. Refuse conflicting identity instead of silently rebinding.
-6. Provide valid recovery commands for null, unavailable, not found, ambiguous, type mismatch,
+5. Provide valid recovery commands for null, unavailable, not found, ambiguous, type mismatch,
    permission, disposed, fault, and broken-restored-path states without parsing error
    messages.
 
 Verification:
 
-- Test notification refresh, polling refresh, overflow, dirty-draft conflict, collection reset,
-  compatible replacement, conflicting replacement, and deterministic handler cleanup.
-- Remove one of two same-path navigators while both observe the domain; prove the remaining
-  navigator still updates.
+- Test explicit refresh, dirty-draft handling, collection replacement, compatible replacement,
+  and conflicting replacement.
+- Remove one of two same-path navigators and prove the remaining navigator still refreshes.
 - Assert that no disposed control receives a later posted update.
 
 ### 12. Connect layout commands and complete acceptance
@@ -460,7 +451,7 @@ Verification:
 - Back navigation is destructive and has no forward history.
 - Broken saved paths remain visible and recoverable.
 - Collection access and asynchronous streams stay bounded.
-- Frontend disposal detaches all readers and subscriptions without stopping domain work.
+- Frontend disposal detaches all readers without stopping domain work.
 - Core has no XenoAtom reference and the TUI has no domain-fixture reference.
 - `dotnet build UIEngine.sln` completes with zero warnings.
 - `dotnet test UIEngine.sln --no-build` passes.

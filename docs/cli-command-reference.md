@@ -83,7 +83,6 @@ call SimulateGrowthAsync years=3 populationPerYear=2
 ```
 
 Arguments are named and may appear in any order. Progress reporters are supplied by the framework.
-Notification and explicit polling observation remain available through the Core API.
 
 ## Errors
 
