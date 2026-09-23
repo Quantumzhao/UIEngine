@@ -2,7 +2,7 @@ namespace UIEngine.Core;
 
 internal static class PathResolution
 {
-    public static async Task<InteractionResult<ResolvedPath>> ResolveAsync(
+    public static InteractionResult<ResolvedPath> Resolve(
         UIEngineHost host,
         LogicalPath path)
     {
@@ -25,21 +25,16 @@ internal static class PathResolution
 
         var canonical = LogicalPath.Root.Append(root.Identifier);
         var locations = new List<PathLocation> { new(root.Handle, canonical) };
-        host.RecordCanonicalPath(root.Handle, canonical);
-        var handle = root.Handle;
-        var described = await host.DescribeAsync(handle);
-        if (!described.IsSuccess)
+        var current = host.CreateObjectNode(root.Handle, root.Identifier);
+        if (!current.IsSuccess)
         {
-            return InteractionResult.Failure<ResolvedPath>(described.Error!);
+            return InteractionResult.Failure<ResolvedPath>(current.Error!);
         }
 
-        var descriptor = described.Value;
         if (path.Segments.Count == 1)
         {
             return InteractionResult.Success(new ResolvedPath(
-                handle,
-                descriptor,
-                null,
+                current.Value,
                 canonical,
                 locations));
         }
@@ -47,7 +42,7 @@ internal static class PathResolution
         for (var index = 1; index < path.Segments.Count; index++)
         {
             var segment = path.Segments[index];
-            var matches = descriptor.Members
+            var matches = current.Value.Members
                 .Where(member => StringComparer.Ordinal.Equals(member.Id, segment.Identifier))
                 .ToArray();
             if (matches.Length == 0)
@@ -65,30 +60,14 @@ internal static class PathResolution
             }
 
             var member = matches[0];
-            if (member is ValueDescriptor or ActionDescriptor)
-            {
-                if (segment.Selector is not null || index != path.Segments.Count - 1)
-                {
-                    return _InvalidTraversal(segment.Identifier);
-                }
-
-                canonical = canonical.Append(segment.Identifier);
-                return InteractionResult.Success(new ResolvedPath(
-                    handle,
-                    descriptor,
-                    member,
-                    canonical,
-                    locations));
-            }
-
-            if (member is ReferenceDescriptor reference)
+            if (member is IReferenceNode reference)
             {
                 if (segment.Selector is not null)
                 {
                     return _InvalidTraversal(segment.Identifier);
                 }
 
-                var read = await reference.ReadAsync();
+                var read = reference.ReadReference();
                 if (!read.IsSuccess)
                 {
                     return InteractionResult.Failure<ResolvedPath>(read.Error!);
@@ -98,13 +77,30 @@ internal static class PathResolution
                 {
                     return InteractionResult.Failure<ResolvedPath>(
                         InteractionErrorCode.UNAVAILABLE,
-                        $"Reference '{reference.Id}' is empty.");
+                        $"Reference '{member.Id}' is empty.");
                 }
 
-                handle = read.Value.Value;
                 canonical = canonical.Append(segment.Identifier);
+                var resolved = host.CreateObjectNode(read.Value.Value, member.Id);
+                if (!resolved.IsSuccess)
+                {
+                    return InteractionResult.Failure<ResolvedPath>(resolved.Error!);
+                }
+
+                current = resolved;
+                locations.Add(new PathLocation(read.Value.Value, canonical));
+                if (index == path.Segments.Count - 1)
+                {
+                    return InteractionResult.Success(new ResolvedPath(
+                        current.Value,
+                        canonical,
+                        locations));
+                }
+
+                continue;
             }
-            else if (member is CollectionDescriptor collection)
+
+            if (member is LiveCollectionNode collection)
             {
                 if (segment.Selector is null)
                 {
@@ -115,14 +111,12 @@ internal static class PathResolution
 
                     canonical = canonical.Append(segment.Identifier);
                     return InteractionResult.Success(new ResolvedPath(
-                        handle,
-                        descriptor,
-                        collection,
+                        member,
                         canonical,
                         locations));
                 }
 
-                var selected = await collection.SelectAsync(segment.Selector);
+                var selected = collection.Select(segment.Selector);
                 if (!selected.IsSuccess)
                 {
                     return InteractionResult.Failure<ResolvedPath>(selected.Error!);
@@ -132,38 +126,44 @@ internal static class PathResolution
                 {
                     return InteractionResult.Failure<ResolvedPath>(
                         InteractionErrorCode.NOT_FOUND,
-                        $"Selector on collection '{collection.Id}' matched no object.");
+                        $"Selector on collection '{member.Id}' matched no object.");
                 }
 
                 if (selected.Value.Count > 1)
                 {
                     return InteractionResult.Failure<ResolvedPath>(
                         InteractionErrorCode.AMBIGUOUS,
-                        $"Selector on collection '{collection.Id}' matched multiple objects.");
+                        $"Selector on collection '{member.Id}' matched multiple objects.");
                 }
 
-                handle = selected.Value[0];
+                var handle = selected.Value[0];
                 canonical = canonical.Append(segment.Identifier, segment.Selector);
+                var resolved = host.CreateObjectNode(handle, member.Id);
+                if (!resolved.IsSuccess)
+                {
+                    return InteractionResult.Failure<ResolvedPath>(resolved.Error!);
+                }
+
+                current = resolved;
+                locations.Add(new PathLocation(handle, canonical));
+                if (index == path.Segments.Count - 1)
+                {
+                    return InteractionResult.Success(new ResolvedPath(
+                        current.Value,
+                        canonical,
+                        locations));
+                }
+
+                continue;
             }
 
-            described = await host.DescribeAsync(handle);
-            if (!described.IsSuccess)
+            if (segment.Selector is not null || index != path.Segments.Count - 1)
             {
-                return InteractionResult.Failure<ResolvedPath>(described.Error!);
+                return _InvalidTraversal(segment.Identifier);
             }
 
-            descriptor = described.Value;
-            locations.Add(new PathLocation(handle, canonical));
-            host.RecordCanonicalPath(handle, canonical);
-            if (index == path.Segments.Count - 1)
-            {
-                return InteractionResult.Success(new ResolvedPath(
-                    handle,
-                    descriptor,
-                    null,
-                    canonical,
-                    locations));
-            }
+            canonical = canonical.Append(segment.Identifier);
+            return InteractionResult.Success(new ResolvedPath(member, canonical, locations));
         }
 
         throw new InvalidOperationException("Path traversal ended without a result.");

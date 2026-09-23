@@ -8,12 +8,12 @@ internal abstract class LiveReflectedMemberNode : BaseNode, IDynamicInterfaceCas
     private readonly MemberNodeSource _Source;
 
     private protected LiveReflectedMemberNode(
-        MemberDescriptor descriptor,
+        UIEngineHost host,
+        string id,
         ReflectedMember member,
         Type valueType)
-        : base(descriptor.Host, descriptor.Id, valueType)
+        : base(host, id, valueType)
     {
-        Descriptor = descriptor;
         DeclaringType = member.Member.DeclaringType!;
         _Source = member.Member switch
         {
@@ -25,8 +25,6 @@ internal abstract class LiveReflectedMemberNode : BaseNode, IDynamicInterfaceCas
     }
 
     public Type DeclaringType { get; }
-
-    internal MemberDescriptor Descriptor { get; }
 
     RuntimeTypeHandle IDynamicInterfaceCastable.GetInterfaceImplementation(
         RuntimeTypeHandle interfaceType)
@@ -75,57 +73,51 @@ internal abstract class LiveReflectedMemberNode : BaseNode, IDynamicInterfaceCas
 }
 
 internal sealed class LiveReferenceNode(
-    ReferenceDescriptor descriptor,
+    ReferenceNodeBinding binding,
     ReflectedMember member)
-    : LiveReflectedMemberNode(descriptor, member, descriptor.ReferenceType), IReferenceNode
+    : LiveReflectedMemberNode(binding.Host, binding.Id, member, binding.ReferenceType), IReferenceNode
 {
-    public Type ReferenceType => descriptor.ReferenceType;
+    public Type ReferenceType => binding.ReferenceType;
 
-    public Task<InteractionResult<Guid?>> ReadReferenceAsync() => descriptor.ReadAsync();
+    public InteractionResult<Guid?> ReadReference() => binding.Read();
 }
 
 internal sealed class LiveCollectionNode(
-    CollectionDescriptor descriptor,
+    CollectionNodeBinding binding,
     ReflectedMember member)
-    : LiveReflectedMemberNode(descriptor, member, descriptor.CollectionType), ICollectionNode
+    : LiveReflectedMemberNode(binding.Host, binding.Id, member, binding.CollectionType), ICollectionNode
 {
-    public Type ElementType => descriptor.ElementType;
+    public Type ElementType => binding.ElementType;
 
-    public Type? KeyType => descriptor.KeyType;
+    public Type? KeyType => binding.KeyType;
 
-    public Task<InteractionResult<CollectionSlice>> ReadEntriesAsync(long offset, int limit) =>
-        descriptor.ReadAsync(offset, limit);
+    public InteractionResult<CollectionSlice> ReadEntries(long offset, int limit) =>
+        binding.Read(offset, limit);
+
+    internal InteractionResult<IReadOnlyList<Guid>> Select(
+        CollectionSelector selector) => binding.Select(selector);
 }
 
 internal sealed class LiveMethodNode : LiveReflectedMemberNode, IMethodNode
 {
-    private readonly ActionDescriptor _Descriptor;
+    private readonly MethodNodeBinding _Binding;
 
-    public LiveMethodNode(ActionDescriptor descriptor, ReflectedMember member)
-        : base(descriptor, member, descriptor.ReturnType)
+    public LiveMethodNode(MethodNodeBinding binding, ReflectedMember member)
+        : base(binding.Host, binding.Id, member, binding.ReturnType)
     {
-        _Descriptor = descriptor;
-        Parameters = descriptor.Parameters.Select(static parameter => new MethodParameter(
-            parameter.Id,
-            parameter.ParameterType,
-            parameter.IsRequired,
-            parameter.IsNullable,
-            parameter.HasDefaultValue,
-            parameter.DefaultValue,
-            parameter.Options,
-            parameter.Range)).ToArray();
+        _Binding = binding;
     }
 
-    public IReadOnlyList<MethodParameter> Parameters { get; }
+    public IReadOnlyList<MethodParameter> Parameters => _Binding.Parameters;
 
-    public Type? ResultType => _Descriptor.ResultType;
+    public Type? ResultType => _Binding.ResultType;
 
-    public bool IsAsynchronous => _Descriptor.IsAsynchronous;
+    public bool IsAsynchronous => _Binding.IsAsynchronous;
 
-    public Type? ProgressType => _Descriptor.ProgressType;
+    public Type? ProgressType => _Binding.ProgressType;
 
-    public Task<InteractionResult<ActionInvocation>> InvokeAsync(
-        IReadOnlyDictionary<string, object?> arguments) => _Descriptor.InvokeAsync(arguments);
+    public InteractionResult<ActionInvocation> Invoke(
+        IReadOnlyDictionary<string, object?> arguments) => _Binding.Invoke(arguments);
 }
 
 [DynamicInterfaceCastableImplementation]

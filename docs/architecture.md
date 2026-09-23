@@ -23,10 +23,12 @@ The host owns:
 - runtime handles and optional stable domain identities;
 - reflection and programmatic exposure;
 - path resolution and live operations;
-- domain dispatch;
+- domain-thread-affine interaction; and
 - started invocation lifetime.
 
-Hosts are isolated and disposable. They contain no process-global registry or frontend state.
+Hosts are isolated and disposable. Their live graph operations are synchronous and must be called
+on the domain model's owning thread. They contain no process-global registry, frontend state, or
+thread-marshaling mechanism.
 
 ### `UIEngineWorkspace`
 
@@ -144,13 +146,10 @@ A navigator may start from a registered root or a specific resolved `BaseNode`. 
 captures the node's current location and resolves a navigator-owned instance. Duplicating a
 navigator follows the same rule at the current path, so the two navigators do not share nodes.
 
-Navigator mutations are latest-request-wins. Starting a mutation advances that navigator's
-generation and supersedes any older unresolved mutation. Resolution may complete in the
-background, but it may publish an entry or change notification only if its generation is still
-current. Back, removal, or disposal also invalidates affected pending work,
-so an older resolution can never restore stale state. Successful mutation results and change
-notifications carry the same committed change object; failed or superseded mutations publish no
-change.
+Navigator mutations and path resolution run synchronously on the domain thread. A successful
+mutation returns the same committed change object published by its change notification; a failed
+mutation publishes no change. Since Core does not queue or dispatch mutations, it cannot later
+restore stale navigation state after back, removal, or disposal.
 
 If a path cannot resolve, the current entry remains present with its structured failure. Back
 navigation remains available. A restored broken path therefore stays visible and can be unwound
@@ -176,8 +175,10 @@ navigators. Serialization produces data; file storage remains the caller's respo
 
 ## Operations and Lifetime
 
-All live operations flow through the host and its `IInteractionDispatcher`. Expected outcomes use
-`InteractionResult<T>` with stable error codes and validation issues.
+All live operations flow synchronously through the host on the domain model's owning thread.
+Expected outcomes use `InteractionResult<T>` with stable error codes and validation issues. If a
+frontend runs on another thread, the embedding application owns the request boundary into the
+domain thread; Core does not marshal work to or from UI threads.
 
 Collection access is always bounded. Collection windows retain positions, optional keys, nulls,
 scalar values, references, optional total counts, and whether more data is available.
@@ -188,12 +189,12 @@ Removing a node or control prevents that frontend from applying later invocation
 
 ## Frontend Lifetime
 
-For every active navigation entry, a frontend creates a control. Completed async work is applied
-only while that entry's generation remains current.
+For every active navigation entry, a frontend creates a control. Invocation updates are applied
+only while that entry is still current.
 
-When an entry is removed, the frontend removes its control. Already-started tasks may finish, but
-generation checks prevent them from updating a detached visual tree. Removal does not stop the
-domain object or a started invocation.
+When an entry is removed, the frontend removes its control and detaches from its invocation
+updates. Already-started domain tasks may finish, but they cannot update a detached visual tree.
+Removal does not stop the domain object or a started invocation.
 
 Removing one navigator cannot interfere with work owned by another navigator, even when both point
 to the same path.

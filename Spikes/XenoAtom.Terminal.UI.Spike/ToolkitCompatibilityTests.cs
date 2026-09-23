@@ -95,9 +95,10 @@ public sealed class ToolkitCompatibilityTests
     {
         var source = new _CountingCollection();
         using var host = new UIEngineHost(new UIEngineHostOptions { MaxCollectionItems = 8 });
-        var root = host.SetRoot("model", source);
-        var described = await host.DescribeAsync(root.Value);
-        var collection = Assert.Single(described.Value.Members.OfType<CollectionDescriptor>());
+        host.SetRoot("model", source);
+        var resolved = host.ResolveRootNode("model");
+        var collection = Assert.IsAssignableFrom<ICollectionNode>(Assert.Single(
+            ((IObjectNode)resolved.Value.Node).Members));
         var list = new ListBox<string>();
         var templateProbe = new _TemplateProbe();
         list.ItemTemplate = new DataTemplate<string>(
@@ -117,12 +118,12 @@ public sealed class ToolkitCompatibilityTests
                 switch (phase)
                 {
                     case 0:
-                        _ReplaceItems(list, (await collection.ReadAsync(0, 3)).Value);
+                        _ReplaceItems(list, collection.ReadEntries(0, 3).Value);
                         enumerationCounts.Add(source.MoveNextCount);
                         phase = 1;
                         return TerminalLoopResult.Continue;
                     case 1:
-                        _UpdateItems(list, (await collection.ReadAsync(3, 3)).Value);
+                        _UpdateItems(list, collection.ReadEntries(3, 3).Value);
                         enumerationCounts.Add(source.MoveNextCount);
                         phase = 2;
                         return TerminalLoopResult.Continue;

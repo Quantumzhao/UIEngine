@@ -68,17 +68,17 @@ public sealed class CliBehaviorTests
         var output = new StringWriter(CultureInfo.InvariantCulture);
         using var session = _CreateSession(output);
 
-        Assert.Contains("cd", await session.GetCompletionsAsync("c", 1));
-        Assert.Contains("/world", await session.GetCompletionsAsync("cd /w", 5));
+        Assert.Contains("cd", session.GetCompletions("c", 1));
+        Assert.Contains("/world", session.GetCompletions("cd /w", 5));
         await session.ExecuteAsync("cd /world/Nations[index=0]");
 
-        Assert.Contains("Population", await session.GetCompletionsAsync("get P", 5));
-        Assert.DoesNotContain("Turn", await session.GetCompletionsAsync("set T", 5));
-        Assert.Contains("Cities", await session.GetCompletionsAsync("ls C", 4));
-        Assert.Contains("AdvanceTurn", await session.GetCompletionsAsync("call A", 6));
+        Assert.Contains("Population", session.GetCompletions("get P", 5));
+        Assert.DoesNotContain("Turn", session.GetCompletions("set T", 5));
+        Assert.Contains("Cities", session.GetCompletions("ls C", 4));
+        Assert.Contains("AdvanceTurn", session.GetCompletions("call A", 6));
         Assert.Contains(
             "populationDelta=",
-            await session.GetCompletionsAsync("call AdvanceTurn ", 17));
+            session.GetCompletions("call AdvanceTurn ", 17));
     }
 
     [Fact]

@@ -13,8 +13,8 @@ public sealed class LiveObjectNodeTests
         using var host = new UIEngineHost(new UIEngineHostOptions { MaxCollectionItems = 2 });
         var handle = host.SetRoot("model", model).Value;
 
-        var first = await host.ResolveRootNodeAsync("model");
-        var second = await host.ResolveRootNodeAsync("model");
+        var first = host.ResolveRootNode("model");
+        var second = host.ResolveRootNode("model");
 
         Assert.True(first.IsSuccess);
         Assert.True(second.IsSuccess);
@@ -37,18 +37,18 @@ public sealed class LiveObjectNodeTests
         Assert.True(child is IReferenceNode);
         Assert.True(child is IPropertyNode);
         Assert.False(child.IsTerminal);
-        Assert.Null((await ((IReferenceNode)child).ReadReferenceAsync()).Value);
+        Assert.Null(((IReferenceNode)child).ReadReference().Value);
 
         model.Child = new _Child("one");
-        var childRead = await ((IReferenceNode)child).ReadReferenceAsync();
+        var childRead = ((IReferenceNode)child).ReadReference();
         Assert.True(childRead.IsSuccess);
         Assert.NotNull(childRead.Value);
 
         var items = members[nameof(_Model.Items)];
         Assert.True(items is ICollectionNode);
         Assert.True(items is IPropertyNode);
-        var slice = await ((ICollectionNode)items).ReadEntriesAsync(0, 2);
-        var tooLarge = await ((ICollectionNode)items).ReadEntriesAsync(0, 3);
+        var slice = ((ICollectionNode)items).ReadEntries(0, 2);
+        var tooLarge = ((ICollectionNode)items).ReadEntries(0, 3);
         Assert.IsType<NullCollectionEntry>(slice.Value.Entries[0]);
         Assert.Equal(7, Assert.IsType<ScalarCollectionEntry>(slice.Value.Entries[1]).Value);
         Assert.True(slice.Value.HasMore);
@@ -65,7 +65,7 @@ public sealed class LiveObjectNodeTests
         Assert.True(method.Parameters[1].HasDefaultValue);
         Assert.Equal(1, method.Parameters[1].DefaultValue);
 
-        var invocation = await method.InvokeAsync(new Dictionary<string, object?>
+        var invocation = method.Invoke(new Dictionary<string, object?>
         {
             ["left"] = "2",
         });
@@ -74,12 +74,12 @@ public sealed class LiveObjectNodeTests
     }
 
     [Fact]
-    public async Task RootResolutionReturnsStructuredFailures()
+    public void RootResolutionReturnsStructuredFailures()
     {
         using var host = new UIEngineHost();
 
-        var invalid = await host.ResolveRootNodeAsync(" ");
-        var missing = await host.ResolveRootNodeAsync("missing");
+        var invalid = host.ResolveRootNode(" ");
+        var missing = host.ResolveRootNode("missing");
 
         Assert.Equal(InteractionErrorCode.INVALID_INPUT, invalid.Error?.Code);
         Assert.Equal(InteractionErrorCode.NOT_FOUND, missing.Error?.Code);

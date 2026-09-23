@@ -17,18 +17,15 @@ public sealed class ActionInvocation
     private readonly TaskCompletionSource<InteractionResult<object?>> _Completion =
         new(TaskCreationOptions.RunContinuationsAsynchronously);
     private readonly Action<ActionInvocation> _OnCompleted;
-    private readonly string _ActionId;
     private int _Terminal;
     private long _OrderingToken;
     private InvocationStatus _Status = InvocationStatus.RUNNING;
     private Exception? _Fault;
 
     internal ActionInvocation(
-        string actionId,
         int progressCapacity,
         Action<ActionInvocation> onCompleted)
     {
-        _ActionId = actionId;
         _Progress = new BoundedAsyncStream<InvocationProgress>(progressCapacity);
         _OnCompleted = onCompleted;
     }

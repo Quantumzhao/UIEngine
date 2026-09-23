@@ -12,6 +12,7 @@ public sealed class TuiBoundaryTests
     public void WorkspaceUsesCopiedOptionsAndLeavesCallerOwnedHostAlive()
     {
         using var host = new UIEngineHost();
+        host.SetRoot("world", new object());
         var options = new TuiFrontendOptions
         {
             ApplicationTitle = "Test application",
@@ -23,11 +24,11 @@ public sealed class TuiBoundaryTests
 
         Assert.NotSame(options, workspace.Options);
         Assert.Equal(options, workspace.Options);
-        Assert.False(host.IsDisposed);
+        Assert.True(host.ResolveRootNode("world").IsSuccess);
 
         workspace.Dispose();
 
-        Assert.False(host.IsDisposed);
+        Assert.True(host.ResolveRootNode("world").IsSuccess);
     }
 
     [Fact]

@@ -63,13 +63,13 @@ public interface IReferenceNode : INavigableNode
 {
     Type ReferenceType { get; }
 
-    Task<InteractionResult<Guid?>> ReadReferenceAsync();
+    InteractionResult<Guid?> ReadReference();
 }
 
 /// <summary>Identifies a node with a readable scalar value.</summary>
 public interface IReadableValueNode
 {
-    Task<InteractionResult<object?>> ReadValueAsync();
+    InteractionResult<object?> ReadValue();
 }
 
 /// <summary>Identifies a node with a writable scalar value.</summary>
@@ -79,7 +79,7 @@ public interface IWritableValueNode
 
     IValueRange? Range { get; }
 
-    Task<InteractionResult<object?>> WriteValueAsync(object? value);
+    InteractionResult<object?> WriteValue(object? value);
 }
 
 /// <summary>Identifies a value node that accepts <see langword="null"/>.</summary>
@@ -110,7 +110,7 @@ public interface ICollectionNode : INavigableNode
 
     Type? KeyType { get; }
 
-    Task<InteractionResult<CollectionSlice>> ReadEntriesAsync(long offset, int limit);
+    InteractionResult<CollectionSlice> ReadEntries(long offset, int limit);
 }
 
 /// <summary>Describes one user-supplied method parameter.</summary>
@@ -135,6 +135,6 @@ public interface IMethodNode : IMemberNode
 
     Type? ProgressType { get; }
 
-    Task<InteractionResult<ActionInvocation>> InvokeAsync(
+    InteractionResult<ActionInvocation> Invoke(
         IReadOnlyDictionary<string, object?> arguments);
 }

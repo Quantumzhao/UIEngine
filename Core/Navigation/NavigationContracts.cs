@@ -45,7 +45,7 @@ public sealed class NavigationEntry
 
 /// <summary>
 /// Describes one committed navigator mutation. Implementations publish the same instance as the
-/// successful async mutation result and in their change notification.
+/// successful mutation result and in their change notification.
 /// </summary>
 public abstract record WorkspaceChange(Guid NavigatorId);
 

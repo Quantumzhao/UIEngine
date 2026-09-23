@@ -60,19 +60,19 @@ internal sealed class CliSession : IDisposable
         switch (tokens[0].ToUpperInvariant())
         {
             case "LS":
-                await _ListAsync(tokens);
+                _List(tokens);
                 return true;
             case "CD":
-                await _ChangeDirectoryAsync(tokens);
+                _ChangeDirectory(tokens);
                 return true;
             case "INSPECT":
-                await _InspectAsync(tokens);
+                _Inspect(tokens);
                 return true;
             case "GET":
-                await _GetAsync(tokens);
+                _Get(tokens);
                 return true;
             case "SET":
-                await _SetAsync(tokens);
+                _Set(tokens);
                 return true;
             case "CALL":
                 await _CallAsync(tokens);
@@ -94,7 +94,7 @@ internal sealed class CliSession : IDisposable
         }
     }
 
-    internal async Task<IReadOnlyList<string>> GetCompletionsAsync(
+    internal IReadOnlyList<string> GetCompletions(
         string text,
         int caret)
     {
@@ -116,14 +116,14 @@ internal sealed class CliSession : IDisposable
         return completedTokens[0].ToUpperInvariant() switch
         {
             "CD" when completedTokens.Length == 1 =>
-                await _GetNavigationCompletionsAsync(),
+                _GetNavigationCompletions(),
             "LS" when completedTokens.Length == 1 =>
-                await _GetCollectionCompletionsAsync(),
+                _GetCollectionCompletions(),
             "GET" when completedTokens.Length == 1 =>
-                await _GetValueCompletionsAsync(false),
+                _GetValueCompletions(false),
             "SET" when completedTokens.Length == 1 =>
-                await _GetValueCompletionsAsync(true),
-            "CALL" => await _GetActionCompletionsAsync(completedTokens),
+                _GetValueCompletions(true),
+            "CALL" => _GetActionCompletions(completedTokens),
             _ => [],
         };
     }
@@ -139,11 +139,11 @@ internal sealed class CliSession : IDisposable
         _Host.Dispose();
     }
 
-    private async Task _ListAsync(IReadOnlyList<string> tokens)
+    private void _List(IReadOnlyList<string> tokens)
     {
         if (tokens.Count > 1)
         {
-            await _ListCollectionAsync(tokens);
+            _ListCollection(tokens);
             return;
         }
 
@@ -157,22 +157,22 @@ internal sealed class CliSession : IDisposable
             return;
         }
 
-        var described = await _GetCurrentDescriptorAsync();
-        if (!described.IsSuccess)
+        var resolved = _GetCurrentObjectNode();
+        if (!resolved.IsSuccess)
         {
-            _WriteFailure(described.Error!);
+            _WriteFailure(resolved.Error!);
             return;
         }
 
-        foreach (var member in described.Value.Members
-                     .OrderBy(static member => member.Kind)
+        foreach (var member in ((IObjectNode)resolved.Value).Members
+                     .OrderBy(_GetNodeOrder)
                      .ThenBy(static member => member.Id, StringComparer.Ordinal))
         {
-            _Output.WriteLine($"{member.Kind.ToString().ToLowerInvariant()} {member.Id}");
+            _Output.WriteLine($"{_GetNodeKind(member)} {member.Id}");
         }
     }
 
-    private async Task _ListCollectionAsync(IReadOnlyList<string> tokens)
+    private void _ListCollection(IReadOnlyList<string> tokens)
     {
         var options = _ParseCollectionOptions(tokens);
         if (!options.IsSuccess)
@@ -181,15 +181,18 @@ internal sealed class CliSession : IDisposable
             return;
         }
 
-        var binding = await _ResolveMemberAsync(tokens[1], MemberKind.COLLECTION);
-        if (!binding.IsSuccess)
+        var resolved = _ResolveMember(
+            tokens[1],
+            static member => member is ICollectionNode,
+            "collection");
+        if (!resolved.IsSuccess)
         {
-            _WriteFailure(binding.Error!);
+            _WriteFailure(resolved.Error!);
             return;
         }
 
-        var collection = (CollectionDescriptor)binding.Value.Member;
-        var read = await collection.ReadAsync(
+        var collection = (ICollectionNode)resolved.Value;
+        var read = collection.ReadEntries(
             options.Value.Offset,
             options.Value.Limit ?? DEFAULT_COLLECTION_LIMIT);
         if (!read.IsSuccess)
@@ -200,7 +203,7 @@ internal sealed class CliSession : IDisposable
 
         var slice = read.Value;
         _Output.WriteLine(
-            $"collection {collection.Id} offset={slice.Offset} count={slice.Entries.Count} " +
+            $"collection {resolved.Value.Id} offset={slice.Offset} count={slice.Entries.Count} " +
             $"total={_FormatValue(slice.TotalCount)} hasMore={slice.HasMore}");
         foreach (var entry in slice.Entries)
         {
@@ -217,7 +220,7 @@ internal sealed class CliSession : IDisposable
         }
     }
 
-    private async Task _ChangeDirectoryAsync(IReadOnlyList<string> tokens)
+    private void _ChangeDirectory(IReadOnlyList<string> tokens)
     {
         if (!_HasArity(tokens, 2, "cd <absolute-path|..>"))
         {
@@ -237,7 +240,7 @@ internal sealed class CliSession : IDisposable
             return;
         }
 
-        var resolution = await _Host.ResolvePathAsync(tokens[1]);
+        var resolution = _Host.ResolvePath(tokens[1]);
         if (!resolution.IsSuccess)
         {
             _WriteFailure(resolution.Error!);
@@ -252,7 +255,7 @@ internal sealed class CliSession : IDisposable
             return;
         }
 
-        var captured = await _CaptureLocationsAsync(resolution.Value.Locations);
+        var captured = _CaptureLocations(resolution.Value.Locations);
         if (!captured.IsSuccess)
         {
             _WriteFailure(captured.Error!);
@@ -263,52 +266,36 @@ internal sealed class CliSession : IDisposable
         _Output.WriteLine(CurrentPath);
     }
 
-    private async Task _InspectAsync(IReadOnlyList<string> tokens)
+    private void _Inspect(IReadOnlyList<string> tokens)
     {
         if (!_HasArity(tokens, 1, "inspect"))
         {
             return;
         }
 
-        var described = await _GetCurrentDescriptorAsync();
-        if (!described.IsSuccess)
+        var resolved = _GetCurrentObjectNode();
+        if (!resolved.IsSuccess)
         {
-            _WriteFailure(described.Error!);
+            _WriteFailure(resolved.Error!);
             return;
         }
 
-        var descriptor = described.Value;
+        var node = resolved.Value;
+        var objectNode = (IObjectNode)node;
         _Output.WriteLine($"path: {CurrentPath}");
-        _Output.WriteLine($"type: {descriptor.TypeName}");
-        _Output.WriteLine($"handle: {descriptor.Handle:D}");
-        _Output.WriteLine($"domain-identity: {_FormatValue(descriptor.DomainIdentity)}");
-        _Output.WriteLine($"summary: {descriptor.Summary ?? "null"}");
+        _Output.WriteLine($"type: {node.ValueType.FullName ?? node.ValueType.Name}");
+        _Output.WriteLine($"handle: {objectNode.Handle:D}");
+        _Output.WriteLine($"domain-identity: {_FormatValue(objectNode.DomainIdentity)}");
+        _Output.WriteLine($"summary: {objectNode.Summary ?? "null"}");
 
-        foreach (var member in descriptor.Members.OrderBy(static member => member.Id, StringComparer.Ordinal))
+        foreach (var member in objectNode.Members.OrderBy(static member => member.Id, StringComparer.Ordinal))
         {
             switch (member)
             {
-                case ValueDescriptor value:
-                    var options = value.Options.Count == 0
-                        ? "none"
-                        : string.Join('|', value.Options.Select(static option => _FormatValue(option.Value)));
-                    _Output.WriteLine(
-                        $"value {value.Id} type={value.ValueType.Name} read={value.CanRead} " +
-                        $"write={value.CanWrite} nullable={value.IsNullable} " +
-                        $"range={_FormatRange(value.Range)} options={options}");
-                    break;
-                case ReferenceDescriptor reference:
-                    _Output.WriteLine($"reference {reference.Id} type={reference.ReferenceType.Name}");
-                    break;
-                case CollectionDescriptor collection:
-                    _Output.WriteLine(
-                        $"collection {collection.Id} element={collection.ElementType.Name} " +
-                        $"key={collection.KeyType?.Name ?? "none"}");
-                    break;
-                case ActionDescriptor action:
+                case IMethodNode method:
                     var parameters = string.Join(
                         ", ",
-                        action.Parameters.Select(parameter =>
+                        method.Parameters.Select(parameter =>
                             $"{parameter.Id}:{parameter.ParameterType.Name}" +
                             $" required={parameter.IsRequired}" +
                             $" nullable={parameter.IsNullable}" +
@@ -316,62 +303,88 @@ internal sealed class CliSession : IDisposable
                             $" range={_FormatRange(parameter.Range)}" +
                             $" options={(parameter.Options.Count == 0 ? "none" : string.Join('|', parameter.Options.Select(static option => _FormatValue(option.Value))))}"));
                     _Output.WriteLine(
-                        $"action {action.Id}({parameters}) result={action.ResultType?.Name ?? "void"} " +
-                        $"async={action.IsAsynchronous} " +
-                        $"progress={action.ProgressType?.Name ?? "none"}");
+                        $"action {member.Id}({parameters}) result={method.ResultType?.Name ?? "void"} " +
+                        $"async={method.IsAsynchronous} " +
+                        $"progress={method.ProgressType?.Name ?? "none"}");
+                    break;
+                case ICollectionNode collection:
+                    _Output.WriteLine(
+                        $"collection {member.Id} element={collection.ElementType.Name} " +
+                        $"key={collection.KeyType?.Name ?? "none"}");
+                    break;
+                case IReferenceNode reference:
+                    _Output.WriteLine($"reference {member.Id} type={reference.ReferenceType.Name}");
+                    break;
+                default:
+                    var writable = member as IWritableValueNode;
+                    var valueOptions = member is IEnumNode enumNode
+                        ? enumNode.Options
+                        : writable?.Options ?? [];
+                    var options = valueOptions.Count == 0
+                        ? "none"
+                        : string.Join('|', valueOptions.Select(static option => _FormatValue(option.Value)));
+                    _Output.WriteLine(
+                        $"value {member.Id} type={member.ValueType.Name} " +
+                        $"read={member is IReadableValueNode} " +
+                        $"write={writable is not null} nullable={member is INullableValueNode} " +
+                        $"range={_FormatRange(writable?.Range)} options={options}");
                     break;
             }
         }
     }
 
-    private async Task _GetAsync(IReadOnlyList<string> tokens)
+    private void _Get(IReadOnlyList<string> tokens)
     {
         if (!_HasArity(tokens, 2, "get <member>"))
         {
             return;
         }
 
-        var binding = await _ResolveMemberAsync(tokens[1], MemberKind.VALUE);
-        if (!binding.IsSuccess)
+        var resolved = _ResolveMember(
+            tokens[1],
+            static member => member is IReadableValueNode,
+            "readable value");
+        if (!resolved.IsSuccess)
         {
-            _WriteFailure(binding.Error!);
+            _WriteFailure(resolved.Error!);
             return;
         }
 
-        var value = (ValueDescriptor)binding.Value.Member;
-        var read = await value.ReadAsync();
+        var read = ((IReadableValueNode)resolved.Value).ReadValue();
         if (!read.IsSuccess)
         {
             _WriteFailure(read.Error!);
             return;
         }
 
-        _Output.WriteLine($"{value.Id} = {_FormatValue(read.Value)}");
+        _Output.WriteLine($"{resolved.Value.Id} = {_FormatValue(read.Value)}");
     }
 
-    private async Task _SetAsync(IReadOnlyList<string> tokens)
+    private void _Set(IReadOnlyList<string> tokens)
     {
         if (!_HasArity(tokens, 3, "set <member> <value>"))
         {
             return;
         }
 
-        var binding = await _ResolveMemberAsync(tokens[1], MemberKind.VALUE);
-        if (!binding.IsSuccess)
+        var resolved = _ResolveMember(
+            tokens[1],
+            static member => member is IWritableValueNode,
+            "writable value");
+        if (!resolved.IsSuccess)
         {
-            _WriteFailure(binding.Error!);
+            _WriteFailure(resolved.Error!);
             return;
         }
 
-        var value = (ValueDescriptor)binding.Value.Member;
-        var write = await value.WriteAsync(tokens[2]);
+        var write = ((IWritableValueNode)resolved.Value).WriteValue(tokens[2]);
         if (!write.IsSuccess)
         {
             _WriteFailure(write.Error!);
             return;
         }
 
-        _Output.WriteLine($"{value.Id} = {_FormatValue(write.Value)}");
+        _Output.WriteLine($"{resolved.Value.Id} = {_FormatValue(write.Value)}");
     }
 
     private async Task _CallAsync(IReadOnlyList<string> tokens)
@@ -389,15 +402,18 @@ internal sealed class CliSession : IDisposable
             return;
         }
 
-        var binding = await _ResolveMemberAsync(tokens[1], MemberKind.ACTION);
-        if (!binding.IsSuccess)
+        var resolved = _ResolveMember(
+            tokens[1],
+            static member => member is IMethodNode,
+            "action");
+        if (!resolved.IsSuccess)
         {
-            _WriteFailure(binding.Error!);
+            _WriteFailure(resolved.Error!);
             return;
         }
 
-        var action = (ActionDescriptor)binding.Value.Member;
-        var started = await action.InvokeAsync(arguments.Value);
+        var action = (IMethodNode)resolved.Value;
+        var started = action.Invoke(arguments.Value);
         if (!started.IsSuccess)
         {
             _WriteFailure(started.Error!);
@@ -408,7 +424,7 @@ internal sealed class CliSession : IDisposable
         await foreach (var progress in invocation.ReadProgressAsync())
         {
             _Output.WriteLine(
-                $"progress {action.Id} token={progress.OrderingToken} " +
+                $"progress {resolved.Value.Id} token={progress.OrderingToken} " +
                 $"value={_FormatValue(progress.Value)}");
         }
 
@@ -419,10 +435,10 @@ internal sealed class CliSession : IDisposable
             return;
         }
 
-        _Output.WriteLine($"{action.Id} => {_FormatValue(completion.Value)}");
+        _Output.WriteLine($"{resolved.Value.Id} => {_FormatValue(completion.Value)}");
     }
 
-    private async Task<IReadOnlyList<string>> _GetNavigationCompletionsAsync()
+    private string[] _GetNavigationCompletions()
     {
         var completions = new HashSet<string>(StringComparer.Ordinal) { "/", ".." };
         foreach (var root in _Host.Roots)
@@ -432,12 +448,12 @@ internal sealed class CliSession : IDisposable
 
         if (CurrentHandle is not null)
         {
-            var descriptor = await _GetCurrentDescriptorAsync();
-            if (descriptor.IsSuccess)
+            var resolved = _GetCurrentObjectNode();
+            if (resolved.IsSuccess)
             {
                 var current = _Locations[^1].Path;
-                foreach (var member in descriptor.Value.Members
-                             .Where(static member => member is ReferenceDescriptor or CollectionDescriptor))
+                foreach (var member in ((IObjectNode)resolved.Value).Members
+                             .Where(static member => member is IReferenceNode or ICollectionNode))
                 {
                     completions.Add(current.Append(member.Id).ToString());
                 }
@@ -447,39 +463,41 @@ internal sealed class CliSession : IDisposable
         return completions.OrderBy(static value => value, StringComparer.Ordinal).ToArray();
     }
 
-    private async Task<IReadOnlyList<string>> _GetValueCompletionsAsync(bool writableOnly)
+    private string[] _GetValueCompletions(bool writableOnly)
     {
-        var descriptor = await _GetCurrentDescriptorAsync();
-        return descriptor.IsSuccess
-            ? descriptor.Value.Members.OfType<ValueDescriptor>()
-                .Where(value => !writableOnly || value.CanWrite)
+        var resolved = _GetCurrentObjectNode();
+        return resolved.IsSuccess
+            ? ((IObjectNode)resolved.Value).Members
+                .Where(_IsValueNode)
+                .Where(value => !writableOnly || value is IWritableValueNode)
                 .Select(static value => value.Id)
                 .OrderBy(static value => value, StringComparer.Ordinal)
                 .ToArray()
             : [];
     }
 
-    private async Task<IReadOnlyList<string>> _GetCollectionCompletionsAsync()
+    private string[] _GetCollectionCompletions()
     {
-        var descriptor = await _GetCurrentDescriptorAsync();
-        return descriptor.IsSuccess
-            ? descriptor.Value.Members.OfType<CollectionDescriptor>()
+        var resolved = _GetCurrentObjectNode();
+        return resolved.IsSuccess
+            ? ((IObjectNode)resolved.Value).Members.Where(static member => member is ICollectionNode)
                 .Select(static collection => collection.Id)
                 .OrderBy(static value => value, StringComparer.Ordinal)
                 .ToArray()
             : [];
     }
 
-    private async Task<IReadOnlyList<string>> _GetActionCompletionsAsync(
+    private string[] _GetActionCompletions(
         string[] completedTokens)
     {
-        var descriptor = await _GetCurrentDescriptorAsync();
-        if (!descriptor.IsSuccess)
+        var resolved = _GetCurrentObjectNode();
+        if (!resolved.IsSuccess)
         {
             return [];
         }
 
-        var actions = descriptor.Value.Members.OfType<ActionDescriptor>();
+        var actions = ((IObjectNode)resolved.Value).Members
+            .Where(static member => member is IMethodNode);
         if (completedTokens.Length == 1)
         {
             return actions.Select(static action => action.Id)
@@ -497,47 +515,47 @@ internal sealed class CliSession : IDisposable
         var supplied = completedTokens.Skip(2)
             .Select(static token => token.Split('=', 2)[0])
             .ToHashSet(StringComparer.Ordinal);
-        return action.Parameters
+        return ((IMethodNode)action).Parameters
             .Where(parameter => !supplied.Contains(parameter.Id))
             .Select(static parameter => $"{parameter.Id}=")
             .OrderBy(static value => value, StringComparer.Ordinal)
             .ToArray();
     }
 
-    private async Task<InteractionResult<ObjectDescriptor>> _GetCurrentDescriptorAsync()
+    private InteractionResult<BaseNode> _GetCurrentObjectNode()
     {
         if (_Locations.Count == 0)
         {
-            return InteractionResult.Failure<ObjectDescriptor>(
+            return InteractionResult.Failure<BaseNode>(
                 InteractionErrorCode.UNAVAILABLE,
                 "No object is selected. Use 'cd /<root>' first.");
         }
 
         var location = _Locations[^1];
-        var resolution = await _Host.ResolvePathAsync(location.Path);
+        var resolution = _Host.ResolvePath(location.Path);
         if (!resolution.IsSuccess)
         {
-            return _Failure<ObjectDescriptor>(resolution.Error!);
+            return _Failure<BaseNode>(resolution.Error!);
         }
 
-        if (!resolution.Value.IsObject)
+        if (resolution.Value.Node is not IObjectNode objectNode)
         {
-            return InteractionResult.Failure<ObjectDescriptor>(
+            return InteractionResult.Failure<BaseNode>(
                 InteractionErrorCode.INVALID_INPUT,
                 "The current path no longer identifies a navigable object.");
         }
 
-        var descriptor = resolution.Value.OwnerDescriptor;
-        if (location.DomainIdentity != descriptor.DomainIdentity)
+        if (location.DomainIdentity != objectNode.DomainIdentity)
         {
-            return InteractionResult.Failure<ObjectDescriptor>(
+            return InteractionResult.Failure<BaseNode>(
                 InteractionErrorCode.NOT_FOUND,
                 "The current path resolved to a different domain identity.");
         }
 
-        if (!StringComparer.Ordinal.Equals(location.TypeName, descriptor.TypeName))
+        var typeName = resolution.Value.Node.ValueType.FullName ?? resolution.Value.Node.ValueType.Name;
+        if (!StringComparer.Ordinal.Equals(location.TypeName, typeName))
         {
-            return InteractionResult.Failure<ObjectDescriptor>(
+            return InteractionResult.Failure<BaseNode>(
                 InteractionErrorCode.TYPE_MISMATCH,
                 "The current path resolved to an incompatible object type.");
         }
@@ -545,59 +563,70 @@ internal sealed class CliSession : IDisposable
         _Locations[^1] = location with
         {
             Path = resolution.Value.CanonicalPath,
-            LastResolvedHandle = descriptor.Handle,
+            LastResolvedHandle = objectNode.Handle,
         };
-        return InteractionResult.Success(descriptor);
+        return InteractionResult.Success(resolution.Value.Node);
     }
 
-    private async Task<InteractionResult<ResolvedBinding>> _ResolveMemberAsync(
+    private InteractionResult<BaseNode> _ResolveMember(
         string memberId,
-        MemberKind kind)
+        Func<BaseNode, bool> matchesExpectedFacet,
+        string expectedKind)
     {
-        if (_Locations.Count == 0)
-        {
-            return InteractionResult.Failure<ResolvedBinding>(
-                InteractionErrorCode.UNAVAILABLE,
-                "No object is selected. Use 'cd /<root>' first.");
-        }
-
-        var location = _Locations[^1];
-        var resolved = await _Host.ResolveBindingAsync(
-            new BindingReference(
-                location.Path.ToString(),
-                memberId,
-                kind,
-                location.DomainIdentity));
+        var resolved = _GetCurrentObjectNode();
         if (!resolved.IsSuccess)
         {
             return resolved;
         }
 
-        _Locations[^1] = location with
+        var members = ((IObjectNode)resolved.Value).Members
+            .Where(member => StringComparer.Ordinal.Equals(member.Id, memberId))
+            .ToArray();
+        if (members.Length == 0)
         {
-            Path = resolved.Value.CanonicalPath,
-            LastResolvedHandle = resolved.Value.OwnerHandle,
-        };
-        return resolved;
+            return InteractionResult.Failure<BaseNode>(
+                InteractionErrorCode.NOT_FOUND,
+                $"Member '{memberId}' was not found.");
+        }
+
+        if (members.Length > 1)
+        {
+            return InteractionResult.Failure<BaseNode>(
+                InteractionErrorCode.AMBIGUOUS,
+                $"Member '{memberId}' is ambiguous.");
+        }
+
+        return matchesExpectedFacet(members[0])
+            ? InteractionResult.Success(members[0])
+            : InteractionResult.Failure<BaseNode>(
+                InteractionErrorCode.TYPE_MISMATCH,
+                $"Member '{memberId}' is not a {expectedKind}.");
     }
 
-    private async Task<InteractionResult<List<_LocationBinding>>> _CaptureLocationsAsync(
+    private InteractionResult<List<_LocationBinding>> _CaptureLocations(
         IReadOnlyList<PathLocation> locations)
     {
         var captured = new List<_LocationBinding>(locations.Count);
         foreach (var location in locations)
         {
-            var described = await _Host.DescribeAsync(location.Handle);
-            if (!described.IsSuccess)
+            var resolved = _Host.ResolvePath(location.Path);
+            if (!resolved.IsSuccess)
             {
-                return _Failure<List<_LocationBinding>>(described.Error!);
+                return _Failure<List<_LocationBinding>>(resolved.Error!);
+            }
+
+            if (resolved.Value.Node is not IObjectNode objectNode)
+            {
+                return InteractionResult.Failure<List<_LocationBinding>>(
+                    InteractionErrorCode.TYPE_MISMATCH,
+                    $"Path '{location.Path}' no longer identifies an object.");
             }
 
             captured.Add(new _LocationBinding(
                 location.Path,
-                described.Value.DomainIdentity,
-                described.Value.TypeName,
-                location.Handle));
+                objectNode.DomainIdentity,
+                resolved.Value.Node.ValueType.FullName ?? resolved.Value.Node.ValueType.Name,
+                objectNode.Handle));
         }
 
         return InteractionResult.Success(captured);
@@ -704,6 +733,25 @@ internal sealed class CliSession : IDisposable
 
     private void _WriteFailure(InteractionErrorCode code, string message) =>
         _Output.WriteLine($"error {code}: {message}");
+
+    private static bool _IsValueNode(BaseNode node) =>
+        node is IReadableValueNode or IWritableValueNode;
+
+    private static int _GetNodeOrder(BaseNode node) => node switch
+    {
+        IMethodNode => 3,
+        ICollectionNode => 2,
+        IReferenceNode => 1,
+        _ => 0,
+    };
+
+    private static string _GetNodeKind(BaseNode node) => node switch
+    {
+        IMethodNode => "action",
+        ICollectionNode => "collection",
+        IReferenceNode => "reference",
+        _ => "value",
+    };
 
     private static string _FormatRange(IValueRange? range) => range is null
         ? "none"

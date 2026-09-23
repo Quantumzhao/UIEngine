@@ -108,11 +108,11 @@ public sealed class NodeAndNavigationContractTests
 
         public IValueRange? Range => null;
 
-        public Task<InteractionResult<object?>> ReadValueAsync() =>
-            Task.FromResult(InteractionResult.Success<object?>(_State.READY));
+        public InteractionResult<object?> ReadValue() =>
+            InteractionResult.Success<object?>(_State.READY);
 
-        public Task<InteractionResult<object?>> WriteValueAsync(object? value) =>
-            Task.FromResult(InteractionResult.Success(value));
+        public InteractionResult<object?> WriteValue(object? value) =>
+            InteractionResult.Success(value);
     }
 
     private sealed class _ProgrammaticStringNode(UIEngineHost host)
@@ -121,8 +121,8 @@ public sealed class NodeAndNavigationContractTests
             IStringNode,
             IReadableValueNode
     {
-        public Task<InteractionResult<object?>> ReadValueAsync() =>
-            Task.FromResult(InteractionResult.Success<object?>("name"));
+        public InteractionResult<object?> ReadValue() =>
+            InteractionResult.Success<object?>("name");
     }
 
     private sealed class _ObjectNode(UIEngineHost host)
@@ -144,10 +144,9 @@ public sealed class NodeAndNavigationContractTests
 
         public Type? KeyType => null;
 
-        public Task<InteractionResult<CollectionSlice>> ReadEntriesAsync(
+        public InteractionResult<CollectionSlice> ReadEntries(
             long offset,
-            int limit) => Task.FromResult(
-                InteractionResult.Success(new CollectionSlice(offset, [], 0, false)));
+            int limit) => InteractionResult.Success(new CollectionSlice(offset, [], 0, false));
     }
 
     private sealed class _MethodNode(UIEngineHost host)
@@ -163,7 +162,7 @@ public sealed class NodeAndNavigationContractTests
 
         public Type? ProgressType => null;
 
-        public Task<InteractionResult<ActionInvocation>> InvokeAsync(
+        public InteractionResult<ActionInvocation> Invoke(
             IReadOnlyDictionary<string, object?> arguments) => throw new NotSupportedException();
     }
 

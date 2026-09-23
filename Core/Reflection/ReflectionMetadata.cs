@@ -7,9 +7,17 @@ using UIEngine.Core.Attributes;
 
 namespace UIEngine.Core;
 
+internal enum ReflectedMemberKind
+{
+    VALUE,
+    REFERENCE,
+    COLLECTION,
+    ACTION,
+}
+
 internal sealed record ReflectedMember(
     string Id,
-    MemberKind Kind,
+    ReflectedMemberKind Kind,
     MemberInfo Member,
     Type ValueType,
     bool IsNullable,
@@ -124,12 +132,12 @@ internal static class ReflectionMetadata
             }
 
             var kind = member is MethodInfo
-                ? MemberKind.ACTION
+                ? ReflectedMemberKind.ACTION
                 : _IsCollection(memberType)
-                    ? MemberKind.COLLECTION
+                    ? ReflectedMemberKind.COLLECTION
                     : _IsScalar(memberType)
-                        ? MemberKind.VALUE
-                        : MemberKind.REFERENCE;
+                        ? ReflectedMemberKind.VALUE
+                        : ReflectedMemberKind.REFERENCE;
             var validation = GetValidationAttributes(member);
             var options = ValueConversion.GetEnumOptions(memberType);
             var range = validation.OfType<RangeAttribute>()

@@ -4,8 +4,7 @@ using System.Reflection;
 namespace UIEngine.Core;
 
 /// <summary>
-/// Owns the live host-mediated operations for one scalar exposure. Descriptor adapters delegate
-/// here so node occurrences can reuse the same implementation as the migration proceeds.
+/// Owns the live host-mediated operations for one scalar node occurrence.
 /// </summary>
 internal sealed class ValueNodeBinding(
     UIEngineHost host,
@@ -43,9 +42,9 @@ internal sealed class ValueNodeBinding(
 
     public IValueRange? Range { get; } = range;
 
-    public Task<InteractionResult<object?>> ReadAsync() => _Host.ExecuteAsync(
+    public InteractionResult<object?> Read() => _Host.Execute(
         $"read value {Id}",
-        async () =>
+        () =>
         {
             if (!CanRead)
             {
@@ -60,13 +59,12 @@ internal sealed class ValueNodeBinding(
                 return InteractionResult.Failure<object?>(target.Error!);
             }
 
-            await Task.CompletedTask;
             return InteractionResult.Success(_Read(target.Value));
         });
 
-    public Task<InteractionResult<object?>> WriteAsync(object? value) => _Host.ExecuteAsync(
+    public InteractionResult<object?> Write(object? value) => _Host.Execute(
         $"write value {Id}",
-        async () =>
+        () =>
         {
             if (!CanWrite || _Write is null)
             {
@@ -119,7 +117,6 @@ internal sealed class ValueNodeBinding(
                 return _SetterRejected(exception);
             }
 
-            await Task.CompletedTask;
             return InteractionResult.Success(converted.Value);
         });
 

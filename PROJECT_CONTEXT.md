@@ -47,7 +47,8 @@ toolkit types in Core.
 - Collections are read in bounded windows.
 - Expected failures use structured results. Unexpected faults remain available only for trusted
   diagnostics.
-- Domain thread affinity is explicit through `IInteractionDispatcher`.
+- Core live operations are synchronous and are called on the domain model's owning thread.
+- Frontends own any cross-thread handoff; Core never marshals domain access to a UI thread.
 
 ## Architectural Invariants
 
@@ -65,8 +66,8 @@ toolkit types in Core.
 
 ## Current Delivery State
 
-The host already provides live graph access, canonical paths, identity, bounded collections,
-validation, dispatch, and synchronous or asynchronous invocation. The CLI exercises
+The host already provides synchronous live graph access, canonical paths, identity, bounded
+collections, validation, and synchronous or asynchronous domain invocation. The CLI exercises
 those capabilities. The TUI has a reusable hosting boundary and independent frontend operation
 scopes.
 

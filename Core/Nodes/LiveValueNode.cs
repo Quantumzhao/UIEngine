@@ -10,9 +10,9 @@ internal sealed class LiveValueNode : BaseNode, IDynamicInterfaceCastable
     private readonly ValueNodeSource _Source;
     private readonly ValueNodeShape _Shape;
 
-    internal LiveValueNode(ValueDescriptor descriptor, ReflectedMember member)
+    internal LiveValueNode(ValueNodeBinding binding, ReflectedMember member)
         : this(
-            descriptor,
+            binding,
             member.Member switch
             {
                 PropertyInfo => ValueNodeSource.PROPERTY,
@@ -24,27 +24,24 @@ internal sealed class LiveValueNode : BaseNode, IDynamicInterfaceCastable
     {
     }
 
-    internal LiveValueNode(ValueDescriptor descriptor)
-        : this(descriptor, ValueNodeSource.PROGRAMMATIC, declaringType: null)
+    internal LiveValueNode(ValueNodeBinding binding)
+        : this(binding, ValueNodeSource.PROGRAMMATIC, declaringType: null)
     {
     }
 
     private LiveValueNode(
-        ValueDescriptor descriptor,
+        ValueNodeBinding binding,
         ValueNodeSource source,
         Type? declaringType)
-        : base(descriptor.Binding.Host, descriptor.Binding.Id, descriptor.Binding.ValueType)
+        : base(binding.Host, binding.Id, binding.ValueType)
     {
-        Descriptor = descriptor;
-        Binding = descriptor.Binding;
+        Binding = binding;
         DeclaringType = declaringType;
         _Source = source;
-        _Shape = _GetShape(descriptor.Binding.ValueType);
+        _Shape = _GetShape(binding.ValueType);
     }
 
     internal ValueNodeBinding Binding { get; }
-
-    internal ValueDescriptor Descriptor { get; }
 
     internal Type? DeclaringType { get; }
 
@@ -203,8 +200,8 @@ internal interface ILiveProgrammaticValueNodeImplementation : IProgrammaticValue
 [DynamicInterfaceCastableImplementation]
 internal interface ILiveReadableValueNodeImplementation : IReadableValueNode
 {
-    Task<InteractionResult<object?>> IReadableValueNode.ReadValueAsync() =>
-        ((LiveValueNode)(object)this).Binding.ReadAsync();
+    InteractionResult<object?> IReadableValueNode.ReadValue() =>
+        ((LiveValueNode)(object)this).Binding.Read();
 }
 
 [DynamicInterfaceCastableImplementation]
@@ -215,8 +212,8 @@ internal interface ILiveWritableValueNodeImplementation : IWritableValueNode
 
     IValueRange? IWritableValueNode.Range => ((LiveValueNode)(object)this).Binding.Range;
 
-    Task<InteractionResult<object?>> IWritableValueNode.WriteValueAsync(object? value) =>
-        ((LiveValueNode)(object)this).Binding.WriteAsync(value);
+    InteractionResult<object?> IWritableValueNode.WriteValue(object? value) =>
+        ((LiveValueNode)(object)this).Binding.Write(value);
 }
 
 [DynamicInterfaceCastableImplementation]

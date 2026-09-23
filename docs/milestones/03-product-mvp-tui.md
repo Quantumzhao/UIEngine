@@ -97,9 +97,8 @@ do not defer Core or lifetime coverage to the final TUI acceptance pass.
 
 ### Migration assumptions
 
-- `BaseNode` replaces the public descriptor hierarchy as the frontend-facing model. Temporary
-  adapters are acceptable while the CLI is migrated, but the completed architecture does not keep
-  two parallel public models.
+- `BaseNode` is the sole frontend-facing and runtime interaction model. Reflection and
+  programmatic exposure metadata create nodes directly rather than maintaining a parallel model.
 - Nodes expose language semantics through a small base contract plus composable facets. Avoid a
   separate concrete class for every possible combination of property, field, value kind,
   nullability, and mutability.
@@ -109,11 +108,8 @@ do not defer Core or lifetime coverage to the final TUI acceptance pass.
   may be owned by `TuiWorkspace`; a caller-supplied Core workspace remains caller-owned.
 - Core produces versioned layout data but does not choose a file, perform file I/O, or persist live
   state. The TUI owns its stable presentation fields and maps them into that data contract.
-- The existing conversion, validation, identity, dispatch, bounded-stream, and
+- The existing conversion, validation, identity, domain-thread affinity, bounded-stream, and
   invocation implementations are behavior to preserve, not subsystems to redesign.
-
-If public compatibility with the current descriptor APIs is required, decide that before Step 1;
-the default sequence below assumes a clean migration to nodes.
 
 ### Completed foundation
 
@@ -143,12 +139,12 @@ Before moving behavior, define and test the smallest public contracts needed by 
    and still keep logical paths off the node itself.
 5. Define `NavigationEntry` as path plus either a fresh node or a structured resolution failure.
    A broken entry is navigation state, not a fake node kind.
-6. Define async mutation results and frontend-neutral change notifications for navigator add,
+6. Define synchronous mutation results and frontend-neutral change notifications for navigator add,
    navigate, back, duplicate, reorder, and remove operations. Notifications must let the TUI
    retire exactly the control and scope associated with a removed entry without exposing toolkit
    types from Core.
-7. Decide and document mutation serialization: one navigator must not publish a stale resolution
-   after a later navigation, back, or removal has won.
+7. Keep mutation and resolution synchronous on the domain thread so no queued older resolution can
+   publish after navigation, back, removal, or disposal.
 
 Verification:
 
@@ -156,21 +152,19 @@ Verification:
   broken entries, and host/workspace ownership.
 - Keep Core free of XenoAtom references and presentation terminology.
 
-### 2. Replace descriptors with live node creation
+### 2. Create live nodes directly
 
-Move the current descriptor behavior behind nodes while preserving the live-domain guarantees.
+Build nodes from exposure metadata while preserving the live-domain guarantees.
 
-1. Extract the useful internals of `ObjectDescriptor`, `MemberDescriptor`, `ValueDescriptor`,
-   `ReferenceDescriptor`, `CollectionDescriptor`, and `ActionDescriptor` into a node factory and
-   node operations. Do not retain a second independent implementation of conversion, validation,
-   collection access, or invocation.
+1. Keep conversion, validation, collection access, and invocation in node-owned operation
+   bindings. Do not retain a second public or internal object/member model.
 2. Resolve a registered root to an object node and every exposed member to a node with the correct
    overlapping facets. Continue to expose only opted-in reflection members and configured
    programmatic values.
 3. Create new node instances on each resolution. Nodes may share the same host, live target, runtime
    handle, and domain identity, but never the same node occurrence across navigator entries.
 4. Keep live operations host-mediated:
-   - reads and writes resolve the current owner and run through `IInteractionDispatcher`;
+   - reads and writes resolve the current owner synchronously on the domain thread;
    - writes use the existing invariant conversion and validation pipeline;
    - reference access handles null and unavailable targets explicitly;
    - collection reads retain the host maximum and closed entry variants; and
@@ -179,11 +173,11 @@ Move the current descriptor behavior behind nodes while preserving the live-doma
    nullability, enum members, numeric range, method defaults, result type, and progress type.
 Verification:
 
-- Port the existing Core behavior tests to nodes before deleting descriptor coverage.
+- Port the existing Core behavior tests to nodes and delete the legacy model coverage.
 - Add focused tests for property versus field semantics, enum and numeric overlap, read-only and
   nullable values, null references, programmatic values, and two fresh nodes operating on the same
   live value.
-- Confirm bounded collection, validation, dispatch, and invocation tests retain their
+- Confirm bounded collection, validation, domain-affinity, and invocation tests retain their
   current behavior.
 
 ### 3. Resolve logical paths to every node kind
@@ -207,8 +201,8 @@ roots, members, collections, selected elements, scalars, and methods.
    stack from one saved current path.
 6. Preserve canonical escaping, case sensitivity, cycles, shared references, compatible identity
    recovery, and conflicting-identity refusal.
-7. Remove or internalize `ResolvedPath`, `ResolvedBinding`, `BindingReference`, `MemberKind`, and
-   descriptor-specific resolution once all consumers use resolved nodes.
+7. Keep path results node-based and remove legacy member-kind and binding-specific resolution once
+   all consumers use resolved nodes.
 
 Verification:
 
@@ -295,8 +289,7 @@ TUI behavior.
 4. Use navigator back semantics for `cd ..`; do not reintroduce a CLI-only history model.
 5. Preserve the CLI executable's existing ownership of its host while making workspace disposal
    explicit.
-6. Delete descriptor-specific CLI code and the temporary compatibility adapter after the CLI tests
-   pass on nodes.
+6. Delete the legacy CLI adapters after the CLI tests pass on nodes.
 
 Verification:
 
@@ -320,8 +313,8 @@ Preserve the completed XenoAtom hosting boundary while changing its model source
    control.
 5. React to Core navigation notifications by creating one replacement control for a pushed/revealed
    entry and removing the departed control exactly once.
-6. Marshal visual state changes with the XenoAtom dispatcher while leaving all domain access under
-   the host's `IInteractionDispatcher`.
+6. Marshal visual state changes with the XenoAtom dispatcher. Domain access remains synchronous on
+   the domain model's thread, with any cross-thread request boundary owned outside Core.
 
 Verification:
 

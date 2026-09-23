@@ -10,34 +10,33 @@ namespace UIEngine.Framework.Tests;
 public sealed class RuntimeBehaviorTests
 {
     [Fact]
-    public async Task ReflectionExposesConcreteMembersAndValidatesWrites()
+    public void ReflectionExposesConcreteMembersAndValidatesWrites()
     {
         var model = new _EditingModel();
         using var host = new UIEngineHost();
-        var root = host.SetRoot("model", model);
+        host.SetRoot("model", model);
 
-        var described = await host.DescribeAsync(root.Value);
+        var resolved = host.ResolveRootNode("model");
 
-        Assert.True(described.IsSuccess);
-        var members = described.Value.Members;
-        var count = Assert.Single(members.OfType<ValueDescriptor>(), value => value.Id == "Count");
-        var name = Assert.Single(members.OfType<ValueDescriptor>(), value => value.Id == "Name");
-        var optional = Assert.Single(members.OfType<ValueDescriptor>(), value => value.Id == "Optional");
-        var state = Assert.Single(members.OfType<ValueDescriptor>(), value => value.Id == "State");
-        var field = Assert.Single(members.OfType<ValueDescriptor>(), value => value.Id == "Field");
-        var readOnly = Assert.Single(members.OfType<ValueDescriptor>(), value => value.Id == "ReadOnly");
+        Assert.True(resolved.IsSuccess);
+        var members = ((IObjectNode)resolved.Value.Node).Members;
+        var count = Assert.Single(members, value => value.Id == "Count");
+        var name = Assert.Single(members, value => value.Id == "Name");
+        var optional = Assert.Single(members, value => value.Id == "Optional");
+        var state = Assert.Single(members, value => value.Id == "State");
+        var field = Assert.Single(members, value => value.Id == "Field");
+        var readOnly = Assert.Single(members, value => value.Id == "ReadOnly");
 
-        Assert.False(count.IsNullable);
-        Assert.True(optional.IsNullable);
-        Assert.Equal(2, state.Options.Count);
-        Assert.True(field.CanWrite);
-        Assert.False(readOnly.CanWrite);
+        Assert.False(count is INullableValueNode);
+        Assert.True(optional is INullableValueNode);
+        Assert.Equal(2, ((IEnumNode)state).Options.Count);
+        Assert.True(field is IWritableValueNode);
+        Assert.False(readOnly is IWritableValueNode);
 
-        var converted = await count.WriteAsync("7");
-        var outOfRange = await count.WriteAsync("12");
-        var required = await name.WriteAsync(null);
-        var enumWrite = await state.WriteAsync("READY");
-        var rejectedReadOnly = await readOnly.WriteAsync("changed");
+        var converted = ((IWritableValueNode)count).WriteValue("7");
+        var outOfRange = ((IWritableValueNode)count).WriteValue("12");
+        var required = ((IWritableValueNode)name).WriteValue(null);
+        var enumWrite = ((IWritableValueNode)state).WriteValue("READY");
 
         Assert.True(converted.IsSuccess);
         Assert.Equal(7, model.Count);
@@ -45,25 +44,27 @@ public sealed class RuntimeBehaviorTests
         Assert.Equal(ValidationIssueCode.OUT_OF_RANGE, Assert.Single(outOfRange.Error!.Issues).Code);
         Assert.Equal(InteractionErrorCode.VALIDATION_FAILED, required.Error?.Code);
         Assert.Equal(_EditingState.READY, enumWrite.Value);
-        Assert.Equal(InteractionErrorCode.VALIDATION_FAILED, rejectedReadOnly.Error?.Code);
     }
 
     [Fact]
-    public async Task ImmutableExposureUsesTheSameLiveValueDescriptor()
+    public void ImmutableExposureUsesTheSameLiveValueNode()
     {
         var profile = new EconomicProfile("N1", 100m);
         using var host = new UIEngineHost(new UIEngineHostOptions
         {
             Exposures = CyclicWorldFactory.CreateExposures(),
         });
-        var root = host.SetRoot("economy", profile);
+        host.SetRoot("economy", profile);
 
-        var described = await host.DescribeAsync(root.Value);
-        var value = Assert.Single(described.Value.Members.OfType<ValueDescriptor>());
-        var write = await value.WriteAsync("125.5");
-        var rejected = await value.WriteAsync("10000001");
+        var resolved = host.ResolveRootNode("economy");
+        var objectNode = (IObjectNode)resolved.Value.Node;
+        var valueNode = Assert.Single(objectNode.Members);
+        Assert.True(valueNode is IWritableValueNode);
+        var value = (IWritableValueNode)valueNode;
+        var write = value.WriteValue("125.5");
+        var rejected = value.WriteValue("10000001");
 
-        Assert.Equal("economy/N1", described.Value.DomainIdentity);
+        Assert.Equal("economy/N1", objectNode.DomainIdentity);
         Assert.Equal(125.5m, write.Value);
         Assert.Equal(125.5m, profile.GrossDomesticProduct);
         Assert.Equal(InteractionErrorCode.VALIDATION_FAILED, rejected.Error?.Code);
@@ -90,20 +91,20 @@ public sealed class RuntimeBehaviorTests
     }
 
     [Fact]
-    public async Task CollectionReadsAreBoundedAndUseClosedEntryTypes()
+    public void CollectionReadsAreBoundedAndUseClosedEntryTypes()
     {
         var model = new _CollectionModel();
         using var host = new UIEngineHost(new UIEngineHostOptions { MaxCollectionItems = 3 });
-        var root = host.SetRoot("model", model);
-        var described = await host.DescribeAsync(root.Value);
-        var members = described.Value.Members.OfType<CollectionDescriptor>().ToDictionary(
-            static member => member.Id,
-            StringComparer.Ordinal);
+        host.SetRoot("model", model);
+        var resolved = host.ResolveRootNode("model");
+        var members = ((IObjectNode)resolved.Value.Node).Members
+            .Where(static member => member is ICollectionNode)
+            .ToDictionary(static member => member.Id, static member => (ICollectionNode)member);
 
-        var items = await members["Items"].ReadAsync(0, 3);
-        var dictionary = await members["ByName"].ReadAsync(0, 3);
-        var lazy = await members["Lazy"].ReadAsync(1, 2);
-        var tooLarge = await members["Items"].ReadAsync(0, 4);
+        var items = members["Items"].ReadEntries(0, 3);
+        var dictionary = members["ByName"].ReadEntries(0, 3);
+        var lazy = members["Lazy"].ReadEntries(1, 2);
+        var tooLarge = members["Items"].ReadEntries(0, 4);
 
         Assert.IsType<NullCollectionEntry>(items.Value.Entries[0]);
         Assert.Equal(7, Assert.IsType<ScalarCollectionEntry>(items.Value.Entries[1]).Value);
@@ -115,58 +116,80 @@ public sealed class RuntimeBehaviorTests
     }
 
     [Fact]
-    public async Task PathsPreserveCyclesAndBindingsSurviveCompatibleReplacement()
+    public void PathsPreserveCyclesAndIdentityChecksSurviveCompatibleReplacement()
     {
         using var host = _CreateWorldHost();
-        var nation = await host.ResolvePathAsync("/world/Nations[index=0]");
-        var cycled = await host.ResolvePathAsync(
+        var nation = host.ResolvePath("/world/Nations[index=0]");
+        var cycled = host.ResolvePath(
             "/world/Nations[index=0]/Capital/OwnerNation");
-        var legacyAlias = await host.ResolvePathAsync("/world/Nations/0");
+        var legacyAlias = host.ResolvePath("/world/Nations/0");
 
         Assert.True(nation.IsSuccess);
         Assert.True(cycled.IsSuccess);
-        Assert.Equal(nation.Value.OwnerHandle, cycled.Value.OwnerHandle);
+        Assert.Equal(
+            ((IObjectNode)nation.Value.Node).Handle,
+            ((IObjectNode)cycled.Value.Node).Handle);
         Assert.Equal(
             "/world/Nations[index=0]/Capital/OwnerNation",
             cycled.Value.CanonicalPath.ToString());
         Assert.False(legacyAlias.IsSuccess);
 
-        var binding = new BindingReference(
+        var original = host.ResolvePath(
             "/world/Nations[index=0]",
-            nameof(Nation.Population),
-            MemberKind.VALUE,
             "nation/N1");
-        var original = await host.ResolveBindingAsync(binding);
         host.SetRoot("world", CyclicWorldFactory.Create());
-        var replacement = await host.ResolveBindingAsync(binding);
+        var replacement = host.ResolvePath(
+            "/world/Nations[index=0]",
+            "nation/N1");
 
         Assert.True(original.IsSuccess);
         Assert.True(replacement.IsSuccess);
-        Assert.NotEqual(original.Value.OwnerHandle, replacement.Value.OwnerHandle);
+        Assert.NotEqual(
+            ((IObjectNode)original.Value.Node).Handle,
+            ((IObjectNode)replacement.Value.Node).Handle);
 
         host.SetRoot("world", new World("Mars"));
-        var conflict = await host.ResolveBindingAsync(new BindingReference(
-            "/world",
-            nameof(World.Name),
-            MemberKind.VALUE,
-            "world/Earth"));
+        var conflict = host.ResolvePath("/world", "world/Earth");
         Assert.Equal(InteractionErrorCode.NOT_FOUND, conflict.Error?.Code);
     }
 
     [Fact]
-    public async Task KeyAndIdentitySelectorsResolveReferenceEntries()
+    public void KeyAndIdentitySelectorsResolveReferenceEntries()
     {
         var first = new _Identified("first");
         var model = new _SelectorModel(first);
         using var host = new UIEngineHost();
         host.SetRoot("model", model);
 
-        var byKey = await host.ResolvePathAsync("/model/ByKey[key=a]");
-        var byIdentity = await host.ResolvePathAsync("/model/Items[identity=item%2Ffirst]");
+        var byKey = host.ResolvePath("/model/ByKey[key=a]");
+        var byIdentity = host.ResolvePath("/model/Items[identity=item%2Ffirst]");
 
         Assert.True(byKey.IsSuccess);
         Assert.True(byIdentity.IsSuccess);
-        Assert.Equal(byKey.Value.OwnerHandle, byIdentity.Value.OwnerHandle);
+        Assert.Equal(
+            ((IObjectNode)byKey.Value.Node).Handle,
+            ((IObjectNode)byIdentity.Value.Node).Handle);
+    }
+
+    [Fact]
+    public void PathsResolveFreshTerminalAndCollectionNodes()
+    {
+        using var host = _CreateWorldHost();
+
+        var firstName = host.ResolvePath("/world/Name");
+        var secondName = host.ResolvePath("/world/Name");
+        var nations = host.ResolvePath("/world/Nations");
+        var advance = host.ResolvePath(
+            "/world/Nations[index=0]/AdvanceTurn");
+
+        Assert.True(firstName.IsSuccess);
+        Assert.True(secondName.IsSuccess);
+        Assert.NotSame(firstName.Value.Node, secondName.Value.Node);
+        Assert.True(firstName.Value.Node is IReadableValueNode and IStringNode);
+        Assert.True(firstName.Value.Node.IsTerminal);
+        Assert.IsAssignableFrom<ICollectionNode>(nations.Value.Node);
+        Assert.IsAssignableFrom<IMethodNode>(advance.Value.Node);
+        Assert.True(advance.Value.Node.IsTerminal);
     }
 
     [Fact]
@@ -174,20 +197,20 @@ public sealed class RuntimeBehaviorTests
     {
         var model = new _ActionModel();
         using var host = new UIEngineHost();
-        var root = host.SetRoot("model", model);
-        var described = await host.DescribeAsync(root.Value);
-        var actions = described.Value.Members.OfType<ActionDescriptor>().ToDictionary(
-            static action => action.Id,
-            StringComparer.Ordinal);
+        host.SetRoot("model", model);
+        var resolved = host.ResolveRootNode("model");
+        var actions = ((IObjectNode)resolved.Value.Node).Members
+            .Where(static member => member is IMethodNode)
+            .ToDictionary(static member => member.Id, static member => (IMethodNode)member);
 
-        var added = await actions["Add"].InvokeAsync(new Dictionary<string, object?>
+        var added = actions["Add"].Invoke(new Dictionary<string, object?>
         {
             ["left"] = "2",
             ["right"] = 3,
         });
         Assert.Equal(5, (await added.Value.Completion).Value);
 
-        var worked = await actions["WorkAsync"].InvokeAsync(new Dictionary<string, object?>
+        var worked = actions["WorkAsync"].Invoke(new Dictionary<string, object?>
         {
             ["steps"] = 3,
         });
@@ -200,7 +223,7 @@ public sealed class RuntimeBehaviorTests
         Assert.Equal([1, 2, 3], progress.Select(static update => (int)update.Value!).ToArray());
         Assert.Equal(3, (await worked.Value.Completion).Value);
 
-        var failed = await actions["Fail"].InvokeAsync(new Dictionary<string, object?>());
+        var failed = actions["Fail"].Invoke(new Dictionary<string, object?>());
         var fault = await failed.Value.Completion;
         Assert.Equal(InvocationStatus.FAILED, failed.Value.Status);
         Assert.Equal(InteractionErrorCode.FAULT, fault.Error?.Code);
@@ -208,22 +231,20 @@ public sealed class RuntimeBehaviorTests
     }
 
     [Fact]
-    public async Task HostDisposalCompletesRunningInvocationsAndRejectsFurtherWork()
+    public async Task HostDisposalCompletesRunningInvocations()
     {
         var host = new UIEngineHost();
-        var root = host.SetRoot("model", new _ActionModel());
-        var described = await host.DescribeAsync(root.Value);
+        host.SetRoot("model", new _ActionModel());
+        var resolved = host.ResolveRootNode("model");
         var wait = Assert.Single(
-            described.Value.Members.OfType<ActionDescriptor>(),
+            ((IObjectNode)resolved.Value.Node).Members,
             action => action.Id == "WaitAsync");
-        var started = await wait.InvokeAsync(new Dictionary<string, object?>());
+        var started = ((IMethodNode)wait).Invoke(new Dictionary<string, object?>());
 
         host.Dispose();
 
         var completion = await started.Value.Completion;
-        var afterDispose = await host.DescribeAsync(root.Value);
         Assert.Equal(InteractionErrorCode.DISPOSED, completion.Error?.Code);
-        Assert.Equal(InteractionErrorCode.DISPOSED, afterDispose.Error?.Code);
     }
 
     [Fact]
@@ -237,20 +258,31 @@ public sealed class RuntimeBehaviorTests
             .ToArray();
         var removed = new[]
         {
+            "ActionDescriptor",
+            "ActionParameter",
+            "BindingReference",
             "ChangeKind",
             "ChangeRecord",
+            "CollectionDescriptor",
             "IObjectDescriptorProvider",
             "IObjectDescriptorFactory",
             "IObservationAdapter",
             "IObjectIdentityProvider",
             "IPathSelector",
             "IInteractionDispatchPolicy",
+            "IInteractionDispatcher",
+            "MemberDescriptor",
+            "MemberKind",
+            "ObjectDescriptor",
             "ObservationSubscription",
             "ObservationValue",
             "ObjectIdentity",
+            "ReferenceDescriptor",
+            "ResolvedBinding",
             "DomainIdentity",
             "BindingResolution",
             "PathResolutionState",
+            "ValueDescriptor",
         };
 
         Assert.Equal(
@@ -260,7 +292,6 @@ public sealed class RuntimeBehaviorTests
                 "ICollectionNode",
                 "IEnumNode",
                 "IFieldNode",
-                "IInteractionDispatcher",
                 "IMemberNode",
                 "IMethodNode",
                 "INavigableNode",
@@ -284,6 +315,20 @@ public sealed class RuntimeBehaviorTests
         Assert.DoesNotContain(
             typeof(UIEngineHost).GetMethods(),
             static method => method.Name == "ObserveAsync");
+        Assert.DoesNotContain(
+            typeof(UIEngineHost).GetMethods(),
+            static method => method.Name is "DescribeAsync" or "ResolveBindingAsync");
+        Assert.DoesNotContain(
+            typeof(UIEngineHost).GetMethods(),
+            static method => method.Name is "ResolveRootNodeAsync" or "ResolvePathAsync");
+        Assert.Equal(
+            typeof(InteractionResult<object?>),
+            typeof(IReadableValueNode).GetMethod(nameof(IReadableValueNode.ReadValue))!.ReturnType);
+        Assert.Equal(
+            typeof(InteractionResult<ActionInvocation>),
+            typeof(IMethodNode).GetMethod(nameof(IMethodNode.Invoke))!.ReturnType);
+        Assert.Null(typeof(UIEngineHostOptions).GetProperty("Dispatcher"));
+        Assert.Null(typeof(UIEngineHost).GetProperty("IsDisposed"));
         Assert.Null(typeof(UIEngineHostOptions).GetProperty("ObservationBufferCapacity"));
     }
 

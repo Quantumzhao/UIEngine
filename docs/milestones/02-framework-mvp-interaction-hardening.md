@@ -16,7 +16,7 @@ collections, and structured failures.
 - Bounded collection windows for indexed and lazy sources.
 - Structured entries for null, scalar, reference, and dictionary values.
 - Synchronous and asynchronous method invocation with bounded progress.
-- `IInteractionDispatcher` for domain thread affinity and reentrant access.
+- Synchronous, reentrant live operations owned by the domain model's thread.
 - Deterministic host and invocation lifetime.
 - Black-box framework and CLI coverage of the complete cyclic-world workflow.
 

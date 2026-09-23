@@ -7,8 +7,6 @@ public sealed record UIEngineHostOptions
 {
     public IEnumerable<TypeExposure> Exposures { get; init; } = [];
 
-    public IInteractionDispatcher Dispatcher { get; init; } = InlineInteractionDispatcher.Instance;
-
     public int MaxCollectionItems { get; init; } = 1_000;
 
     public int InvocationProgressBufferCapacity { get; init; } = 256;
@@ -37,7 +35,6 @@ internal sealed class HostSettings
         }
 
         Exposures = exposures.ToDictionary(static exposure => exposure.ObjectType);
-        Dispatcher = options.Dispatcher;
         MaxCollectionItems = options.MaxCollectionItems;
         InvocationProgressBufferCapacity = options.InvocationProgressBufferCapacity;
         LoggerFactory = options.LoggerFactory;
@@ -45,8 +42,6 @@ internal sealed class HostSettings
     }
 
     public IReadOnlyDictionary<Type, TypeExposure> Exposures { get; }
-
-    public IInteractionDispatcher Dispatcher { get; }
 
     public int MaxCollectionItems { get; }
 

@@ -8,14 +8,14 @@ namespace UIEngine.Framework.Tests;
 public sealed class LiveValueNodeTests
 {
     [Fact]
-    public async Task ReflectedValuesReceiveExactMembershipAccessAndShapeFacets()
+    public void ReflectedValuesReceiveExactMembershipAccessAndShapeFacets()
     {
         var model = new _ReflectedModel();
         using var host = new UIEngineHost();
         host.SetRoot("model", model);
 
-        var first = await _ResolveMembersAsync(host, "model");
-        var second = await _ResolveMembersAsync(host, "model");
+        var first = _ResolveMembers(host, "model");
+        var second = _ResolveMembers(host, "model");
 
         var state = first[nameof(_ReflectedModel.State)];
         Assert.NotSame(state, second[nameof(_ReflectedModel.State)]);
@@ -59,10 +59,9 @@ public sealed class LiveValueNodeTests
             IStringNode or ICharacterNode or IBooleanNode or INumberNode or IEnumNode);
         Assert.All(first.Values, static node => Assert.True(node.IsTerminal));
 
-        var write = await ((IWritableValueNode)state).WriteValueAsync("READY");
-        var writeWithoutRead = await ((IWritableValueNode)writeOnly).WriteValueAsync("updated");
-        var read = await ((IReadableValueNode)second[nameof(_ReflectedModel.State)])
-            .ReadValueAsync();
+        var write = ((IWritableValueNode)state).WriteValue("READY");
+        var writeWithoutRead = ((IWritableValueNode)writeOnly).WriteValue("updated");
+        var read = ((IReadableValueNode)second[nameof(_ReflectedModel.State)]).ReadValue();
 
         Assert.True(write.IsSuccess);
         Assert.True(writeWithoutRead.IsSuccess);
@@ -72,7 +71,7 @@ public sealed class LiveValueNodeTests
     }
 
     [Fact]
-    public async Task ProgrammaticValuesAreFreshNodesOverTheSameLiveValue()
+    public void ProgrammaticValuesAreFreshNodesOverTheSameLiveValue()
     {
         var model = new _ProgrammaticModel();
         var exposure = new ValueExposure<_ProgrammaticModel, decimal>(
@@ -86,8 +85,8 @@ public sealed class LiveValueNodeTests
         });
         host.SetRoot("model", model);
 
-        var first = Assert.Single((await _ResolveMembersAsync(host, "model")).Values);
-        var second = Assert.Single((await _ResolveMembersAsync(host, "model")).Values);
+        var first = Assert.Single(_ResolveMembers(host, "model").Values);
+        var second = Assert.Single(_ResolveMembers(host, "model").Values);
 
         Assert.NotSame(first, second);
         Assert.True(first is IProgrammaticValueNode);
@@ -98,19 +97,19 @@ public sealed class LiveValueNodeTests
         Assert.False(first is IMemberNode);
         Assert.IsType<ValueRange<decimal>>(writable.Range);
 
-        var write = await writable.WriteValueAsync("12.5");
-        var read = await ((IReadableValueNode)second).ReadValueAsync();
+        var write = writable.WriteValue("12.5");
+        var read = ((IReadableValueNode)second).ReadValue();
 
         Assert.True(write.IsSuccess);
         Assert.Equal(12.5m, model.Amount);
         Assert.Equal(12.5m, read.Value);
     }
 
-    private static async Task<IReadOnlyDictionary<string, BaseNode>> _ResolveMembersAsync(
+    private static Dictionary<string, BaseNode> _ResolveMembers(
         UIEngineHost host,
         string rootIdentifier)
     {
-        var resolved = await host.ResolveRootNodeAsync(rootIdentifier);
+        var resolved = host.ResolveRootNode(rootIdentifier);
         Assert.True(resolved.IsSuccess);
         return ((IObjectNode)resolved.Value.Node).Members.ToDictionary(
             static node => node.Id,

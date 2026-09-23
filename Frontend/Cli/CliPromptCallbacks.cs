@@ -4,7 +4,7 @@ using PrettyPrompt.Documents;
 
 namespace UIEngine.Frontend.Cli;
 
-/// <summary>Adapts live CLI command and descriptor metadata to PrettyPrompt completions.</summary>
+/// <summary>Adapts live CLI command and node metadata to PrettyPrompt completions.</summary>
 internal sealed class CliPromptCallbacks : PromptCallbacks
 {
     private readonly CliSession _Session;
@@ -34,13 +34,14 @@ internal sealed class CliPromptCallbacks : PromptCallbacks
         return Task.FromResult(TextSpan.FromBounds(start, end));
     }
 
-    protected override async Task<IReadOnlyList<CompletionItem>> GetCompletionItemsAsync(
+    protected override Task<IReadOnlyList<CompletionItem>> GetCompletionItemsAsync(
         string text,
         int caret,
         TextSpan spanToBeReplaced,
         CancellationToken _)
     {
-        var completions = await _Session.GetCompletionsAsync(text, caret);
-        return completions.Select(static completion => new CompletionItem(completion)).ToArray();
+        var completions = _Session.GetCompletions(text, caret);
+        return Task.FromResult<IReadOnlyList<CompletionItem>>(
+            completions.Select(static completion => new CompletionItem(completion)).ToArray());
     }
 }

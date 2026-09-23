@@ -68,7 +68,6 @@ internal sealed class ReflectedAction
         }
 
         var progress = progressParameters.SingleOrDefault();
-
         var returnType = method.ReturnType;
         if (returnType.IsGenericType && returnType.GetGenericTypeDefinition() == typeof(ValueTask<>) ||
             returnType == typeof(ValueTask))
@@ -111,25 +110,26 @@ internal sealed class ReflectedAction
             $"Action '{method.Name}' is unsupported because {reason}.");
 }
 
-public sealed class ActionDescriptor : MemberDescriptor
+internal sealed class MethodNodeBinding
 {
     private readonly UIEngineHost _Host;
     private readonly Guid _Owner;
     private readonly ReflectedAction _Action;
     private readonly List<IReadOnlyList<ValidationAttribute>> _ValidationAttributes;
 
-    internal ActionDescriptor(
+    public MethodNodeBinding(
         UIEngineHost host,
         Guid owner,
         string id,
         ReflectedAction action)
-        : base(host, owner, id, MemberKind.ACTION)
     {
         _Host = host;
         _Owner = owner;
         _Action = action;
+        Id = id;
+
         var validation = new List<IReadOnlyList<ValidationAttribute>>();
-        var parameters = new List<ActionParameter>();
+        var parameters = new List<MethodParameter>();
         foreach (var parameter in action.UserParameters)
         {
             var attributes = ReflectionMetadata.GetValidationAttributes(parameter);
@@ -139,7 +139,7 @@ public sealed class ActionDescriptor : MemberDescriptor
                 .Select(static attribute =>
                     new ValueRange<object>(attribute.Minimum, attribute.Maximum))
                 .FirstOrDefault();
-            parameters.Add(new ActionParameter(
+            parameters.Add(new MethodParameter(
                 parameter.Name ?? $"arg{parameter.Position}",
                 parameter.ParameterType,
                 !parameter.IsOptional,
@@ -155,7 +155,13 @@ public sealed class ActionDescriptor : MemberDescriptor
         _ValidationAttributes = validation;
     }
 
-    public IReadOnlyList<ActionParameter> Parameters { get; }
+    public UIEngineHost Host => _Host;
+
+    public string Id { get; }
+
+    public Type ReturnType => _Action.Method.ReturnType;
+
+    public IReadOnlyList<MethodParameter> Parameters { get; }
 
     public Type? ResultType => _Action.ResultType;
 
@@ -163,12 +169,10 @@ public sealed class ActionDescriptor : MemberDescriptor
 
     public Type? ProgressType => _Action.ProgressType;
 
-    internal Type ReturnType => _Action.Method.ReturnType;
-
-    public Task<InteractionResult<ActionInvocation>> InvokeAsync(
-        IReadOnlyDictionary<string, object?> arguments) => _Host.ExecuteAsync(
+    public InteractionResult<ActionInvocation> Invoke(
+        IReadOnlyDictionary<string, object?> arguments) => _Host.Execute(
         $"invoke action {Id}",
-        async () =>
+        () =>
         {
             var target = _Host.ResolveTarget(_Owner);
             if (!target.IsSuccess)
@@ -188,29 +192,29 @@ public sealed class ActionDescriptor : MemberDescriptor
             var bound = new object?[_Action.MethodParameters.Length];
             for (var index = 0; index < Parameters.Count; index++)
             {
-                var descriptor = Parameters[index];
+                var metadata = Parameters[index];
                 var parameter = _Action.UserParameters[index];
-                if (!arguments.TryGetValue(descriptor.Id, out var supplied))
+                if (!arguments.TryGetValue(metadata.Id, out var supplied))
                 {
-                    if (descriptor.IsRequired)
+                    if (metadata.IsRequired)
                     {
-                        var message = $"Required parameter '{descriptor.Id}' was not supplied.";
+                        var message = $"Required parameter '{metadata.Id}' was not supplied.";
                         return InteractionResult.Failure<ActionInvocation>(
                             InteractionErrorCode.INVALID_INPUT,
                             message,
                             [new ValidationIssue(
                                 ValidationIssueCode.REQUIRED,
-                                descriptor.Id,
+                                metadata.Id,
                                 message)]);
                     }
 
-                    bound[parameter.Position] = descriptor.HasDefaultValue
-                        ? descriptor.DefaultValue
+                    bound[parameter.Position] = metadata.HasDefaultValue
+                        ? metadata.DefaultValue
                         : null;
                     continue;
                 }
 
-                var converted = ValueConversion.Convert(supplied, descriptor.ParameterType);
+                var converted = ValueConversion.Convert(supplied, metadata.ParameterType);
                 if (!converted.IsSuccess)
                 {
                     return InteractionResult.Failure<ActionInvocation>(converted.Error!);
@@ -218,25 +222,24 @@ public sealed class ActionDescriptor : MemberDescriptor
 
                 var issues = ValueConversion.Validate(
                     converted.Value,
-                    descriptor.IsNullable,
-                    descriptor.Options,
-                    descriptor.Range,
+                    metadata.IsNullable,
+                    metadata.Options,
+                    metadata.Range,
                     _ValidationAttributes[index],
                     target.Value,
-                    descriptor.Id);
+                    metadata.Id);
                 if (issues.Count > 0)
                 {
                     return InteractionResult.Failure<ActionInvocation>(
                         InteractionErrorCode.VALIDATION_FAILED,
-                        $"Parameter '{descriptor.Id}' failed validation.",
+                        $"Parameter '{metadata.Id}' failed validation.",
                         issues);
                 }
 
                 bound[parameter.Position] = converted.Value;
             }
 
-            var invocation = _Host.CreateInvocation(Id);
-
+            var invocation = _Host.CreateInvocation();
             if (_Action.ProgressParameter is not null)
             {
                 bound[_Action.ProgressParameter.Position] =
@@ -264,7 +267,6 @@ public sealed class ActionDescriptor : MemberDescriptor
                 invocation.CompleteFailure(exception);
             }
 
-            await Task.CompletedTask;
             return InteractionResult.Success(invocation);
         });
 
@@ -272,7 +274,7 @@ public sealed class ActionDescriptor : MemberDescriptor
     {
         try
         {
-            await task;
+            await task.ConfigureAwait(false);
             var result = ResultType is null
                 ? null
                 : task.GetType().GetProperty(nameof(Task<object>.Result))?.GetValue(task);
