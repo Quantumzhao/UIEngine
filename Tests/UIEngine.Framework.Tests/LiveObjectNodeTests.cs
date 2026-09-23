@@ -69,7 +69,8 @@ public sealed class LiveObjectNodeTests
         {
             ["left"] = "2",
         });
-        Assert.Equal(3, (await invocation.Value.Completion).Value);
+        Assert.Equal(InvocationStatus.SUCCEEDED, invocation.Value);
+        Assert.Equal(3, (await method.ResultTask!).Value);
         Assert.Equal(1, model.InvocationCount);
     }
 

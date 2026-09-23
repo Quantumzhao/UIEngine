@@ -20,7 +20,7 @@ public sealed class TuiBoundaryTests
             CollectionWindowSize = 12,
         };
 
-        using var workspace = TuiFrontend.CreateWorkspace(host, options);
+        using var workspace = new TuiWorkspace(host, options);
 
         Assert.NotSame(options, workspace.Options);
         Assert.Equal(options, workspace.Options);

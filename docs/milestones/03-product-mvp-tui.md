@@ -108,8 +108,8 @@ do not defer Core or lifetime coverage to the final TUI acceptance pass.
   may be owned by `TuiWorkspace`; a caller-supplied Core workspace remains caller-owned.
 - Core produces versioned layout data but does not choose a file, perform file I/O, or persist live
   state. The TUI owns its stable presentation fields and maps them into that data contract.
-- The existing conversion, validation, runtime-handle, domain-thread affinity, bounded-collection, and
-  invocation implementations are behavior to preserve, not subsystems to redesign.
+- The existing conversion, validation, runtime-handle, domain-thread affinity, bounded-collection,
+  and method-occurrence invocation behavior are behavior to preserve, not subsystems to redesign.
 
 ### Completed foundation
 
@@ -168,7 +168,8 @@ Build nodes from exposure metadata while preserving the live-domain guarantees.
    - writes use the existing invariant conversion and validation pipeline;
    - reference access handles null and unavailable targets explicitly;
    - collection reads retain the host maximum and closed entry variants; and
-   - method invocation returns the existing host-owned `ActionInvocation` lifetime.
+   - each method node exposes its latest status and a result task carrying that call's
+     structured result while the returned domain task executes independently.
 5. Preserve metadata needed by generated controls: runtime type, summary, read/write capability,
    nullability, enum members, numeric range, method defaults, result type, and invocation status.
 Verification:
@@ -229,8 +230,8 @@ Add the frontend-neutral navigation session only after node and path behavior is
    root-entry behavior as a structured no-op/failure rather than silently removing the navigator.
 6. Duplicate the current navigator by resolving its current path into a new navigator with fresh
    entries and node instances.
-7. Remove and reorder navigators without affecting their domain objects, host-owned invocations,
-   or any other navigator.
+7. Remove and reorder navigators without affecting their domain objects, already-started domain
+   tasks, or any other navigator.
 8. Retain an attempted target as a broken current entry when resolution fails. Back must remove the
    broken entry and reveal the previous entry.
 9. Dispose all entries and publish deterministic removal notifications when a navigator or
@@ -385,8 +386,8 @@ Verification:
    omitted, defaulted, explicit-null, and supplied values.
 5. Start a method once per submission, prevent accidental duplicate submission, and present
    synchronous/asynchronous completion, result, structured failure, and lifecycle status.
-6. On method-control disposal, release its frontend-owned resources without stopping the
-   host-owned invocation.
+6. On method-control disposal, detach its completion continuation and release the node occurrence
+   without stopping the already-started domain task.
 
 Verification:
 

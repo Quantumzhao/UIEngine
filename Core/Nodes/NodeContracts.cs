@@ -122,7 +122,7 @@ public sealed record MethodParameter(
     IReadOnlyList<SelectionOption> Options,
     IValueRange? Range);
 
-/// <summary>Exposes reflected method metadata and starts host-owned invocations.</summary>
+/// <summary>Exposes reflected method metadata and occurrence-local invocation state.</summary>
 public interface IMethodNode : IMemberNode
 {
     IReadOnlyList<MethodParameter> Parameters { get; }
@@ -134,6 +134,9 @@ public interface IMethodNode : IMemberNode
     /// <summary>The status of the most recently started invocation, or null before invocation.</summary>
     InvocationStatus? Status { get; }
 
-    InteractionResult<ActionInvocation> Invoke(
+    /// <summary>A task carrying the current invocation's structured outcome.</summary>
+    Task<InteractionResult<object?>>? ResultTask { get; }
+
+    InteractionResult<InvocationStatus> Invoke(
         IReadOnlyDictionary<string, object?> arguments);
 }

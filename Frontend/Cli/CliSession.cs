@@ -418,15 +418,15 @@ internal sealed class CliSession : IDisposable
             return;
         }
 
-        var invocation = started.Value;
-        var completion = await invocation.Completion;
-        if (!completion.IsSuccess)
+        var result = await action.ResultTask!;
+
+        if (!result.IsSuccess)
         {
-            _WriteFailure(completion.Error!);
+            _WriteFailure(result.Error!);
             return;
         }
 
-        _Output.WriteLine($"{resolved.Value.Name} => {_FormatValue(completion.Value)}");
+        _Output.WriteLine($"{resolved.Value.Name} => {_FormatValue(result.Value)}");
     }
 
     private string[] _GetNavigationCompletions()

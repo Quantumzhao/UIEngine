@@ -3,32 +3,21 @@ using System.Reflection;
 
 namespace UIEngine.Core;
 
-internal sealed class ReflectedAction
+internal sealed class LiveMethodNode : LiveReflectedMemberNode, IMethodNode
 {
-    private ReflectedAction(
-        MethodInfo method,
-        ParameterInfo[] userParameters,
-        Type? resultType)
+    private readonly Guid _Owner;
+    private readonly MethodInfo _Method;
+    private readonly List<IReadOnlyList<ValidationAttribute>> _ValidationAttributes;
+    private readonly Lock _InvocationGate = new();
+    private Task<InteractionResult<object?>>? _ResultTask;
+
+    public static InteractionResult<LiveMethodNode> Create(
+        UIEngineHost host,
+        Guid owner,
+        ReflectedMember member)
     {
-        Method = method;
-        MethodParameters = method.GetParameters();
-        UserParameters = userParameters;
-        ResultType = resultType;
-    }
-
-    public MethodInfo Method { get; }
-
-    public ParameterInfo[] MethodParameters { get; }
-
-    public ParameterInfo[] UserParameters { get; }
-
-    public Type? ResultType { get; }
-
-    public bool IsAsynchronous => typeof(Task).IsAssignableFrom(Method.ReturnType);
-
-    public static InteractionResult<ReflectedAction> Create(MethodInfo method)
-    {
-        if (method.IsStatic || method.IsGenericMethodDefinition || method.ContainsGenericParameters)
+        var method = (MethodInfo)member.Member;
+        if (method.IsStatic || method.ContainsGenericParameters)
         {
             return _Unsupported(method, "actions must be non-generic instance methods");
         }
@@ -64,41 +53,31 @@ internal sealed class ReflectedAction
             resultType = returnType;
         }
 
-        return InteractionResult.Success(new ReflectedAction(
-            method,
-            parameters,
-            resultType));
+        return InteractionResult.Success(new LiveMethodNode(
+            host, owner, member, method, parameters, resultType));
     }
 
-    private static InteractionResult<ReflectedAction> _Unsupported(MethodInfo method, string reason) =>
-        InteractionResult.Failure<ReflectedAction>(
+    private static InteractionResult<LiveMethodNode> _Unsupported(MethodInfo method, string reason) =>
+        InteractionResult.Failure<LiveMethodNode>(
             InteractionErrorCode.UNSUPPORTED,
             $"Action '{method.Name}' is unsupported because {reason}.");
-}
 
-internal sealed class MethodNodeBinding
-{
-    private readonly UIEngineHost _Host;
-    private readonly Guid _Owner;
-    private readonly ReflectedAction _Action;
-    private readonly List<IReadOnlyList<ValidationAttribute>> _ValidationAttributes;
-    private readonly object _InvocationGate = new();
-    private ActionInvocation? _CurrentInvocation;
-
-    public MethodNodeBinding(
+    private LiveMethodNode(
         UIEngineHost host,
         Guid owner,
-        string name,
-        ReflectedAction action)
+        ReflectedMember member,
+        MethodInfo method,
+        ParameterInfo[] methodParameters,
+        Type? resultType)
+        : base(host, member.Name, member, method.ReturnType)
     {
-        _Host = host;
         _Owner = owner;
-        _Action = action;
-        Name = name;
+        _Method = method;
+        ResultType = resultType;
 
         var validation = new List<IReadOnlyList<ValidationAttribute>>();
         var parameters = new List<MethodParameter>();
-        foreach (var parameter in action.UserParameters)
+        foreach (var parameter in methodParameters)
         {
             var attributes = ReflectionMetadata.GetValidationAttributes(parameter);
             validation.Add(attributes);
@@ -123,60 +102,70 @@ internal sealed class MethodNodeBinding
         _ValidationAttributes = validation;
     }
 
-    public UIEngineHost Host => _Host;
-
-    public string Name { get; }
-
-    public Type ReturnType => _Action.Method.ReturnType;
-
     public IReadOnlyList<MethodParameter> Parameters { get; }
 
-    public Type? ResultType => _Action.ResultType;
+    public Type? ResultType { get; }
 
-    public bool IsAsynchronous => _Action.IsAsynchronous;
+    public bool IsAsynchronous => typeof(Task).IsAssignableFrom(_Method.ReturnType);
 
     public InvocationStatus? Status
     {
         get
         {
+            var resultTask = ResultTask;
+            return resultTask is null ? null : _GetStatus(resultTask);
+        }
+    }
+
+    public Task<InteractionResult<object?>>? ResultTask
+    {
+        get
+        {
             lock (_InvocationGate)
             {
-                return _CurrentInvocation?.Status;
+                return _ResultTask;
             }
         }
     }
 
-    public InteractionResult<ActionInvocation> Invoke(
-        IReadOnlyDictionary<string, object?> arguments) => _Host.Execute(
+    public InteractionResult<InvocationStatus> Invoke(
+        IReadOnlyDictionary<string, object?> arguments) => Host.Execute(
         $"invoke action {Name}",
         () =>
         {
-            var target = _Host.ResolveTarget(_Owner);
+            lock (_InvocationGate)
+            {
+                if (_ResultTask is { IsCompleted: false })
+                {
+                    return _AlreadyRunning();
+                }
+            }
+
+            var target = Host.ResolveTarget(_Owner);
             if (!target.IsSuccess)
             {
-                return InteractionResult.Failure<ActionInvocation>(target.Error!);
+                return InteractionResult.Failure<InvocationStatus>(target.Error!);
             }
 
             var unknown = arguments.Keys.FirstOrDefault(name =>
                 Parameters.All(parameter => !StringComparer.Ordinal.Equals(parameter.Name, name)));
             if (unknown is not null)
             {
-                return InteractionResult.Failure<ActionInvocation>(
+                return InteractionResult.Failure<InvocationStatus>(
                     InteractionErrorCode.INVALID_INPUT,
                     $"Action '{Name}' has no parameter named '{unknown}'.");
             }
 
-            var bound = new object?[_Action.MethodParameters.Length];
+            var bound = new object?[Parameters.Count];
             for (var index = 0; index < Parameters.Count; index++)
             {
                 var metadata = Parameters[index];
-                var parameter = _Action.UserParameters[index];
                 if (!arguments.TryGetValue(metadata.Name, out var supplied))
                 {
                     if (metadata.IsRequired)
                     {
                         var message = $"Required parameter '{metadata.Name}' was not supplied.";
-                        return InteractionResult.Failure<ActionInvocation>(
+                        return InteractionResult.Failure<InvocationStatus>(
                             InteractionErrorCode.INVALID_INPUT,
                             message,
                             [new ValidationIssue(
@@ -185,7 +174,7 @@ internal sealed class MethodNodeBinding
                                 message)]);
                     }
 
-                    bound[parameter.Position] = metadata.HasDefaultValue
+                    bound[index] = metadata.HasDefaultValue
                         ? metadata.DefaultValue
                         : null;
                     continue;
@@ -194,7 +183,7 @@ internal sealed class MethodNodeBinding
                 var converted = ValueConversion.Convert(supplied, metadata.ParameterType);
                 if (!converted.IsSuccess)
                 {
-                    return InteractionResult.Failure<ActionInvocation>(converted.Error!);
+                    return InteractionResult.Failure<InvocationStatus>(converted.Error!);
                 }
 
                 var issues = ValueConversion.Validate(
@@ -207,46 +196,73 @@ internal sealed class MethodNodeBinding
                     metadata.Name);
                 if (issues.Count > 0)
                 {
-                    return InteractionResult.Failure<ActionInvocation>(
+                    return InteractionResult.Failure<InvocationStatus>(
                         InteractionErrorCode.VALIDATION_FAILED,
                         $"Parameter '{metadata.Name}' failed validation.",
                         issues);
                 }
 
-                bound[parameter.Position] = converted.Value;
+                bound[index] = converted.Value;
             }
 
-            var invocation = _Host.CreateInvocation();
+            TaskCompletionSource<InteractionResult<object?>> completion;
             lock (_InvocationGate)
             {
-                _CurrentInvocation = invocation;
+                if (_ResultTask is { IsCompleted: false })
+                {
+                    return _AlreadyRunning();
+                }
+
+                completion = new TaskCompletionSource<InteractionResult<object?>>(
+                    TaskCreationOptions.RunContinuationsAsynchronously);
+                _ResultTask = completion.Task;
             }
 
             try
             {
-                var returned = _Action.Method.Invoke(target.Value, bound);
-                if (_Action.IsAsynchronous)
+                var returned = _Method.Invoke(target.Value, bound);
+                if (IsAsynchronous)
                 {
-                    _ = _CompleteAsync(invocation, (Task)returned!);
+                    if (returned is Task task)
+                    {
+                        _ = _CompleteAsync(completion, task);
+                    }
+                    else
+                    {
+                        _CompleteFailure(
+                            completion,
+                            new InvalidOperationException(
+                                $"Action '{Name}' returned a null task."));
+                    }
                 }
                 else
                 {
-                    invocation.CompleteSuccess(returned);
+                    completion.TrySetResult(InteractionResult.Success(returned));
                 }
             }
             catch (TargetInvocationException exception)
             {
-                invocation.CompleteFailure(exception.InnerException ?? exception);
+                _CompleteFailure(completion, exception.InnerException ?? exception);
             }
             catch (Exception exception)
             {
-                invocation.CompleteFailure(exception);
+                _CompleteFailure(completion, exception);
             }
 
-            return InteractionResult.Success(invocation);
+            return InteractionResult.Success(_GetStatus(completion.Task));
         });
 
-    private async Task _CompleteAsync(ActionInvocation invocation, Task task)
+    private static InvocationStatus _GetStatus(Task<InteractionResult<object?>> resultTask)
+    {
+        if (!resultTask.IsCompletedSuccessfully) return InvocationStatus.RUNNING;
+        return resultTask.Result.IsSuccess
+            ? InvocationStatus.SUCCEEDED
+            : InvocationStatus.FAILED;
+    }
+
+    private async Task _CompleteAsync(
+        TaskCompletionSource<InteractionResult<object?>> completion,
+        Task task)
     {
         try
         {
@@ -254,11 +270,28 @@ internal sealed class MethodNodeBinding
             var result = ResultType is null
                 ? null
                 : task.GetType().GetProperty(nameof(Task<object>.Result))?.GetValue(task);
-            invocation.CompleteSuccess(result);
+            completion.TrySetResult(InteractionResult.Success(result));
         }
         catch (Exception exception)
         {
-            invocation.CompleteFailure(exception);
+            _CompleteFailure(completion, exception);
         }
+    }
+
+    private InteractionResult<InvocationStatus> _AlreadyRunning() =>
+        InteractionResult.Failure<InvocationStatus>(
+            InteractionErrorCode.UNAVAILABLE,
+            $"Action '{Name}' is already running on this method node.");
+
+    private void _CompleteFailure(
+        TaskCompletionSource<InteractionResult<object?>> completion,
+        Exception exception)
+    {
+        completion.TrySetResult(InteractionResult.Failure<object?>(
+            exception is UnauthorizedAccessException
+                ? InteractionErrorCode.PERMISSION_DENIED
+                : InteractionErrorCode.FAULT,
+            exception.Message));
+        Host.ReportInvocationFault(exception);
     }
 }

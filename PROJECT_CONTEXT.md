@@ -4,7 +4,7 @@
 
 UIEngine exposes a running .NET application's live objects as a navigable, editable, and
 invocable graph. Domain objects remain authoritative; UIEngine provides frontend-neutral nodes,
-navigation, paths, validation, and invocation lifetime.
+navigation, paths, validation, and invocation observation.
 
 The framework targets simulations, engines, services, research systems, internal tools, and
 prototypes that need generated user interfaces over live state.
@@ -34,7 +34,8 @@ toolkit types in Core.
 - Navigating deeper pushes a new entry. Going back removes the current entry permanently.
 - Removing an entry or navigator causes its frontend control and frontend-owned work to be
   disposed.
-- Started domain invocations remain owned by the host and continue after their control is removed.
+- Each method-node occurrence owns its latest invocation state. The underlying domain task
+  continues independently after its control is removed or the host is disposed.
 - A workspace may contain several navigators at the same path. Each resolves separate node and
   presentation instances while sharing the same domain object.
 - A navigator can start from a registered root or a specific resolved `BaseNode`. The workspace
@@ -57,8 +58,8 @@ toolkit types in Core.
 3. Node semantics describe the exposed language feature, not a widget or interaction archetype.
 4. A node instance belongs to one resolved navigator occurrence and is never shared between
    navigators.
-5. Navigation state belongs to `Navigator`; domain access and invocation lifetime belong to
-   `UIEngineHost`.
+5. Navigation state belongs to `Navigator`; domain access belongs to `UIEngineHost`; invocation
+   observation belongs to the originating method-node occurrence.
 6. Core contains no frontend or toolkit types.
 7. Frontends branch on structured failures rather than parsing messages.
 8. Every public collection read is bounded.

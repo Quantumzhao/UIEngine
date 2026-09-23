@@ -6,7 +6,7 @@
 - [x] Canonical logical paths.
 - [x] Live reads, writes, conversion, and validation.
 - [x] Bounded collection access.
-- [x] Synchronous and asynchronous invocation with lifecycle status.
+- [x] Synchronous and asynchronous invocation with method-occurrence-local status and result.
 - [x] Explicit domain dispatch.
 - [x] Structured interaction failures.
 - [x] CLI coverage of the live graph workflow.

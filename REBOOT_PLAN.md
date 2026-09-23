@@ -4,7 +4,7 @@
 
 Expose live .NET objects through frontend-neutral `BaseNode`s and let users work through one or
 more independent `Navigator`s. Preserve the existing guarantees for runtime handles, paths,
-bounded work, validation, dispatch, and invocation lifetime.
+bounded work, validation, dispatch, and occurrence-local invocation state.
 
 ## Target Model
 
@@ -60,7 +60,8 @@ facets, and frontends choose controls from those semantics.
 - Dispose the frontend control and frontend-owned work when its navigation entry is removed.
 - Isolate each navigator's frontend work from every other navigator.
 - Leave the caller-owned host alive when a frontend closes.
-- Keep started invocations alive under host ownership after their controls are removed.
+- Keep started domain tasks running independently after their controls are removed while releasing
+  the removed method node's observation state.
 
 ## Implementation Sequence
 

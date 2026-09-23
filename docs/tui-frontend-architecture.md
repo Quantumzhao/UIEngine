@@ -62,7 +62,9 @@ dispatch, bounded reads, and invocation.
 Going back removes the departed control. Removing a navigator removes all controls belonging to
 it. Closing the TUI leaves the caller-owned host and domain objects alive.
 
-A started `ActionInvocation` continues under host ownership after its method control is removed.
+A method control observes invocation state on its method-node occurrence. Removing the control
+detaches its completion continuation and releases that node; the already-started domain task
+continues independently.
 
 ## Layout Persistence
 

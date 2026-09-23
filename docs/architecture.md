@@ -24,7 +24,7 @@ The host owns:
 - reflection and programmatic exposure;
 - path resolution and live operations;
 - domain-thread-affine interaction; and
-- started invocation lifetime.
+- non-owning diagnostic reporting for invocation faults.
 
 Hosts are isolated and disposable. Their live graph operations are synchronous and must be called
 on the domain model's owning thread. They contain no process-global registry, frontend state, or
@@ -181,19 +181,20 @@ domain thread; Core does not marshal work to or from UI threads.
 Collection access is always bounded. Collection windows retain positions, optional keys, nulls,
 scalar values, references, optional total counts, and whether more data is available.
 
-Method invocation returns an `ActionInvocation` with lifecycle status and completion. The method
-node exposes the latest invocation status so synchronous execution is observable as running. Once
-started, an invocation is owned by the host. Removing a node or control prevents that frontend
-from applying later completion updates.
+Each method-node occurrence exposes its latest invocation status and a result task carrying the
+structured outcome for that exact call. Synchronous execution is observable as running, and one
+occurrence accepts only one running call at a time. Separate occurrences can invoke the same domain
+method concurrently. Once reflection returns a domain task, that task continues independently of the
+node and host; the node only observes its outcome.
 
 ## Frontend Lifetime
 
 For every active navigation entry, a frontend creates a control. Invocation updates are applied
 only while that entry is still current.
 
-When an entry is removed, the frontend removes its control and detaches from its invocation.
-Already-started domain tasks may finish, but they cannot update a detached visual tree.
-Removal does not stop the domain object or a started invocation.
+When an entry is removed, the frontend removes its control and detaches its completion continuation.
+Already-started domain tasks may finish, but they cannot update a detached visual tree. Host disposal
+does not cancel them or replace their natural outcome with a host-lifetime failure.
 
 Removing one navigator cannot interfere with work owned by another navigator, even when both point
 to the same path.

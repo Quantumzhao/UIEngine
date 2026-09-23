@@ -1,4 +1,3 @@
-using System.Collections.Concurrent;
 using System.Reflection;
 using System.Runtime.CompilerServices;
 using Microsoft.Extensions.Logging;
@@ -6,7 +5,7 @@ using UIEngine.Core.Attributes;
 
 namespace UIEngine.Core;
 
-/// <summary>Owns roots, runtime handles, live interaction, and action lifetime.</summary>
+/// <summary>Owns roots, runtime handles, and live interaction.</summary>
 /// <remarks>
 /// Live graph operations are synchronous and must be called on the domain model's owning thread.
 /// A frontend on another thread is responsible for arranging that handoff outside Core.
@@ -16,7 +15,6 @@ public sealed class UIEngineHost : IDisposable
     private readonly ConditionalWeakTable<object, _HandleHolder> _Handles = new();
     private readonly Dictionary<Guid, WeakReference<object>> _Objects = [];
     private readonly Dictionary<string, _RootEntry> _Roots = new(StringComparer.Ordinal);
-    private readonly ConcurrentDictionary<ActionInvocation, byte> _Invocations = [];
     private readonly HostSettings _Settings;
     private readonly ILogger _Logger;
 
@@ -99,16 +97,9 @@ public sealed class UIEngineHost : IDisposable
 
     public void Dispose()
     {
-        var invocations = _Invocations.Keys.ToArray();
-        _Invocations.Clear();
         _Roots.Clear();
         _Objects.Clear();
         _Handles.Clear();
-
-        foreach (var invocation in invocations)
-        {
-            invocation.CompleteHostDisposed();
-        }
     }
 
     internal InteractionResult<object> ResolveTarget(Guid handle)
@@ -155,13 +146,8 @@ public sealed class UIEngineHost : IDisposable
         }
     }
 
-    internal ActionInvocation CreateInvocation()
-    {
-        var invocation = new ActionInvocation(_InvocationCompleted);
-        _Invocations.TryAdd(invocation, 0);
-
-        return invocation;
-    }
+    internal void ReportInvocationFault(Exception exception) => 
+        _ReportUnexpected("action invocation", exception);
 
     private Guid _GetOrCreateHandle(object instance)
     {
@@ -226,15 +212,13 @@ public sealed class UIEngineHost : IDisposable
                         target => ReflectionMetadata.Read(member.Member, target)), member));
                     break;
                 case ReflectedMemberKind.ACTION:
-                    var action = ReflectedAction.Create((MethodInfo)member.Member);
-                    if (!action.IsSuccess)
+                    var methodNode = LiveMethodNode.Create(this, handle, member);
+                    if (!methodNode.IsSuccess)
                     {
-                        return InteractionResult.Failure<LiveObjectNode>(action.Error!);
+                        return InteractionResult.Failure<LiveObjectNode>(methodNode.Error!);
                     }
 
-                    members.Add(new LiveMethodNode(
-                        new MethodNodeBinding(this, handle, member.Name, action.Value),
-                        member));
+                    members.Add(methodNode.Value);
                     break;
                 default:
                     throw new InvalidOperationException("Unknown member kind.");
@@ -276,16 +260,6 @@ public sealed class UIEngineHost : IDisposable
             handle,
             summary,
             members.OrderBy(static member => member.Name, StringComparer.Ordinal).ToArray()));
-    }
-
-    private void _InvocationCompleted(ActionInvocation invocation)
-    {
-        _Invocations.TryRemove(invocation, out _);
-
-        if (invocation.Fault is not null)
-        {
-            _ReportUnexpected("action invocation", invocation.Fault);
-        }
     }
 
     private void _ReportUnexpected(string operation, Exception exception) =>

@@ -98,28 +98,6 @@ internal sealed class LiveCollectionNode(
         CollectionSelector selector) => binding.Select(selector);
 }
 
-internal sealed class LiveMethodNode : LiveReflectedMemberNode, IMethodNode
-{
-    private readonly MethodNodeBinding _Binding;
-
-    public LiveMethodNode(MethodNodeBinding binding, ReflectedMember member)
-        : base(binding.Host, binding.Name, member, binding.ReturnType)
-    {
-        _Binding = binding;
-    }
-
-    public IReadOnlyList<MethodParameter> Parameters => _Binding.Parameters;
-
-    public Type? ResultType => _Binding.ResultType;
-
-    public bool IsAsynchronous => _Binding.IsAsynchronous;
-
-    public InvocationStatus? Status => _Binding.Status;
-
-    public InteractionResult<ActionInvocation> Invoke(
-        IReadOnlyDictionary<string, object?> arguments) => _Binding.Invoke(arguments);
-}
-
 [DynamicInterfaceCastableImplementation]
 internal interface ILiveReflectedMemberNodeImplementation : IMemberNode
 {

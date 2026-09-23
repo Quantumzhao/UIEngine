@@ -208,9 +208,13 @@ public sealed class RuntimeBehaviorTests
             .ToDictionary(static member => member.Name, static member => (IMethodNode)member);
 
         Assert.Null(actions["ObserveStatus"].Status);
+        Assert.Null(actions["ObserveStatus"].ResultTask);
         model.ReadInvocationStatus = () => actions["ObserveStatus"].Status;
         var observed = actions["ObserveStatus"].Invoke(new Dictionary<string, object?>());
-        Assert.Equal(InvocationStatus.RUNNING, (await observed.Value.Completion).Value);
+        Assert.Equal(InvocationStatus.SUCCEEDED, observed.Value);
+        Assert.Equal(
+            InvocationStatus.RUNNING,
+            (await actions["ObserveStatus"].ResultTask!).Value);
         Assert.Equal(InvocationStatus.SUCCEEDED, actions["ObserveStatus"].Status);
 
         var added = actions["Add"].Invoke(new Dictionary<string, object?>
@@ -218,40 +222,124 @@ public sealed class RuntimeBehaviorTests
             ["left"] = "2",
             ["right"] = 3,
         });
-        Assert.Equal(5, (await added.Value.Completion).Value);
+        Assert.Equal(InvocationStatus.SUCCEEDED, added.Value);
+        Assert.True(actions["Add"].ResultTask!.IsCompletedSuccessfully);
+        Assert.Equal(5, (await actions["Add"].ResultTask!).Value);
+
+        var previousResultTask = actions["Add"].ResultTask;
+        var rejected = actions["Add"].Invoke(new Dictionary<string, object?>
+        {
+            ["missing"] = 1,
+        });
+        Assert.Equal(InteractionErrorCode.INVALID_INPUT, rejected.Error?.Code);
+        Assert.Same(previousResultTask, actions["Add"].ResultTask);
 
         var worked = actions["WorkAsync"].Invoke(new Dictionary<string, object?>
         {
             ["steps"] = 3,
         });
+        Assert.Equal(InvocationStatus.RUNNING, worked.Value);
         Assert.Equal(InvocationStatus.RUNNING, actions["WorkAsync"].Status);
+        var workResultTask = actions["WorkAsync"].ResultTask!;
+        Assert.False(workResultTask.IsCompleted);
+        var invocationCount = model.InvocationCount;
+        var overlapping = actions["WorkAsync"].Invoke(new Dictionary<string, object?>
+        {
+            ["steps"] = 4,
+        });
+        Assert.Equal(InteractionErrorCode.UNAVAILABLE, overlapping.Error?.Code);
+        Assert.Equal(invocationCount, model.InvocationCount);
         model.CompleteWork();
-        Assert.Equal(3, (await worked.Value.Completion).Value);
+        Assert.Equal(3, (await workResultTask).Value);
         Assert.Equal(InvocationStatus.SUCCEEDED, actions["WorkAsync"].Status);
+        var completedWork = actions["WorkAsync"].ResultTask;
+        var workedAgain = actions["WorkAsync"].Invoke(new Dictionary<string, object?>
+        {
+            ["steps"] = 2,
+        });
+        Assert.Equal(InvocationStatus.SUCCEEDED, workedAgain.Value);
+        Assert.NotSame(completedWork, actions["WorkAsync"].ResultTask);
+        Assert.Equal(3, (await completedWork!).Value);
+        Assert.Equal(2, (await actions["WorkAsync"].ResultTask!).Value);
 
         var failed = actions["Fail"].Invoke(new Dictionary<string, object?>());
-        var fault = await failed.Value.Completion;
-        Assert.Equal(InvocationStatus.FAILED, failed.Value.Status);
+        Assert.Equal(InvocationStatus.FAILED, failed.Value);
+        var fault = await actions["Fail"].ResultTask!;
         Assert.Equal(InteractionErrorCode.FAULT, fault.Error?.Code);
-        Assert.IsType<InvalidOperationException>(failed.Value.Fault);
         Assert.Equal(InvocationStatus.FAILED, actions["Fail"].Status);
+
+        var failedAsync = actions["FailAsync"].Invoke(new Dictionary<string, object?>());
+        Assert.True(failedAsync.IsSuccess);
+        var asyncFault = await actions["FailAsync"].ResultTask!;
+        Assert.Equal(InvocationStatus.FAILED, actions["FailAsync"].Status);
+        Assert.Equal(InteractionErrorCode.FAULT, asyncFault.Error?.Code);
     }
 
     [Fact]
-    public async Task HostDisposalCompletesRunningInvocations()
+    public async Task SeparateMethodNodeOccurrencesCanRunConcurrently()
     {
+        var model = new _ActionModel();
+        using var host = new UIEngineHost();
+        host.SetRoot("model", model);
+        var first = (IMethodNode)Assert.Single(
+            ((IObjectNode)host.ResolveRootNode("model").Value.Node).Members,
+            static member => member.Name == "WorkAsync");
+        var second = (IMethodNode)Assert.Single(
+            ((IObjectNode)host.ResolveRootNode("model").Value.Node).Members,
+            static member => member.Name == "WorkAsync");
+
+        var firstStarted = first.Invoke(new Dictionary<string, object?> { ["steps"] = 1 });
+        var secondStarted = second.Invoke(new Dictionary<string, object?> { ["steps"] = 2 });
+
+        Assert.Equal(InvocationStatus.RUNNING, firstStarted.Value);
+        Assert.Equal(InvocationStatus.RUNNING, secondStarted.Value);
+        Assert.NotSame(first.ResultTask, second.ResultTask);
+        Assert.Equal(2, model.InvocationCount);
+
+        model.CompleteWork();
+        var results = await Task.WhenAll(first.ResultTask!, second.ResultTask!);
+        Assert.Equal(1, results[0].Value);
+        Assert.Equal(2, results[1].Value);
+    }
+
+    [Fact]
+    public async Task HostDisposalDoesNotRewriteRunningInvocation()
+    {
+        var model = new _ActionModel();
         var host = new UIEngineHost();
-        host.SetRoot("model", new _ActionModel());
+        host.SetRoot("model", model);
         var resolved = host.ResolveRootNode("model");
-        var wait = Assert.Single(
+        var work = Assert.Single(
             ((IObjectNode)resolved.Value.Node).Members,
-            action => action.Name == "WaitAsync");
-        var started = ((IMethodNode)wait).Invoke(new Dictionary<string, object?>());
+            action => action.Name == "WorkAsync");
+        var method = (IMethodNode)work;
+        var started = method.Invoke(new Dictionary<string, object?> { ["steps"] = 5 });
+        var resultTask = method.ResultTask!;
 
         host.Dispose();
 
-        var completion = await started.Value.Completion;
-        Assert.Equal(InteractionErrorCode.DISPOSED, completion.Error?.Code);
+        Assert.Equal(InvocationStatus.RUNNING, started.Value);
+        Assert.False(resultTask.IsCompleted);
+        Assert.Equal(InvocationStatus.RUNNING, method.Status);
+
+        model.CompleteWork();
+        var result = await resultTask;
+        Assert.Equal(InvocationStatus.SUCCEEDED, method.Status);
+        Assert.Equal(5, result.Value);
+    }
+
+    [Fact]
+    public async Task ReleasingMethodNodeObservationDoesNotStopDomainTask()
+    {
+        var model = new _ActionModel();
+        using var host = new UIEngineHost();
+        host.SetRoot("model", model);
+
+        _StartWorkWithoutRetainingNode(host);
+        model.CompleteWork();
+
+        await model.WorkFinished;
+        Assert.Equal(1, model.CompletedWorkCount);
     }
 
     [Fact]
@@ -331,13 +419,20 @@ public sealed class RuntimeBehaviorTests
             typeof(InteractionResult<object?>),
             typeof(IReadableValueNode).GetMethod(nameof(IReadableValueNode.ReadValue))!.ReturnType);
         Assert.Equal(
-            typeof(InteractionResult<ActionInvocation>),
+            typeof(InteractionResult<InvocationStatus>),
             typeof(IMethodNode).GetMethod(nameof(IMethodNode.Invoke))!.ReturnType);
         Assert.Equal(
             typeof(InvocationStatus?),
             typeof(IMethodNode).GetProperty(nameof(IMethodNode.Status))!.PropertyType);
+        Assert.Equal(
+            typeof(Task<InteractionResult<object>>),
+            typeof(IMethodNode).GetProperty(nameof(IMethodNode.ResultTask))!.PropertyType);
+        Assert.Null(typeof(IMethodNode).GetProperty("Completion"));
+        Assert.Null(typeof(IMethodNode).GetProperty("Result"));
         Assert.Null(typeof(IMethodNode).GetProperty("ProgressType"));
-        Assert.Null(typeof(ActionInvocation).GetMethod("ReadProgressAsync"));
+        Assert.DoesNotContain(
+            assembly.GetExportedTypes(),
+            static type => type.Name == "ActionInvocation");
         Assert.Null(typeof(UIEngineHostOptions).GetProperty("Dispatcher"));
         Assert.Null(typeof(UIEngineHost).GetProperty("IsDisposed"));
         Assert.Null(typeof(UIEngineHostOptions).GetProperty("ObservationBufferCapacity"));
@@ -355,6 +450,15 @@ public sealed class RuntimeBehaviorTests
         });
         host.SetRoot("world", CyclicWorldFactory.Create());
         return host;
+    }
+
+    private static void _StartWorkWithoutRetainingNode(UIEngineHost host)
+    {
+        var work = (IMethodNode)Assert.Single(
+            ((IObjectNode)host.ResolveRootNode("model").Value.Node).Members,
+            static member => member.Name == "WorkAsync");
+        var started = work.Invoke(new Dictionary<string, object?> { ["steps"] = 1 });
+        Assert.Equal(InvocationStatus.RUNNING, started.Value);
     }
 
     private enum _EditingState
@@ -432,8 +536,17 @@ public sealed class RuntimeBehaviorTests
         private int _InvocationCount;
         private readonly TaskCompletionSource _WorkCompletion = new(
             TaskCreationOptions.RunContinuationsAsynchronously);
+        private readonly TaskCompletionSource _WorkFinished = new(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        private int _CompletedWorkCount;
 
         public Func<InvocationStatus?> ReadInvocationStatus { get; set; } = () => null;
+
+        public int InvocationCount => _InvocationCount;
+
+        public int CompletedWorkCount => _CompletedWorkCount;
+
+        public Task WorkFinished => _WorkFinished.Task;
 
         public void CompleteWork() => _WorkCompletion.TrySetResult();
 
@@ -457,6 +570,8 @@ public sealed class RuntimeBehaviorTests
         {
             _InvocationCount++;
             await _WorkCompletion.Task;
+            Interlocked.Increment(ref _CompletedWorkCount);
+            _WorkFinished.TrySetResult();
 
             return steps;
         }
@@ -466,6 +581,14 @@ public sealed class RuntimeBehaviorTests
         {
             _InvocationCount++;
             return new TaskCompletionSource().Task;
+        }
+
+        [Action]
+        public async Task FailAsync()
+        {
+            _InvocationCount++;
+            await Task.Yield();
+            throw new InvalidOperationException("async domain failure");
         }
 
         [Action]

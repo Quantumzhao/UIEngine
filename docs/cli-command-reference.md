@@ -81,8 +81,8 @@ call AdvanceTurn populationDelta=5
 call SimulateGrowthAsync years=3 populationPerYear=2
 ```
 
-Arguments are named and may appear in any order. Asynchronous actions remain host-owned until they
-complete.
+Arguments are named and may appear in any order. The CLI retains the resolved method-node occurrence
+while it awaits that node's result task and then prints the returned structured result.
 
 ## Errors
 

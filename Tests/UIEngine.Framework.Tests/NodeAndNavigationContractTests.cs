@@ -160,7 +160,9 @@ public sealed class NodeAndNavigationContractTests
 
         public InvocationStatus? Status => null;
 
-        public InteractionResult<ActionInvocation> Invoke(
+        public Task<InteractionResult<object?>>? ResultTask => null;
+
+        public InteractionResult<InvocationStatus> Invoke(
             IReadOnlyDictionary<string, object?> arguments) => throw new NotSupportedException();
     }
 
