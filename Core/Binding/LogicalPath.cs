@@ -51,7 +51,7 @@ public sealed record CollectionSelector
     }
 }
 
-public sealed record LogicalPathSegment(string Identifier, CollectionSelector? Selector = null);
+public sealed record LogicalPathSegment(string Name, CollectionSelector? Selector = null);
 
 public sealed class LogicalPath : IEquatable<LogicalPath>
 {
@@ -59,18 +59,18 @@ public sealed class LogicalPath : IEquatable<LogicalPath>
 
     private LogicalPath(IEnumerable<LogicalPathSegment> segments)
     {
-        _Segments = segments.ToArray();
+        _Segments = [.. segments];
     }
 
     public static LogicalPath Root { get; } = new([]);
 
     public IReadOnlyList<LogicalPathSegment> Segments => _Segments;
 
-    public LogicalPath Append(string identifier, CollectionSelector? selector = null)
+    public LogicalPath Append(string name, CollectionSelector? selector = null)
     {
-        if (string.IsNullOrEmpty(identifier))
+        if (string.IsNullOrEmpty(name))
         {
-            throw new ArgumentException("A path identifier cannot be empty.", nameof(identifier));
+            throw new ArgumentException("A path name cannot be empty.", nameof(name));
         }
 
         if (_Segments.Length == 0 && selector is not null)
@@ -78,7 +78,7 @@ public sealed class LogicalPath : IEquatable<LogicalPath>
             throw new ArgumentException("A root cannot have a selector.", nameof(selector));
         }
 
-        return new LogicalPath(_Segments.Append(new LogicalPathSegment(identifier, selector)));
+        return new LogicalPath(_Segments.Append(new LogicalPathSegment(name, selector)));
     }
 
     public static InteractionResult<LogicalPath> Parse(string path)
@@ -151,10 +151,10 @@ public sealed class LogicalPath : IEquatable<LogicalPath>
                 return _InvalidSegment("A path segment contains an unescaped delimiter.");
             }
 
-            var identifier = _Decode(encoded);
-            return identifier.IsSuccess
-                ? InteractionResult.Success(new LogicalPathSegment(identifier.Value))
-                : InteractionResult.Failure<LogicalPathSegment>(identifier.Error!);
+            var name = _Decode(encoded);
+            return name.IsSuccess
+                ? InteractionResult.Success(new LogicalPathSegment(name.Value))
+                : InteractionResult.Failure<LogicalPathSegment>(name.Error!);
         }
 
         if (selectorStart == 0 || encoded[^1] != ']' ||
@@ -164,10 +164,10 @@ public sealed class LogicalPath : IEquatable<LogicalPath>
             return _InvalidSegment("A path selector is malformed.");
         }
 
-        var identifierResult = _Decode(encoded[..selectorStart]);
-        if (!identifierResult.IsSuccess)
+        var nameResult = _Decode(encoded[..selectorStart]);
+        if (!nameResult.IsSuccess)
         {
-            return InteractionResult.Failure<LogicalPathSegment>(identifierResult.Error!);
+            return InteractionResult.Failure<LogicalPathSegment>(nameResult.Error!);
         }
 
         var selectorText = encoded[(selectorStart + 1)..^1];
@@ -199,7 +199,7 @@ public sealed class LogicalPath : IEquatable<LogicalPath>
         try
         {
             return InteractionResult.Success(new LogicalPathSegment(
-                identifierResult.Value,
+                nameResult.Value,
                 new CollectionSelector(kind.Value, value.Value)));
         }
         catch (ArgumentException exception)
@@ -210,10 +210,10 @@ public sealed class LogicalPath : IEquatable<LogicalPath>
 
     private static string _FormatSegment(LogicalPathSegment segment)
     {
-        var identifier = Escape(segment.Identifier);
+        var name = Escape(segment.Name);
         if (segment.Selector is null)
         {
-            return identifier;
+            return name;
         }
 
         var selector = segment.Selector.Kind switch
@@ -223,7 +223,7 @@ public sealed class LogicalPath : IEquatable<LogicalPath>
             CollectionSelectorKind.DOMAIN_IDENTITY => "identity",
             _ => throw new InvalidOperationException("Unknown collection selector kind."),
         };
-        return $"{identifier}[{selector}={Escape(segment.Selector.Value)}]";
+        return $"{name}[{selector}={Escape(segment.Selector.Value)}]";
     }
 
     private static InteractionResult<string> _Decode(string encoded)
@@ -275,7 +275,7 @@ public sealed class LogicalPath : IEquatable<LogicalPath>
             return builder.Length == 0
                 ? InteractionResult.Failure<string>(
                     InteractionErrorCode.INVALID_INPUT,
-                    "Path identifiers and selector values cannot be empty.")
+                    "Path names and selector values cannot be empty.")
                 : InteractionResult.Success(builder.ToString());
         }
         catch (DecoderFallbackException)

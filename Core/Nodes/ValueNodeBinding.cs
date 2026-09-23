@@ -9,7 +9,7 @@ namespace UIEngine.Core;
 internal sealed class ValueNodeBinding(
     UIEngineHost host,
     Guid owner,
-    string id,
+    string name,
     Type valueType,
     bool canRead,
     bool canWrite,
@@ -28,7 +28,7 @@ internal sealed class ValueNodeBinding(
 
     internal UIEngineHost Host { get; } = host;
 
-    public string Id { get; } = id;
+    public string Name { get; } = name;
 
     public Type ValueType { get; } = valueType;
 
@@ -43,14 +43,14 @@ internal sealed class ValueNodeBinding(
     public IValueRange? Range { get; } = range;
 
     public InteractionResult<object?> Read() => _Host.Execute(
-        $"read value {Id}",
+        $"read value {Name}",
         () =>
         {
             if (!CanRead)
             {
                 return InteractionResult.Failure<object?>(
                     InteractionErrorCode.UNSUPPORTED,
-                    $"Value '{Id}' is not readable.");
+                    $"Value '{Name}' is not readable.");
             }
 
             var target = _Host.ResolveTarget(_Owner);
@@ -63,16 +63,16 @@ internal sealed class ValueNodeBinding(
         });
 
     public InteractionResult<object?> Write(object? value) => _Host.Execute(
-        $"write value {Id}",
+        $"write value {Name}",
         () =>
         {
             if (!CanWrite || _Write is null)
             {
-                var message = $"Value '{Id}' is read-only.";
+                var message = $"Value '{Name}' is read-only.";
                 return InteractionResult.Failure<object?>(
                     InteractionErrorCode.VALIDATION_FAILED,
                     message,
-                    [new ValidationIssue(ValidationIssueCode.READ_ONLY, Id, message)]);
+                    [new ValidationIssue(ValidationIssueCode.READ_ONLY, Name, message)]);
             }
 
             var target = _Host.ResolveTarget(_Owner);
@@ -94,12 +94,12 @@ internal sealed class ValueNodeBinding(
                 Range,
                 _ValidationAttributes,
                 target.Value,
-                Id);
+                Name);
             if (issues.Count > 0)
             {
                 return InteractionResult.Failure<object?>(
                     InteractionErrorCode.VALIDATION_FAILED,
-                    $"Value '{Id}' failed validation.",
+                    $"Value '{Name}' failed validation.",
                     issues);
             }
 
@@ -124,5 +124,5 @@ internal sealed class ValueNodeBinding(
         InteractionResult.Failure<object?>(
             InteractionErrorCode.VALIDATION_FAILED,
             exception.Message,
-            [new ValidationIssue(ValidationIssueCode.RULE_FAILED, Id, exception.Message)]);
+            [new ValidationIssue(ValidationIssueCode.RULE_FAILED, Name, exception.Message)]);
 }

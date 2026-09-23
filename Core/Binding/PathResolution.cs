@@ -15,17 +15,17 @@ internal static class PathResolution
 
         var rootSegment = path.Segments[0];
         var root = host.Roots.FirstOrDefault(candidate =>
-            StringComparer.Ordinal.Equals(candidate.Identifier, rootSegment.Identifier));
+            StringComparer.Ordinal.Equals(candidate.Name, rootSegment.Name));
         if (root is null)
         {
             return InteractionResult.Failure<ResolvedPath>(
                 InteractionErrorCode.NOT_FOUND,
-                $"Root '{rootSegment.Identifier}' was not found.");
+                $"Root '{rootSegment.Name}' was not found.");
         }
 
-        var canonical = LogicalPath.Root.Append(root.Identifier);
+        var canonical = LogicalPath.Root.Append(root.Name);
         var locations = new List<PathLocation> { new(root.Handle, canonical) };
-        var current = host.CreateObjectNode(root.Handle, root.Identifier);
+        var current = host.CreateObjectNode(root.Handle, root.Name);
         if (!current.IsSuccess)
         {
             return InteractionResult.Failure<ResolvedPath>(current.Error!);
@@ -43,20 +43,20 @@ internal static class PathResolution
         {
             var segment = path.Segments[index];
             var matches = current.Value.Members
-                .Where(member => StringComparer.Ordinal.Equals(member.Id, segment.Identifier))
+                .Where(member => StringComparer.Ordinal.Equals(member.Name, segment.Name))
                 .ToArray();
             if (matches.Length == 0)
             {
                 return InteractionResult.Failure<ResolvedPath>(
                     InteractionErrorCode.NOT_FOUND,
-                    $"Member '{segment.Identifier}' was not found at '{canonical}'.");
+                    $"Member '{segment.Name}' was not found at '{canonical}'.");
             }
 
             if (matches.Length > 1)
             {
                 return InteractionResult.Failure<ResolvedPath>(
                     InteractionErrorCode.AMBIGUOUS,
-                    $"Member '{segment.Identifier}' is ambiguous at '{canonical}'.");
+                    $"Member '{segment.Name}' is ambiguous at '{canonical}'.");
             }
 
             var member = matches[0];
@@ -64,7 +64,7 @@ internal static class PathResolution
             {
                 if (segment.Selector is not null)
                 {
-                    return _InvalidTraversal(segment.Identifier);
+                    return _InvalidTraversal(segment.Name);
                 }
 
                 var read = reference.ReadReference();
@@ -77,11 +77,11 @@ internal static class PathResolution
                 {
                     return InteractionResult.Failure<ResolvedPath>(
                         InteractionErrorCode.UNAVAILABLE,
-                        $"Reference '{member.Id}' is empty.");
+                        $"Reference '{member.Name}' is empty.");
                 }
 
-                canonical = canonical.Append(segment.Identifier);
-                var resolved = host.CreateObjectNode(read.Value.Value, member.Id);
+                canonical = canonical.Append(segment.Name);
+                var resolved = host.CreateObjectNode(read.Value.Value, member.Name);
                 if (!resolved.IsSuccess)
                 {
                     return InteractionResult.Failure<ResolvedPath>(resolved.Error!);
@@ -106,10 +106,10 @@ internal static class PathResolution
                 {
                     if (index != path.Segments.Count - 1)
                     {
-                        return _InvalidTraversal(segment.Identifier);
+                        return _InvalidTraversal(segment.Name);
                     }
 
-                    canonical = canonical.Append(segment.Identifier);
+                    canonical = canonical.Append(segment.Name);
                     return InteractionResult.Success(new ResolvedPath(
                         member,
                         canonical,
@@ -126,19 +126,19 @@ internal static class PathResolution
                 {
                     return InteractionResult.Failure<ResolvedPath>(
                         InteractionErrorCode.NOT_FOUND,
-                        $"Selector on collection '{member.Id}' matched no object.");
+                        $"Selector on collection '{member.Name}' matched no object.");
                 }
 
                 if (selected.Value.Count > 1)
                 {
                     return InteractionResult.Failure<ResolvedPath>(
                         InteractionErrorCode.AMBIGUOUS,
-                        $"Selector on collection '{member.Id}' matched multiple objects.");
+                        $"Selector on collection '{member.Name}' matched multiple objects.");
                 }
 
                 var handle = selected.Value[0];
-                canonical = canonical.Append(segment.Identifier, segment.Selector);
-                var resolved = host.CreateObjectNode(handle, member.Id);
+                canonical = canonical.Append(segment.Name, segment.Selector);
+                var resolved = host.CreateObjectNode(handle, member.Name);
                 if (!resolved.IsSuccess)
                 {
                     return InteractionResult.Failure<ResolvedPath>(resolved.Error!);
@@ -159,18 +159,18 @@ internal static class PathResolution
 
             if (segment.Selector is not null || index != path.Segments.Count - 1)
             {
-                return _InvalidTraversal(segment.Identifier);
+                return _InvalidTraversal(segment.Name);
             }
 
-            canonical = canonical.Append(segment.Identifier);
+            canonical = canonical.Append(segment.Name);
             return InteractionResult.Success(new ResolvedPath(member, canonical, locations));
         }
 
         throw new InvalidOperationException("Path traversal ended without a result.");
     }
 
-    private static InteractionResult<ResolvedPath> _InvalidTraversal(string memberId) =>
+    private static InteractionResult<ResolvedPath> _InvalidTraversal(string memberName) =>
         InteractionResult.Failure<ResolvedPath>(
             InteractionErrorCode.INVALID_INPUT,
-            $"Member '{memberId}' cannot be traversed in this path.");
+            $"Member '{memberName}' cannot be traversed in this path.");
 }

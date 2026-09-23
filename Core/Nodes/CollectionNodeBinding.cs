@@ -6,13 +6,13 @@ namespace UIEngine.Core;
 internal sealed class CollectionNodeBinding(
     UIEngineHost host,
     Guid owner,
-    string id,
+    string name,
     Type collectionType,
     Func<object, object?> read)
 {
     public UIEngineHost Host { get; } = host;
 
-    public string Id { get; } = id;
+    public string Name { get; } = name;
 
     public Type CollectionType { get; } = collectionType;
 
@@ -37,7 +37,7 @@ internal sealed class CollectionNodeBinding(
         }
 
         return Host.Execute(
-            $"read collection {Id}",
+            $"read collection {Name}",
             () =>
             {
                 var source = _ReadSource();
@@ -74,7 +74,7 @@ internal sealed class CollectionNodeBinding(
         {
             return InteractionResult.Failure<IReadOnlyList<Guid>>(
                 InteractionErrorCode.UNSUPPORTED,
-                $"Collection '{Id}' is too large for bounded selector lookup.");
+                $"Collection '{Name}' is too large for bounded selector lookup.");
         }
 
         var matches = snapshot.Value.Entries
@@ -106,7 +106,7 @@ internal sealed class CollectionNodeBinding(
             ? InteractionResult.Success(source)
             : InteractionResult.Failure<IEnumerable>(
                 InteractionErrorCode.UNAVAILABLE,
-                $"Collection '{Id}' is null or unavailable.");
+                $"Collection '{Name}' is null or unavailable.");
     }
 
     private InteractionResult<CollectionSlice> _ReadSlice(

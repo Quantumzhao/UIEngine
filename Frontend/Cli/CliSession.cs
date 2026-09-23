@@ -149,9 +149,9 @@ internal sealed class CliSession : IDisposable
 
         if (_Locations.Count == 0)
         {
-            foreach (var root in _Host.Roots.OrderBy(static root => root.Identifier, StringComparer.Ordinal))
+            foreach (var root in _Host.Roots.OrderBy(static root => root.Name, StringComparer.Ordinal))
             {
-                _Output.WriteLine($"root {root.Identifier}");
+                _Output.WriteLine($"root {root.Name}");
             }
 
             return;
@@ -166,9 +166,9 @@ internal sealed class CliSession : IDisposable
 
         foreach (var member in ((IObjectNode)resolved.Value).Members
                      .OrderBy(_GetNodeOrder)
-                     .ThenBy(static member => member.Id, StringComparer.Ordinal))
+                     .ThenBy(static member => member.Name, StringComparer.Ordinal))
         {
-            _Output.WriteLine($"{_GetNodeKind(member)} {member.Id}");
+            _Output.WriteLine($"{_GetNodeKind(member)} {member.Name}");
         }
     }
 
@@ -203,7 +203,7 @@ internal sealed class CliSession : IDisposable
 
         var slice = read.Value;
         _Output.WriteLine(
-            $"collection {resolved.Value.Id} offset={slice.Offset} count={slice.Entries.Count} " +
+            $"collection {resolved.Value.Name} offset={slice.Offset} count={slice.Entries.Count} " +
             $"total={_FormatValue(slice.TotalCount)} hasMore={slice.HasMore}");
         foreach (var entry in slice.Entries)
         {
@@ -288,7 +288,7 @@ internal sealed class CliSession : IDisposable
         _Output.WriteLine($"domain-identity: {_FormatValue(objectNode.DomainIdentity)}");
         _Output.WriteLine($"summary: {objectNode.Summary ?? "null"}");
 
-        foreach (var member in objectNode.Members.OrderBy(static member => member.Id, StringComparer.Ordinal))
+        foreach (var member in objectNode.Members.OrderBy(static member => member.Name, StringComparer.Ordinal))
         {
             switch (member)
             {
@@ -296,23 +296,23 @@ internal sealed class CliSession : IDisposable
                     var parameters = string.Join(
                         ", ",
                         method.Parameters.Select(parameter =>
-                            $"{parameter.Id}:{parameter.ParameterType.Name}" +
+                            $"{parameter.Name}:{parameter.ParameterType.Name}" +
                             $" required={parameter.IsRequired}" +
                             $" nullable={parameter.IsNullable}" +
                             $" default={(parameter.HasDefaultValue ? _FormatValue(parameter.DefaultValue) : "absent")}" +
                             $" range={_FormatRange(parameter.Range)}" +
                             $" options={(parameter.Options.Count == 0 ? "none" : string.Join('|', parameter.Options.Select(static option => _FormatValue(option.Value))))}"));
                     _Output.WriteLine(
-                        $"action {member.Id}({parameters}) result={method.ResultType?.Name ?? "void"} " +
+                        $"action {member.Name}({parameters}) result={method.ResultType?.Name ?? "void"} " +
                         $"async={method.IsAsynchronous} status={method.Status?.ToString() ?? "never-run"}");
                     break;
                 case ICollectionNode collection:
                     _Output.WriteLine(
-                        $"collection {member.Id} element={collection.ElementType.Name} " +
+                        $"collection {member.Name} element={collection.ElementType.Name} " +
                         $"key={collection.KeyType?.Name ?? "none"}");
                     break;
                 case IReferenceNode reference:
-                    _Output.WriteLine($"reference {member.Id} type={reference.ReferenceType.Name}");
+                    _Output.WriteLine($"reference {member.Name} type={reference.ReferenceType.Name}");
                     break;
                 default:
                     var writable = member as IWritableValueNode;
@@ -323,7 +323,7 @@ internal sealed class CliSession : IDisposable
                         ? "none"
                         : string.Join('|', valueOptions.Select(static option => _FormatValue(option.Value)));
                     _Output.WriteLine(
-                        $"value {member.Id} type={member.ValueType.Name} " +
+                        $"value {member.Name} type={member.ValueType.Name} " +
                         $"read={member is IReadableValueNode} " +
                         $"write={writable is not null} nullable={member is INullableValueNode} " +
                         $"range={_FormatRange(writable?.Range)} options={options}");
@@ -356,7 +356,7 @@ internal sealed class CliSession : IDisposable
             return;
         }
 
-        _Output.WriteLine($"{resolved.Value.Id} = {_FormatValue(read.Value)}");
+        _Output.WriteLine($"{resolved.Value.Name} = {_FormatValue(read.Value)}");
     }
 
     private void _Set(IReadOnlyList<string> tokens)
@@ -383,7 +383,7 @@ internal sealed class CliSession : IDisposable
             return;
         }
 
-        _Output.WriteLine($"{resolved.Value.Id} = {_FormatValue(write.Value)}");
+        _Output.WriteLine($"{resolved.Value.Name} = {_FormatValue(write.Value)}");
     }
 
     private async Task _CallAsync(IReadOnlyList<string> tokens)
@@ -427,7 +427,7 @@ internal sealed class CliSession : IDisposable
             return;
         }
 
-        _Output.WriteLine($"{resolved.Value.Id} => {_FormatValue(completion.Value)}");
+        _Output.WriteLine($"{resolved.Value.Name} => {_FormatValue(completion.Value)}");
     }
 
     private string[] _GetNavigationCompletions()
@@ -435,7 +435,7 @@ internal sealed class CliSession : IDisposable
         var completions = new HashSet<string>(StringComparer.Ordinal) { "/", ".." };
         foreach (var root in _Host.Roots)
         {
-            completions.Add(LogicalPath.Root.Append(root.Identifier).ToString());
+            completions.Add(LogicalPath.Root.Append(root.Name).ToString());
         }
 
         if (CurrentHandle is not null)
@@ -447,7 +447,7 @@ internal sealed class CliSession : IDisposable
                 foreach (var member in ((IObjectNode)resolved.Value).Members
                              .Where(static member => member is IReferenceNode or ICollectionNode))
                 {
-                    completions.Add(current.Append(member.Id).ToString());
+                    completions.Add(current.Append(member.Name).ToString());
                 }
             }
         }
@@ -462,7 +462,7 @@ internal sealed class CliSession : IDisposable
             ? ((IObjectNode)resolved.Value).Members
                 .Where(_IsValueNode)
                 .Where(value => !writableOnly || value is IWritableValueNode)
-                .Select(static value => value.Id)
+                .Select(static value => value.Name)
                 .OrderBy(static value => value, StringComparer.Ordinal)
                 .ToArray()
             : [];
@@ -473,7 +473,7 @@ internal sealed class CliSession : IDisposable
         var resolved = _GetCurrentObjectNode();
         return resolved.IsSuccess
             ? ((IObjectNode)resolved.Value).Members.Where(static member => member is ICollectionNode)
-                .Select(static collection => collection.Id)
+                .Select(static collection => collection.Name)
                 .OrderBy(static value => value, StringComparer.Ordinal)
                 .ToArray()
             : [];
@@ -492,13 +492,13 @@ internal sealed class CliSession : IDisposable
             .Where(static member => member is IMethodNode);
         if (completedTokens.Length == 1)
         {
-            return actions.Select(static action => action.Id)
+            return actions.Select(static action => action.Name)
                 .OrderBy(static value => value, StringComparer.Ordinal)
                 .ToArray();
         }
 
         var action = actions.FirstOrDefault(candidate =>
-            StringComparer.Ordinal.Equals(candidate.Id, completedTokens[1]));
+            StringComparer.Ordinal.Equals(candidate.Name, completedTokens[1]));
         if (action is null)
         {
             return [];
@@ -508,8 +508,8 @@ internal sealed class CliSession : IDisposable
             .Select(static token => token.Split('=', 2)[0])
             .ToHashSet(StringComparer.Ordinal);
         return ((IMethodNode)action).Parameters
-            .Where(parameter => !supplied.Contains(parameter.Id))
-            .Select(static parameter => $"{parameter.Id}=")
+            .Where(parameter => !supplied.Contains(parameter.Name))
+            .Select(static parameter => $"{parameter.Name}=")
             .OrderBy(static value => value, StringComparer.Ordinal)
             .ToArray();
     }
@@ -561,7 +561,7 @@ internal sealed class CliSession : IDisposable
     }
 
     private InteractionResult<BaseNode> _ResolveMember(
-        string memberId,
+        string memberName,
         Func<BaseNode, bool> matchesExpectedFacet,
         string expectedKind)
     {
@@ -572,27 +572,27 @@ internal sealed class CliSession : IDisposable
         }
 
         var members = ((IObjectNode)resolved.Value).Members
-            .Where(member => StringComparer.Ordinal.Equals(member.Id, memberId))
+            .Where(member => StringComparer.Ordinal.Equals(member.Name, memberName))
             .ToArray();
         if (members.Length == 0)
         {
             return InteractionResult.Failure<BaseNode>(
                 InteractionErrorCode.NOT_FOUND,
-                $"Member '{memberId}' was not found.");
+                $"Member '{memberName}' was not found.");
         }
 
         if (members.Length > 1)
         {
             return InteractionResult.Failure<BaseNode>(
                 InteractionErrorCode.AMBIGUOUS,
-                $"Member '{memberId}' is ambiguous.");
+                $"Member '{memberName}' is ambiguous.");
         }
 
         return matchesExpectedFacet(members[0])
             ? InteractionResult.Success(members[0])
             : InteractionResult.Failure<BaseNode>(
                 InteractionErrorCode.TYPE_MISMATCH,
-                $"Member '{memberId}' is not a {expectedKind}.");
+                $"Member '{memberName}' is not a {expectedKind}.");
     }
 
     private InteractionResult<List<_LocationBinding>> _CaptureLocations(
@@ -719,7 +719,7 @@ internal sealed class CliSession : IDisposable
         _WriteFailure(error.Code, error.Message);
         foreach (var issue in error.Issues)
         {
-            _Output.WriteLine($"issue {issue.Code} id={issue.TargetId}: {issue.Message}");
+            _Output.WriteLine($"issue {issue.Code} name={issue.TargetName}: {issue.Message}");
         }
     }
 

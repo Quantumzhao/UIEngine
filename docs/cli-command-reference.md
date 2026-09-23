@@ -14,7 +14,7 @@ Output is human-readable and is not a machine protocol.
 
 ## Syntax
 
-- Command verbs are case-insensitive; identifiers and argument names are case-sensitive.
+- Command verbs are case-insensitive; names and argument names are case-sensitive.
 - Double quotes preserve whitespace: `set Motto "New Horizon"`.
 - Inside quotes, `\` escapes the following character.
 - Values use invariant-culture conversion.
@@ -93,7 +93,7 @@ Expected failures do not end the session:
 error NOT_FOUND: Member 'population' was not found.
 error CONVERSION_FAILED: 'invalid' cannot be converted to 'Int32'.
 error VALIDATION_FAILED: Value 'Population' failed validation.
-issue OUT_OF_RANGE id=Population: 'Population' must be between 0 and 1000000.
+issue OUT_OF_RANGE name=Population: 'Population' must be between 0 and 1000000.
 ```
 
 ## End-to-End Example

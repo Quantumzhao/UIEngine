@@ -107,12 +107,12 @@ public sealed class LiveValueNodeTests
 
     private static Dictionary<string, BaseNode> _ResolveMembers(
         UIEngineHost host,
-        string rootIdentifier)
+        string rootName)
     {
-        var resolved = host.ResolveRootNode(rootIdentifier);
+        var resolved = host.ResolveRootNode(rootName);
         Assert.True(resolved.IsSuccess);
         return ((IObjectNode)resolved.Value.Node).Members.ToDictionary(
-            static node => node.Id,
+            static node => node.Name,
             StringComparer.Ordinal);
     }
 

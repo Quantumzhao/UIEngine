@@ -101,7 +101,7 @@ public sealed class CliBehaviorTests
         Assert.Contains("error NOT_FOUND", transcript, StringComparison.Ordinal);
         Assert.Contains("error CONVERSION_FAILED", transcript, StringComparison.Ordinal);
         Assert.Contains("error VALIDATION_FAILED", transcript, StringComparison.Ordinal);
-        Assert.Contains("issue OUT_OF_RANGE id=Population", transcript, StringComparison.Ordinal);
+        Assert.Contains("issue OUT_OF_RANGE name=Population", transcript, StringComparison.Ordinal);
         Assert.Contains("error INVALID_INPUT", transcript, StringComparison.Ordinal);
         Assert.Contains("Population = 100", transcript, StringComparison.Ordinal);
     }

@@ -6,15 +6,15 @@ namespace UIEngine.Core;
 /// </summary>
 public abstract class BaseNode
 {
-    internal BaseNode(UIEngineHost host, string id, Type valueType)
+    internal BaseNode(UIEngineHost host, string name, Type valueType)
     {
         Host = host;
-        Id = id;
+        Name = name;
         ValueType = valueType;
     }
 
-    /// <summary>The root, member, or selected-entry identifier for this occurrence.</summary>
-    public string Id { get; }
+    /// <summary>The root, member, or selected-entry name for this occurrence.</summary>
+    public string Name { get; }
 
     /// <summary>The .NET type represented by this node.</summary>
     public Type ValueType { get; }
@@ -115,7 +115,7 @@ public interface ICollectionNode : INavigableNode
 
 /// <summary>Describes one user-supplied method parameter.</summary>
 public sealed record MethodParameter(
-    string Id,
+    string Name,
     Type ParameterType,
     bool IsRequired,
     bool IsNullable,

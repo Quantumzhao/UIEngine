@@ -159,7 +159,7 @@ until a valid node is reached.
 
 A workspace serializes a versioned layout containing:
 
-- navigator order and identifiers;
+- navigator order and names;
 - each navigator's current logical path; and
 - stable presentation configuration such as placement or size.
 

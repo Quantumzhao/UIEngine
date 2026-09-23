@@ -32,13 +32,13 @@ public sealed class UIEngineHost : IDisposable
         _Roots.Values.Select(static root => root.Registration).ToArray();
     internal int MaxCollectionItems => _Settings.MaxCollectionItems;
 
-    public InteractionResult<Guid> SetRoot(string identifier, object instance)
+    public InteractionResult<Guid> SetRoot(string name, object instance)
     {
-        if (string.IsNullOrWhiteSpace(identifier))
+        if (string.IsNullOrWhiteSpace(name))
         {
             return InteractionResult.Failure<Guid>(
                 InteractionErrorCode.INVALID_INPUT,
-                "A root identifier cannot be empty or whitespace.");
+                "A root name cannot be empty or whitespace.");
         }
 
         if (instance.GetType().IsValueType)
@@ -49,25 +49,25 @@ public sealed class UIEngineHost : IDisposable
         }
 
         var handle = _GetOrCreateHandle(instance);
-        var registration = new RootRegistration(identifier, handle);
-        _Roots[identifier] = new _RootEntry(registration, instance);
+        var registration = new RootRegistration(name, handle);
+        _Roots[name] = new _RootEntry(registration, instance);
         return InteractionResult.Success(handle);
     }
 
-    public InteractionResult<RootRegistration> RemoveRoot(string identifier)
+    public InteractionResult<RootRegistration> RemoveRoot(string name)
     {
-        if (string.IsNullOrWhiteSpace(identifier))
+        if (string.IsNullOrWhiteSpace(name))
         {
             return InteractionResult.Failure<RootRegistration>(
                 InteractionErrorCode.INVALID_INPUT,
-                "A root identifier cannot be empty or whitespace.");
+                "A root name cannot be empty or whitespace.");
         }
 
-        return _Roots.Remove(identifier, out var root)
+        return _Roots.Remove(name, out var root)
             ? InteractionResult.Success(root.Registration)
             : InteractionResult.Failure<RootRegistration>(
                 InteractionErrorCode.NOT_FOUND,
-                $"Root '{identifier}' was not found.");
+                $"Root '{name}' was not found.");
     }
 
     public Guid GetOrCreateHandle(object instance)
@@ -136,23 +136,23 @@ public sealed class UIEngineHost : IDisposable
                 $"Domain identity '{identity}' matches multiple live objects.");
     }
 
-    public InteractionResult<ResolvedNode> ResolveRootNode(string identifier)
+    public InteractionResult<ResolvedNode> ResolveRootNode(string name)
     {
-        if (!_Roots.TryGetValue(identifier, out var root))
+        if (!_Roots.TryGetValue(name, out var root))
         {
             return InteractionResult.Failure<ResolvedNode>(
                 InteractionErrorCode.NOT_FOUND,
-                $"Root '{identifier}' was not found.");
+                $"Root '{name}' was not found.");
         }
 
-        var created = CreateObjectNode(root.Registration.Handle, identifier);
+        var created = CreateObjectNode(root.Registration.Handle, name);
         if (!created.IsSuccess)
         {
             return InteractionResult.Failure<ResolvedNode>(created.Error!);
         }
 
         return InteractionResult.Success(new ResolvedNode(
-            LogicalPath.Root.Append(identifier),
+            LogicalPath.Root.Append(name),
             created.Value));
     }
 
@@ -218,7 +218,7 @@ public sealed class UIEngineHost : IDisposable
 
     internal InteractionResult<LiveObjectNode> CreateObjectNode(
         Guid handle,
-        string id)
+        string name)
     {
         var target = ResolveTarget(handle);
         if (!target.IsSuccess)
@@ -234,7 +234,7 @@ public sealed class UIEngineHost : IDisposable
 
         return Execute(
             "create object node",
-            () => _CreateObjectNode(target.Value, handle, id, identity.Value));
+            () => _CreateObjectNode(target.Value, handle, name, identity.Value));
     }
 
     internal InteractionResult<T> Execute<T>(string operation, Func<InteractionResult<T>> action)
@@ -309,15 +309,15 @@ public sealed class UIEngineHost : IDisposable
     private InteractionResult<LiveObjectNode> _CreateObjectNode(
         object instance,
         Guid handle,
-        string id,
+        string name,
         string? identity)
     {
         var metadata = ReflectionMetadata.Get(instance.GetType());
         _Settings.Exposures.TryGetValue(instance.GetType(), out var exposure);
-        var programmaticIds = exposure?.Values.Select(static value => value.Id)
+        var programmaticNames = exposure?.Values.Select(static value => value.Name)
             .ToHashSet(StringComparer.Ordinal) ?? [];
         var members = new List<BaseNode>();
-        foreach (var member in metadata.Members.Where(member => !programmaticIds.Contains(member.Id)))
+        foreach (var member in metadata.Members.Where(member => !programmaticNames.Contains(member.Name)))
         {
             switch (member.Kind)
             {
@@ -325,7 +325,7 @@ public sealed class UIEngineHost : IDisposable
                     var valueBinding = new ValueNodeBinding(
                         this,
                         handle,
-                        member.Id,
+                        member.Name,
                         member.ValueType,
                         ReflectionMetadata.CanRead(member.Member),
                         ReflectionMetadata.CanWrite(member.Member) &&
@@ -344,7 +344,7 @@ public sealed class UIEngineHost : IDisposable
                     members.Add(new LiveReferenceNode(new ReferenceNodeBinding(
                         this,
                         handle,
-                        member.Id,
+                        member.Name,
                         member.ValueType,
                         target => ReflectionMetadata.Read(member.Member, target)), member));
                     break;
@@ -352,7 +352,7 @@ public sealed class UIEngineHost : IDisposable
                     members.Add(new LiveCollectionNode(new CollectionNodeBinding(
                         this,
                         handle,
-                        member.Id,
+                        member.Name,
                         member.ValueType,
                         target => ReflectionMetadata.Read(member.Member, target)), member));
                     break;
@@ -364,7 +364,7 @@ public sealed class UIEngineHost : IDisposable
                     }
 
                     members.Add(new LiveMethodNode(
-                        new MethodNodeBinding(this, handle, member.Id, action.Value),
+                        new MethodNodeBinding(this, handle, member.Name, action.Value),
                         member));
                     break;
                 default:
@@ -378,7 +378,7 @@ public sealed class UIEngineHost : IDisposable
                 new ValueNodeBinding(
                     this,
                     handle,
-                    value.Id,
+                    value.Name,
                     value.ValueType,
                     canRead: true,
                     value.CanWrite,
@@ -402,12 +402,12 @@ public sealed class UIEngineHost : IDisposable
 
         return InteractionResult.Success(new LiveObjectNode(
             this,
-            id,
+            name,
             instance.GetType(),
             handle,
             identity,
             summary,
-            members.OrderBy(static member => member.Id, StringComparer.Ordinal).ToArray()));
+            members.OrderBy(static member => member.Name, StringComparer.Ordinal).ToArray()));
     }
 
     private static InteractionResult<string?> _NormalizeIdentity(string? value)

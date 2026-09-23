@@ -40,12 +40,12 @@ public sealed class TypeExposure<T> : TypeExposure
         }
 
         var duplicate = snapshot
-            .GroupBy(static value => value.Id, StringComparer.Ordinal)
+            .GroupBy(static value => value.Name, StringComparer.Ordinal)
             .FirstOrDefault(static group => group.Count() > 1)?.Key;
         if (duplicate is not null)
         {
             throw new ArgumentException(
-                $"Programmatic exposure contains duplicate value identifier '{duplicate}'.",
+                $"Programmatic exposure contains duplicate value name '{duplicate}'.",
                 nameof(values));
         }
 
@@ -67,26 +67,26 @@ public abstract class ValueExposure
 {
     private protected ValueExposure(
         Type objectType,
-        string id,
+        string name,
         Type valueType,
         bool canWrite,
         bool isNullable,
         IValueRange? range)
     {
-        if (string.IsNullOrWhiteSpace(id))
+        if (string.IsNullOrWhiteSpace(name))
         {
-            throw new ArgumentException("A value identifier cannot be empty or whitespace.", nameof(id));
+            throw new ArgumentException("A value name cannot be empty or whitespace.", nameof(name));
         }
 
         ObjectType = objectType;
-        Id = id;
+        Name = name;
         ValueType = valueType;
         CanWrite = canWrite;
         IsNullable = isNullable;
         Range = range;
     }
 
-    public string Id { get; }
+    public string Name { get; }
 
     public Type ValueType { get; }
 
@@ -110,14 +110,14 @@ public sealed class ValueExposure<T, TValue> : ValueExposure
     private readonly Action<T, TValue>? _Setter;
 
     public ValueExposure(
-        string id,
+        string name,
         Func<T, TValue> getter,
         Action<T, TValue>? setter = null,
         ValueRange<TValue>? range = null,
         bool? isNullable = null)
         : base(
             typeof(T),
-            id,
+            name,
             typeof(TValue),
             setter is not null,
             isNullable ?? _InferNullability(),

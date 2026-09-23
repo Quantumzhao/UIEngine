@@ -3,18 +3,18 @@ namespace UIEngine.Core;
 internal sealed class ReferenceNodeBinding(
     UIEngineHost host,
     Guid owner,
-    string id,
+    string name,
     Type referenceType,
     Func<object, object?> read)
 {
     public UIEngineHost Host { get; } = host;
 
-    public string Id { get; } = id;
+    public string Name { get; } = name;
 
     public Type ReferenceType { get; } = referenceType;
 
     public InteractionResult<Guid?> Read() => Host.Execute(
-        $"read reference {Id}",
+        $"read reference {Name}",
         () =>
         {
             var target = Host.ResolveTarget(owner);
@@ -33,7 +33,7 @@ internal sealed class ReferenceNodeBinding(
             {
                 return InteractionResult.Failure<Guid?>(
                     InteractionErrorCode.TYPE_MISMATCH,
-                    $"Reference '{Id}' returned a value type.");
+                    $"Reference '{Name}' returned a value type.");
             }
 
             var encountered = Host.GetOrCreateHandle(value);

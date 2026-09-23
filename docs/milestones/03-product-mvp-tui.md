@@ -58,7 +58,7 @@ and save or restore navigator layouts without domain-specific screens.
 
 The saved layout contains:
 
-- navigator identifiers and order;
+- navigator names and order;
 - current logical paths; and
 - stable placement, size, and selection configuration.
 
@@ -222,7 +222,7 @@ Add the frontend-neutral navigation session only after node and path behavior is
    - a selected registered root;
    - an absolute logical path; and
    - a supplied resolved-node occurrence through the location hand-off defined in Step 1.
-3. Give each navigator a stable identifier, an ordered entry stack, and one current entry.
+3. Give each navigator a stable name, an ordered entry stack, and one current entry.
 4. Navigate deeper by resolving and pushing a fresh node. Reject navigation from terminal nodes
    without changing the stack.
 5. Go back by permanently removing the current entry. Expose no forward history, and define the
@@ -249,8 +249,8 @@ Verification:
 
 Implement address persistence before building TUI save/restore commands.
 
-1. Define a small versioned layout DTO containing navigator identifiers, order, current paths, the
-   selected navigator identifier, and stable per-navigator presentation configuration.
+1. Define a small versioned layout DTO containing navigator names, order, current paths, the
+   selected navigator name, and stable per-navigator presentation configuration.
 2. Choose one bounded, serializable representation for TUI presentation configuration. Keep it
    opaque to Core and restrict the initial schema to placement and size fields required by this
    milestone.
@@ -263,14 +263,14 @@ Implement address persistence before building TUI save/restore commands.
 6. If any restored prefix cannot resolve, retain that prefix and each requested descendant as
    structured broken entries so repeated back navigation eventually reaches the deepest valid
    ancestor.
-7. Define deterministic handling for an unknown layout version, duplicate navigator identifiers,
-   an invalid selected identifier, empty layouts, and invalid presentation fields.
+7. Define deterministic handling for an unknown layout version, duplicate navigator names,
+   an invalid selected name, empty layouts, and invalid presentation fields.
 8. Keep JSON or other file storage in the caller/example layer; Core only creates and consumes the
    serializable snapshot.
 
 Verification:
 
-- Round-trip multi-navigator order, identifiers, paths, selection, placement, and size.
+- Round-trip multi-navigator order, names, paths, selection, placement, and size.
 - Restore mixed valid and broken navigators and navigate backward from a broken selected element to
   its valid collection.
 - Inspect serialized test data to prove excluded live state is absent.
@@ -309,7 +309,7 @@ Preserve the completed XenoAtom hosting boundary while changing its model source
    workspace when applicable. It never owns a caller-supplied host or workspace.
 3. Replace `InitialPath` with startup configuration that can create the initial navigator or load a
    supplied layout. Define the empty-workspace behavior without treating `/` as an object node.
-4. Maintain a TUI presentation record keyed by navigator identifier. Each record owns the current
+4. Maintain a TUI presentation record keyed by navigator name. Each record owns the current
    control.
 5. React to Core navigation notifications by creating one replacement control for a pushed/revealed
    entry and removing the departed control exactly once.
@@ -420,7 +420,7 @@ Verification:
 2. Expose save/load through caller-supplied callbacks or another explicit composition boundary so
    the reusable TUI library does not choose a filesystem location.
 3. Reconcile controls when a layout is loaded: retire removed presentations, retain navigator
-   identifiers from the snapshot, create fresh nodes and controls, and select the restored
+   names from the snapshot, create fresh nodes and controls, and select the restored
    navigator deterministically.
 4. Finish `Examples/CyclicWorld.Tui` as composition and manual-acceptance code only. Add no
    model-specific control or Core behavior to the executable.

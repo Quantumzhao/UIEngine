@@ -37,7 +37,7 @@
 ## Layout Persistence
 
 - [ ] Define a versioned workspace layout snapshot.
-- [ ] Persist navigator identifiers, order, paths, and stable presentation configuration.
+- [ ] Persist navigator names, order, paths, and stable presentation configuration.
 - [ ] Restore each navigator independently.
 - [ ] Preserve broken paths during restore.
 - [ ] Verify that live state, handles, nodes, controls, drafts, and running work are never persisted.

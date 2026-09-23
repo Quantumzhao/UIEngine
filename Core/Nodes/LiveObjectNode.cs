@@ -4,13 +4,13 @@ internal sealed class LiveObjectNode : BaseNode, IObjectNode
 {
     public LiveObjectNode(
         UIEngineHost host,
-        string id,
+        string name,
         Type valueType,
         Guid handle,
         string? domainIdentity,
         string? summary,
         IReadOnlyList<BaseNode> members)
-        : base(host, id, valueType)
+        : base(host, name, valueType)
     {
         Handle = handle;
         DomainIdentity = domainIdentity;

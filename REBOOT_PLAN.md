@@ -90,7 +90,7 @@ facets, and frontends choose controls from those semantics.
 ### 4. Add layout snapshots
 
 - Define a small versioned layout format.
-- Serialize navigator paths, order, identifiers, and stable presentation configuration.
+- Serialize navigator paths, order, names, and stable presentation configuration.
 - Restore each navigator independently and retain broken entries.
 - Keep file I/O outside Core.
 

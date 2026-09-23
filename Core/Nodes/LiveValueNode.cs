@@ -33,7 +33,7 @@ internal sealed class LiveValueNode : BaseNode, IDynamicInterfaceCastable
         ValueNodeBinding binding,
         ValueNodeSource source,
         Type? declaringType)
-        : base(binding.Host, binding.Id, binding.ValueType)
+        : base(binding.Host, binding.Name, binding.ValueType)
     {
         Binding = binding;
         DeclaringType = declaringType;

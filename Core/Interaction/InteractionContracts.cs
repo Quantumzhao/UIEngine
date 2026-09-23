@@ -27,10 +27,10 @@ public enum ValidationIssueCode
     RULE_FAILED,
 }
 
-/// <summary>Identifies one invalid member or action parameter.</summary>
+/// <summary>Names one invalid member or action parameter.</summary>
 public sealed record ValidationIssue(
     ValidationIssueCode Code,
-    string TargetId,
+    string TargetName,
     string Message);
 
 public sealed record InteractionError(

@@ -88,13 +88,13 @@ internal sealed class MethodNodeBinding
     public MethodNodeBinding(
         UIEngineHost host,
         Guid owner,
-        string id,
+        string name,
         ReflectedAction action)
     {
         _Host = host;
         _Owner = owner;
         _Action = action;
-        Id = id;
+        Name = name;
 
         var validation = new List<IReadOnlyList<ValidationAttribute>>();
         var parameters = new List<MethodParameter>();
@@ -125,7 +125,7 @@ internal sealed class MethodNodeBinding
 
     public UIEngineHost Host => _Host;
 
-    public string Id { get; }
+    public string Name { get; }
 
     public Type ReturnType => _Action.Method.ReturnType;
 
@@ -148,7 +148,7 @@ internal sealed class MethodNodeBinding
 
     public InteractionResult<ActionInvocation> Invoke(
         IReadOnlyDictionary<string, object?> arguments) => _Host.Execute(
-        $"invoke action {Id}",
+        $"invoke action {Name}",
         () =>
         {
             var target = _Host.ResolveTarget(_Owner);
@@ -158,12 +158,12 @@ internal sealed class MethodNodeBinding
             }
 
             var unknown = arguments.Keys.FirstOrDefault(name =>
-                Parameters.All(parameter => !StringComparer.Ordinal.Equals(parameter.Id, name)));
+                Parameters.All(parameter => !StringComparer.Ordinal.Equals(parameter.Name, name)));
             if (unknown is not null)
             {
                 return InteractionResult.Failure<ActionInvocation>(
                     InteractionErrorCode.INVALID_INPUT,
-                    $"Action '{Id}' has no parameter named '{unknown}'.");
+                    $"Action '{Name}' has no parameter named '{unknown}'.");
             }
 
             var bound = new object?[_Action.MethodParameters.Length];
@@ -171,17 +171,17 @@ internal sealed class MethodNodeBinding
             {
                 var metadata = Parameters[index];
                 var parameter = _Action.UserParameters[index];
-                if (!arguments.TryGetValue(metadata.Id, out var supplied))
+                if (!arguments.TryGetValue(metadata.Name, out var supplied))
                 {
                     if (metadata.IsRequired)
                     {
-                        var message = $"Required parameter '{metadata.Id}' was not supplied.";
+                        var message = $"Required parameter '{metadata.Name}' was not supplied.";
                         return InteractionResult.Failure<ActionInvocation>(
                             InteractionErrorCode.INVALID_INPUT,
                             message,
                             [new ValidationIssue(
                                 ValidationIssueCode.REQUIRED,
-                                metadata.Id,
+                                metadata.Name,
                                 message)]);
                     }
 
@@ -204,12 +204,12 @@ internal sealed class MethodNodeBinding
                     metadata.Range,
                     _ValidationAttributes[index],
                     target.Value,
-                    metadata.Id);
+                    metadata.Name);
                 if (issues.Count > 0)
                 {
                     return InteractionResult.Failure<ActionInvocation>(
                         InteractionErrorCode.VALIDATION_FAILED,
-                        $"Parameter '{metadata.Id}' failed validation.",
+                        $"Parameter '{metadata.Name}' failed validation.",
                         issues);
                 }
 

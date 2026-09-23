@@ -20,12 +20,12 @@ public sealed class RuntimeBehaviorTests
 
         Assert.True(resolved.IsSuccess);
         var members = ((IObjectNode)resolved.Value.Node).Members;
-        var count = Assert.Single(members, value => value.Id == "Count");
-        var name = Assert.Single(members, value => value.Id == "Name");
-        var optional = Assert.Single(members, value => value.Id == "Optional");
-        var state = Assert.Single(members, value => value.Id == "State");
-        var field = Assert.Single(members, value => value.Id == "Field");
-        var readOnly = Assert.Single(members, value => value.Id == "ReadOnly");
+        var count = Assert.Single(members, value => value.Name == "Count");
+        var name = Assert.Single(members, value => value.Name == "Name");
+        var optional = Assert.Single(members, value => value.Name == "Optional");
+        var state = Assert.Single(members, value => value.Name == "State");
+        var field = Assert.Single(members, value => value.Name == "Field");
+        var readOnly = Assert.Single(members, value => value.Name == "ReadOnly");
 
         Assert.False(count is INullableValueNode);
         Assert.True(optional is INullableValueNode);
@@ -99,7 +99,7 @@ public sealed class RuntimeBehaviorTests
         var resolved = host.ResolveRootNode("model");
         var members = ((IObjectNode)resolved.Value.Node).Members
             .Where(static member => member is ICollectionNode)
-            .ToDictionary(static member => member.Id, static member => (ICollectionNode)member);
+            .ToDictionary(static member => member.Name, static member => (ICollectionNode)member);
 
         var items = members["Items"].ReadEntries(0, 3);
         var dictionary = members["ByName"].ReadEntries(0, 3);
@@ -156,7 +156,7 @@ public sealed class RuntimeBehaviorTests
     [Fact]
     public void KeyAndIdentitySelectorsResolveReferenceEntries()
     {
-        var first = new _Identified("first");
+        var first = new _DomainObject("first");
         var model = new _SelectorModel(first);
         using var host = new UIEngineHost();
         host.SetRoot("model", model);
@@ -201,7 +201,7 @@ public sealed class RuntimeBehaviorTests
         var resolved = host.ResolveRootNode("model");
         var actions = ((IObjectNode)resolved.Value.Node).Members
             .Where(static member => member is IMethodNode)
-            .ToDictionary(static member => member.Id, static member => (IMethodNode)member);
+            .ToDictionary(static member => member.Name, static member => (IMethodNode)member);
 
         Assert.Null(actions["ObserveStatus"].Status);
         model.ReadInvocationStatus = () => actions["ObserveStatus"].Status;
@@ -241,7 +241,7 @@ public sealed class RuntimeBehaviorTests
         var resolved = host.ResolveRootNode("model");
         var wait = Assert.Single(
             ((IObjectNode)resolved.Value.Node).Members,
-            action => action.Id == "WaitAsync");
+            action => action.Name == "WaitAsync");
         var started = ((IMethodNode)wait).Invoke(new Dictionary<string, object?>());
 
         host.Dispose();
@@ -388,7 +388,7 @@ public sealed class RuntimeBehaviorTests
         private readonly int _Start = start;
 
         [Children]
-        public object?[] Items { get; } = [null, 7, new _Identified("entry")];
+        public object?[] Items { get; } = [null, 7, new _DomainObject("entry")];
 
         [Children]
         public Dictionary<string, object?> ByName { get; } = new()
@@ -409,22 +409,22 @@ public sealed class RuntimeBehaviorTests
         }
     }
 
-    private sealed class _Identified(string id)
+    private sealed class _DomainObject(string key)
     {
         [DomainIdentitySource]
-        public string DomainIdentity => $"item/{Id}";
+        public string DomainIdentity => $"item/{Key}";
 
         [Expose]
-        public string Id { get; } = id;
+        public string Key { get; } = key;
     }
 
-    private sealed class _SelectorModel(_Identified item)
+    private sealed class _SelectorModel(_DomainObject item)
     {
         [Children]
-        public Dictionary<string, _Identified> ByKey { get; } = new() { ["a"] = item };
+        public Dictionary<string, _DomainObject> ByKey { get; } = new() { ["a"] = item };
 
         [Children]
-        public IReadOnlyList<_Identified> Items { get; } = [item];
+        public IReadOnlyList<_DomainObject> Items { get; } = [item];
     }
 
     private sealed class _ActionModel

@@ -9,10 +9,10 @@ internal abstract class LiveReflectedMemberNode : BaseNode, IDynamicInterfaceCas
 
     private protected LiveReflectedMemberNode(
         UIEngineHost host,
-        string id,
+        string name,
         ReflectedMember member,
         Type valueType)
-        : base(host, id, valueType)
+        : base(host, name, valueType)
     {
         DeclaringType = member.Member.DeclaringType!;
         _Source = member.Member switch
@@ -75,7 +75,7 @@ internal abstract class LiveReflectedMemberNode : BaseNode, IDynamicInterfaceCas
 internal sealed class LiveReferenceNode(
     ReferenceNodeBinding binding,
     ReflectedMember member)
-    : LiveReflectedMemberNode(binding.Host, binding.Id, member, binding.ReferenceType), IReferenceNode
+    : LiveReflectedMemberNode(binding.Host, binding.Name, member, binding.ReferenceType), IReferenceNode
 {
     public Type ReferenceType => binding.ReferenceType;
 
@@ -85,7 +85,7 @@ internal sealed class LiveReferenceNode(
 internal sealed class LiveCollectionNode(
     CollectionNodeBinding binding,
     ReflectedMember member)
-    : LiveReflectedMemberNode(binding.Host, binding.Id, member, binding.CollectionType), ICollectionNode
+    : LiveReflectedMemberNode(binding.Host, binding.Name, member, binding.CollectionType), ICollectionNode
 {
     public Type ElementType => binding.ElementType;
 
@@ -103,7 +103,7 @@ internal sealed class LiveMethodNode : LiveReflectedMemberNode, IMethodNode
     private readonly MethodNodeBinding _Binding;
 
     public LiveMethodNode(MethodNodeBinding binding, ReflectedMember member)
-        : base(binding.Host, binding.Id, member, binding.ReturnType)
+        : base(binding.Host, binding.Name, member, binding.ReturnType)
     {
         _Binding = binding;
     }

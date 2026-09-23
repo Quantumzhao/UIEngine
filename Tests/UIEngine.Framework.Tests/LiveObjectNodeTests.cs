@@ -25,14 +25,14 @@ public sealed class LiveObjectNodeTests
         Assert.Equal(handle, firstObject.Handle);
         Assert.Equal("model summary", firstObject.Summary);
         Assert.Equal(typeof(_Model), first.Value.Node.ValueType);
-        Assert.DoesNotContain(firstObject.Members, static node => node.Id == nameof(_Model.Hidden));
+        Assert.DoesNotContain(firstObject.Members, static node => node.Name == nameof(_Model.Hidden));
         Assert.Equal(
-            firstObject.Members.Select(static node => node.Id),
-            secondObject.Members.Select(static node => node.Id));
+            firstObject.Members.Select(static node => node.Name),
+            secondObject.Members.Select(static node => node.Name));
         Assert.All(firstObject.Members.Zip(secondObject.Members),
             static pair => Assert.NotSame(pair.First, pair.Second));
 
-        var members = firstObject.Members.ToDictionary(static node => node.Id);
+        var members = firstObject.Members.ToDictionary(static node => node.Name);
         var child = members[nameof(_Model.Child)];
         Assert.True(child is IReferenceNode);
         Assert.True(child is IPropertyNode);
@@ -78,10 +78,8 @@ public sealed class LiveObjectNodeTests
     {
         using var host = new UIEngineHost();
 
-        var invalid = host.ResolveRootNode(" ");
         var missing = host.ResolveRootNode("missing");
 
-        Assert.Equal(InteractionErrorCode.INVALID_INPUT, invalid.Error?.Code);
         Assert.Equal(InteractionErrorCode.NOT_FOUND, missing.Error?.Code);
     }
 

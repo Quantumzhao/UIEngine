@@ -80,7 +80,7 @@ internal static class ValueConversion
         IValueRange? range,
         IReadOnlyList<ValidationAttribute> attributes,
         object? instance,
-        string targetId)
+        string targetName)
     {
         var issues = new List<ValidationIssue>();
         if (value is null && !isNullable &&
@@ -88,8 +88,8 @@ internal static class ValueConversion
         {
             issues.Add(new ValidationIssue(
                 ValidationIssueCode.NULL_NOT_ALLOWED,
-                targetId,
-                $"'{targetId}' does not allow null."));
+                targetName,
+                $"'{targetName}' does not allow null."));
         }
 
         if (value is not null && options.Count > 0 &&
@@ -97,16 +97,16 @@ internal static class ValueConversion
         {
             issues.Add(new ValidationIssue(
                 ValidationIssueCode.NOT_IN_SELECTION,
-                targetId,
-                $"'{targetId}' must be one of its declared options."));
+                targetName,
+                $"'{targetName}' must be one of its declared options."));
         }
 
         if (value is not null && range is not null && !_IsInRange(value, range))
         {
             issues.Add(new ValidationIssue(
                 ValidationIssueCode.OUT_OF_RANGE,
-                targetId,
-                $"'{targetId}' must be between {range.Minimum} and {range.Maximum}."));
+                targetName,
+                $"'{targetName}' must be between {range.Minimum} and {range.Maximum}."));
         }
 
         foreach (var attribute in attributes)
@@ -118,8 +118,8 @@ internal static class ValueConversion
 
             var context = new ValidationContext(instance ?? new object())
             {
-                MemberName = targetId,
-                DisplayName = targetId,
+                MemberName = targetName,
+                DisplayName = targetName,
             };
             ValidationResult? result;
             try
@@ -130,8 +130,8 @@ internal static class ValueConversion
             {
                 issues.Add(new ValidationIssue(
                     ValidationIssueCode.RULE_FAILED,
-                    targetId,
-                    $"Validation rule '{attribute.GetType().Name}' failed for '{targetId}'."));
+                    targetName,
+                    $"Validation rule '{attribute.GetType().Name}' failed for '{targetName}'."));
                 continue;
             }
 
@@ -146,8 +146,8 @@ internal static class ValueConversion
                     : attribute is RangeAttribute
                         ? ValidationIssueCode.OUT_OF_RANGE
                         : ValidationIssueCode.RULE_FAILED,
-                targetId,
-                result?.ErrorMessage ?? $"'{targetId}' did not satisfy its validation rule."));
+                targetName,
+                result?.ErrorMessage ?? $"'{targetName}' did not satisfy its validation rule."));
         }
 
         return issues;

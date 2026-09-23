@@ -16,7 +16,7 @@ internal enum ReflectedMemberKind
 }
 
 internal sealed record ReflectedMember(
-    string Id,
+    string Name,
     ReflectedMemberKind Kind,
     MemberInfo Member,
     Type ValueType,
@@ -108,7 +108,7 @@ internal static class ReflectionMetadata
             .OrderBy(static member => member.Name, StringComparer.Ordinal)
             .ThenBy(_Signature, StringComparer.Ordinal)
             .ToArray();
-        var usedIds = new HashSet<string>(StringComparer.Ordinal);
+        var usedNames = new HashSet<string>(StringComparer.Ordinal);
         var members = new List<ReflectedMember>();
         foreach (var member in candidates)
         {
@@ -125,10 +125,10 @@ internal static class ReflectionMetadata
                 continue;
             }
 
-            var id = member.Name;
-            for (var suffix = 2; !usedIds.Add(id); suffix++)
+            var name = member.Name;
+            for (var suffix = 2; !usedNames.Add(name); suffix++)
             {
-                id = $"{member.Name}#{suffix}";
+                name = $"{member.Name}#{suffix}";
             }
 
             var kind = member is MethodInfo
@@ -145,7 +145,7 @@ internal static class ReflectionMetadata
                     new ValueRange<object>(attribute.Minimum, attribute.Maximum))
                 .FirstOrDefault();
             members.Add(new ReflectedMember(
-                id,
+                name,
                 kind,
                 member,
                 memberType,
