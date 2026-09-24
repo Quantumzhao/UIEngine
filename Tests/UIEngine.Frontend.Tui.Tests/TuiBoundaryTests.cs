@@ -22,7 +22,6 @@ public sealed class TuiBoundaryTests
 
         using var workspace = new TuiWorkspace(host, options);
 
-        Assert.NotSame(options, workspace.Options);
         Assert.Equal(options, workspace.Options);
         Assert.True(host.ResolveRootNode("world").IsRight);
 

@@ -12,9 +12,9 @@ prototypes that need generated user interfaces over live state.
 ## Architecture
 
 `UIEngineHost` owns registered roots and access to the live domain graph. An
-`UIEngineWorkspace` owns an ordered collection of independent `Navigator`s. Each navigator holds
-one navigation stack whose current entry contains a logical path and a freshly resolved
-`BaseNode`.
+`UIEngineWorkspace` owns an ordered collection of independent `Navigator`s. Each navigator tracks
+one stack of logical paths alongside `Either<InteractionError, Option<BaseNode>>` resolution
+results.
 
 `BaseNode` is frontend-neutral. Its concrete types and semantic interfaces describe .NET
 language features rather than controls. Names follow those features—for example, `PropertyNode`,

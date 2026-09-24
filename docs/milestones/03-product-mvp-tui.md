@@ -135,8 +135,8 @@ Before moving behavior, define and test the smallest public contracts needed by 
 4. [x] Define a resolved-node envelope or equivalent Core-owned location token. It must carry the
    canonical path beside a node, allow a workspace to start from an already resolved occurrence,
    and still keep logical paths off the node itself.
-5. [x] Define `NavigationEntry` as path plus either a fresh node or a structured resolution failure.
-   A broken entry is navigation state, not a fake node kind.
+5. [x] Model navigator entries directly as `Either<InteractionError, Option<BaseNode>>`, with
+   their logical paths tracked separately. A broken entry is navigation state, not a fake node kind.
 6. [x] Define synchronous mutation results and frontend-neutral change notifications for navigator add,
    navigate, back, duplicate, reorder, and remove operations. Notifications must let the TUI
    retire exactly the control and scope associated with a removed entry without exposing toolkit

@@ -11,3 +11,10 @@ internal static class EitherTestExtensions
         Right: static _ => throw new InvalidOperationException("Expected a Left value."),
         Left: static error => error);
 }
+
+internal static class OptionTestExtensions
+{
+    public static T SomeValue<T>(this Option<T> option) => option.Match(
+        Some: static value => value,
+        None: static () => throw new InvalidOperationException("Expected a Some value."));
+}

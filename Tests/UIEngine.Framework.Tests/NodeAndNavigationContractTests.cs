@@ -62,16 +62,14 @@ public sealed class NodeAndNavigationContractTests
     }
 
     [Fact]
-    public void BrokenEntryCarriesFailureInsteadOfFakeNode()
+    public void NavigationEntriesUseEitherWithoutAWrapperType()
     {
-        var path = _Path(_Member("missing"));
-        var error = new InteractionError(InteractionErrorCode.NOT_FOUND, "Missing node.");
-        var entry = new NavigationEntry(path, error);
-
-        Assert.False(entry.IsResolved);
-        Assert.Null(entry.Node);
-        Assert.Same(error, entry.Error);
-        Assert.Equal(path, entry.Path);
+        Assert.Equal(
+            typeof(Either<InteractionError, Option<BaseNode>>),
+            typeof(Navigator).GetProperty(nameof(Navigator.CurrentEntry))!.PropertyType);
+        Assert.DoesNotContain(
+            typeof(Navigator).Assembly.GetExportedTypes(),
+            static type => type.Name == "NavigationEntry");
     }
 
     [Fact]
@@ -79,18 +77,24 @@ public sealed class NodeAndNavigationContractTests
     {
         using var host = new UIEngineHost();
         var navigatorId = Guid.NewGuid();
-        var oldEntry = new NavigationEntry(
-            _Path(_Member("model"), _Member("Name")),
-            new _ProgrammaticStringNode(host));
-        var currentEntry = new NavigationEntry(
-            _Path(_Member("model")),
-            new _ObjectNode(host));
-        var change = new NavigationPoppedChange(navigatorId, oldEntry, currentEntry);
+        var oldNode = new _ProgrammaticStringNode(host);
+        var oldPath = _Path(_Member("model"), _Member("Name"));
+        Either<InteractionError, Option<BaseNode>> oldEntry = Right(Some<BaseNode>(oldNode));
+        var currentPath = _Path(_Member("model"));
+        Either<InteractionError, Option<BaseNode>> currentEntry =
+            Right(Some<BaseNode>(new _ObjectNode(host)));
+        var change = new NavigationPoppedChange(
+            navigatorId,
+            oldPath,
+            oldEntry,
+            currentPath,
+            currentEntry);
         var notification = new WorkspaceChangedEventArgs(change);
 
         Assert.Same(change, notification.Change);
-        Assert.Same(oldEntry, change.RemovedEntry);
-        Assert.Same(currentEntry, change.CurrentEntry);
+        Assert.Same(oldNode, change.RemovedEntry.RightValue().SomeValue());
+        Assert.Equal(oldPath, change.RemovedPath);
+        Assert.Equal(currentPath, change.CurrentPath);
     }
 
     [Fact]

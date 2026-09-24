@@ -1,3 +1,5 @@
+using LanguageExt;
+
 namespace UIEngine.Core;
 
 /// <summary>
@@ -19,30 +21,6 @@ public sealed class ResolvedNode
     internal UIEngineHost Host => Node.Host;
 }
 
-/// <summary>A navigator stack entry containing either a resolved node or one structured failure.</summary>
-public sealed class NavigationEntry
-{
-    internal NavigationEntry(LogicalPath path, BaseNode node)
-    {
-        Path = path;
-        Node = node;
-    }
-
-    internal NavigationEntry(LogicalPath path, InteractionError error)
-    {
-        Path = path;
-        Error = error;
-    }
-
-    public LogicalPath Path { get; }
-
-    public BaseNode? Node { get; }
-
-    public InteractionError? Error { get; }
-
-    public bool IsResolved => Node is not null;
-}
-
 /// <summary>
 /// Describes one committed navigator mutation. Implementations publish the same instance as the
 /// successful mutation result and in their change notification.
@@ -52,25 +30,30 @@ public abstract record WorkspaceChange(Guid NavigatorId);
 public sealed record NavigatorAddedChange(
     Guid NavigatorId,
     int Index,
-    NavigationEntry InitialEntry)
+    LogicalPath InitialPath,
+    Either<InteractionError, Option<BaseNode>> InitialEntry)
     : WorkspaceChange(NavigatorId);
 
 public sealed record NavigationPushedChange(
     Guid NavigatorId,
-    NavigationEntry Entry)
+    LogicalPath Path,
+    Either<InteractionError, Option<BaseNode>> Entry)
     : WorkspaceChange(NavigatorId);
 
 public sealed record NavigationPoppedChange(
     Guid NavigatorId,
-    NavigationEntry RemovedEntry,
-    NavigationEntry CurrentEntry)
+    LogicalPath RemovedPath,
+    Either<InteractionError, Option<BaseNode>> RemovedEntry,
+    LogicalPath CurrentPath,
+    Either<InteractionError, Option<BaseNode>> CurrentEntry)
     : WorkspaceChange(NavigatorId);
 
 public sealed record NavigatorDuplicatedChange(
     Guid SourceNavigatorId,
     Guid NavigatorId,
     int Index,
-    NavigationEntry InitialEntry)
+    LogicalPath InitialPath,
+    Either<InteractionError, Option<BaseNode>> InitialEntry)
     : WorkspaceChange(NavigatorId);
 
 public sealed record NavigatorReorderedChange(
@@ -82,7 +65,8 @@ public sealed record NavigatorReorderedChange(
 public sealed record NavigatorRemovedChange(
     Guid NavigatorId,
     int PreviousIndex,
-    IReadOnlyList<NavigationEntry> RemovedEntries)
+    IReadOnlyList<LogicalPath> RemovedPaths,
+    IReadOnlyList<Either<InteractionError, Option<BaseNode>>> RemovedEntries)
     : WorkspaceChange(NavigatorId);
 
 /// <summary>Event data for a committed, frontend-neutral workspace change.</summary>
