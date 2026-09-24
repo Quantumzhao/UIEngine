@@ -1,5 +1,7 @@
 using System.Globalization;
+using LanguageExt;
 using UIEngine.Core;
+using static LanguageExt.Prelude;
 
 namespace UIEngine.Frontend.Cli;
 
@@ -45,13 +47,13 @@ internal sealed class CliSession : IDisposable
         }
 
         var tokenResult = CliTokenizer.Tokenize(line);
-        if (!tokenResult.IsSuccess)
+        if (!tokenResult.IsRight)
         {
-            _WriteFailure(tokenResult.Error!);
+            _WriteFailure((InteractionError)tokenResult);
             return true;
         }
 
-        var tokens = tokenResult.Value;
+        var tokens = tokenResult.IfLeft(static _ => System.Array.Empty<string>());
         if (tokens.Count == 0)
         {
             return true;
@@ -158,13 +160,13 @@ internal sealed class CliSession : IDisposable
         }
 
         var resolved = _GetCurrentObjectNode();
-        if (!resolved.IsSuccess)
+        if (!resolved.IsRight)
         {
-            _WriteFailure(resolved.Error!);
+            _WriteFailure((InteractionError)resolved);
             return;
         }
 
-        foreach (var member in ((IObjectNode)resolved.Value).Members
+        foreach (var member in ((IObjectNode)(BaseNode)resolved).Members
                      .OrderBy(_GetNodeOrder)
                      .ThenBy(static member => member.Name, StringComparer.Ordinal))
         {
@@ -175,9 +177,9 @@ internal sealed class CliSession : IDisposable
     private void _ListCollection(IReadOnlyList<string> tokens)
     {
         var options = _ParseCollectionOptions(tokens);
-        if (!options.IsSuccess)
+        if (!options.IsRight)
         {
-            _WriteFailure(options.Error!);
+            _WriteFailure((InteractionError)options);
             return;
         }
 
@@ -185,25 +187,26 @@ internal sealed class CliSession : IDisposable
             tokens[1],
             static member => member is ICollectionNode,
             "collection");
-        if (!resolved.IsSuccess)
+        if (!resolved.IsRight)
         {
-            _WriteFailure(resolved.Error!);
+            _WriteFailure((InteractionError)resolved);
             return;
         }
 
-        var collection = (ICollectionNode)resolved.Value;
+        var collection = (ICollectionNode)(BaseNode)resolved;
+        var collectionOptions = (_CollectionOptions)options;
         var read = collection.ReadEntries(
-            options.Value.Offset,
-            options.Value.Limit ?? DEFAULT_COLLECTION_LIMIT);
-        if (!read.IsSuccess)
+            collectionOptions.Offset,
+            collectionOptions.Limit ?? DEFAULT_COLLECTION_LIMIT);
+        if (!read.IsRight)
         {
-            _WriteFailure(read.Error!);
+            _WriteFailure((InteractionError)read);
             return;
         }
 
-        var slice = read.Value;
+        var slice = (CollectionSlice)read;
         _Output.WriteLine(
-            $"collection {resolved.Value.Name} offset={slice.Offset} count={slice.Entries.Count} " +
+            $"collection {((BaseNode)resolved).Name} offset={slice.Offset} count={slice.Entries.Count} " +
             $"total={_FormatValue(slice.TotalCount)} hasMore={slice.HasMore}");
         foreach (var entry in slice.Entries)
         {
@@ -241,20 +244,21 @@ internal sealed class CliSession : IDisposable
         }
 
         var path = CliLogicalPathParser.Parse(tokens[1]);
-        if (!path.IsSuccess)
+        if (!path.IsRight)
         {
-            _WriteFailure(path.Error!);
+            _WriteFailure((InteractionError)path);
             return;
         }
 
-        var resolution = _Host.ResolvePath(path.Value);
-        if (!resolution.IsSuccess)
+        var resolution = _Host.ResolvePath((LogicalPath)path);
+        if (!resolution.IsRight)
         {
-            _WriteFailure(resolution.Error!);
+            _WriteFailure((InteractionError)resolution);
             return;
         }
 
-        if (!resolution.Value.IsObject)
+        var resolvedPath = (ResolvedPath)resolution;
+        if (!resolvedPath.IsObject)
         {
             _WriteFailure(
                 InteractionErrorCode.INVALID_INPUT,
@@ -262,14 +266,14 @@ internal sealed class CliSession : IDisposable
             return;
         }
 
-        var captured = _CaptureLocations(resolution.Value.ResolutionChain);
-        if (!captured.IsSuccess)
+        var captured = _CaptureLocations(resolvedPath.ResolutionChain);
+        if (!captured.IsRight)
         {
-            _WriteFailure(captured.Error!);
+            _WriteFailure((InteractionError)captured);
             return;
         }
 
-        _Locations = captured.Value;
+        _Locations = (List<_LocationBinding>)captured;
         _Output.WriteLine(CurrentPath);
     }
 
@@ -281,13 +285,13 @@ internal sealed class CliSession : IDisposable
         }
 
         var resolved = _GetCurrentObjectNode();
-        if (!resolved.IsSuccess)
+        if (!resolved.IsRight)
         {
-            _WriteFailure(resolved.Error!);
+            _WriteFailure((InteractionError)resolved);
             return;
         }
 
-        var node = resolved.Value;
+        var node = (BaseNode)resolved;
         var objectNode = (IObjectNode)node;
         _Output.WriteLine($"path: {CurrentPath}");
         _Output.WriteLine($"type: {node.ValueType.FullName ?? node.ValueType.Name}");
@@ -349,20 +353,22 @@ internal sealed class CliSession : IDisposable
             tokens[1],
             static member => member is IReadableValueNode,
             "readable value");
-        if (!resolved.IsSuccess)
+        if (!resolved.IsRight)
         {
-            _WriteFailure(resolved.Error!);
+            _WriteFailure((InteractionError)resolved);
             return;
         }
 
-        var read = ((IReadableValueNode)resolved.Value).ReadValue();
-        if (!read.IsSuccess)
+        var resolvedNode = (BaseNode)resolved;
+        var read = ((IReadableValueNode)resolvedNode).ReadValue();
+        if (!read.IsRight)
         {
-            _WriteFailure(read.Error!);
+            _WriteFailure((InteractionError)read);
             return;
         }
 
-        _Output.WriteLine($"{resolved.Value.Name} = {_FormatValue(read.Value)}");
+        var value = ((Option<object>)read).IfNoneUnsafe((object?)null);
+        _Output.WriteLine($"{resolvedNode.Name} = {_FormatValue(value)}");
     }
 
     private void _Set(IReadOnlyList<string> tokens)
@@ -376,20 +382,22 @@ internal sealed class CliSession : IDisposable
             tokens[1],
             static member => member is IWritableValueNode,
             "writable value");
-        if (!resolved.IsSuccess)
+        if (!resolved.IsRight)
         {
-            _WriteFailure(resolved.Error!);
+            _WriteFailure((InteractionError)resolved);
             return;
         }
 
-        var write = ((IWritableValueNode)resolved.Value).WriteValue(tokens[2]);
-        if (!write.IsSuccess)
+        var resolvedNode = (BaseNode)resolved;
+        var write = ((IWritableValueNode)resolvedNode).WriteValue(tokens[2]);
+        if (!write.IsRight)
         {
-            _WriteFailure(write.Error!);
+            _WriteFailure((InteractionError)write);
             return;
         }
 
-        _Output.WriteLine($"{resolved.Value.Name} = {_FormatValue(write.Value)}");
+        var value = ((Option<object>)write).IfNoneUnsafe((object?)null);
+        _Output.WriteLine($"{resolvedNode.Name} = {_FormatValue(value)}");
     }
 
     private async Task _CallAsync(IReadOnlyList<string> tokens)
@@ -401,9 +409,9 @@ internal sealed class CliSession : IDisposable
         }
 
         var arguments = _ParseArguments(tokens);
-        if (!arguments.IsSuccess)
+        if (!arguments.IsRight)
         {
-            _WriteFailure(arguments.Error!);
+            _WriteFailure((InteractionError)arguments);
             return;
         }
 
@@ -411,34 +419,42 @@ internal sealed class CliSession : IDisposable
             tokens[1],
             static member => member is IMethodNode,
             "action");
-        if (!resolved.IsSuccess)
+        if (!resolved.IsRight)
         {
-            _WriteFailure(resolved.Error!);
+            _WriteFailure((InteractionError)resolved);
             return;
         }
 
-        var action = (IMethodNode)resolved.Value;
-        var started = action.Invoke(arguments.Value);
-        if (!started.IsSuccess)
+        var resolvedNode = (BaseNode)resolved;
+        var action = (IMethodNode)resolvedNode;
+        var parsedArguments = arguments.IfLeft(
+            static _ => new Dictionary<string, object?>());
+        var started = action.Invoke(parsedArguments);
+        if (!started.IsRight)
         {
-            _WriteFailure(started.Error!);
+            _WriteFailure((InteractionError)started);
             return;
         }
 
         var result = await action.ResultTask!;
 
-        if (!result.IsSuccess)
+        if (!result.IsRight)
         {
-            _WriteFailure(result.Error!);
+            _WriteFailure((InteractionError)result);
             return;
         }
 
-        _Output.WriteLine($"{resolved.Value.Name} => {_FormatValue(result.Value)}");
+        var value = ((Option<object>)result).IfNoneUnsafe((object?)null);
+        _Output.WriteLine($"{resolvedNode.Name} => {_FormatValue(value)}");
     }
 
     private string[] _GetNavigationCompletions()
     {
-        var completions = new HashSet<string>(StringComparer.Ordinal) { "/", ".." };
+        var completions = new System.Collections.Generic.HashSet<string>(StringComparer.Ordinal)
+        {
+            "/",
+            "..",
+        };
         foreach (var root in _Host.Roots)
         {
             completions.Add(LogicalPath.Root.Append(root.Name).ToString());
@@ -447,10 +463,10 @@ internal sealed class CliSession : IDisposable
         if (CurrentHandle is not null)
         {
             var resolved = _GetCurrentObjectNode();
-            if (resolved.IsSuccess)
+            if (resolved.IsRight)
             {
                 var current = _Locations[^1].Path;
-                foreach (var member in ((IObjectNode)resolved.Value).Members
+                foreach (var member in ((IObjectNode)(BaseNode)resolved).Members
                              .Where(static member => member is IReferenceNode or ICollectionNode))
                 {
                     completions.Add(current.Append(member.Name).ToString());
@@ -464,8 +480,8 @@ internal sealed class CliSession : IDisposable
     private string[] _GetValueCompletions(bool writableOnly)
     {
         var resolved = _GetCurrentObjectNode();
-        return resolved.IsSuccess
-            ? ((IObjectNode)resolved.Value).Members
+        return resolved.IsRight
+            ? ((IObjectNode)(BaseNode)resolved).Members
                 .Where(_IsValueNode)
                 .Where(value => !writableOnly || value is IWritableValueNode)
                 .Select(static value => value.Name)
@@ -477,8 +493,9 @@ internal sealed class CliSession : IDisposable
     private string[] _GetCollectionCompletions()
     {
         var resolved = _GetCurrentObjectNode();
-        return resolved.IsSuccess
-            ? ((IObjectNode)resolved.Value).Members.Where(static member => member is ICollectionNode)
+        return resolved.IsRight
+            ? ((IObjectNode)(BaseNode)resolved).Members
+                .Where(static member => member is ICollectionNode)
                 .Select(static collection => collection.Name)
                 .OrderBy(static value => value, StringComparer.Ordinal)
                 .ToArray()
@@ -489,12 +506,12 @@ internal sealed class CliSession : IDisposable
         string[] completedTokens)
     {
         var resolved = _GetCurrentObjectNode();
-        if (!resolved.IsSuccess)
+        if (!resolved.IsRight)
         {
             return [];
         }
 
-        var actions = ((IObjectNode)resolved.Value).Members
+        var actions = ((IObjectNode)(BaseNode)resolved).Members
             .Where(static member => member is IMethodNode);
         if (completedTokens.Length == 1)
         {
@@ -520,81 +537,82 @@ internal sealed class CliSession : IDisposable
             .ToArray();
     }
 
-    private InteractionResult<BaseNode> _GetCurrentObjectNode()
+    private Either<InteractionError, BaseNode> _GetCurrentObjectNode()
     {
         if (_Locations.Count == 0)
         {
-            return InteractionResult.Failure<BaseNode>(
+            return Left(new InteractionError(
                 InteractionErrorCode.UNAVAILABLE,
-                "No object is selected. Use 'cd /<root>' first.");
+                "No object is selected. Use 'cd /<root>' first."));
         }
 
         var location = _Locations[^1];
         var resolution = _Host.ResolvePath(location.Path);
-        if (!resolution.IsSuccess)
+        if (!resolution.IsRight)
         {
-            return _Failure<BaseNode>(resolution.Error!);
+            return _Failure<BaseNode>((InteractionError)resolution);
         }
 
-        if (resolution.Value.Node is not IObjectNode objectNode)
+        var resolvedPath = (ResolvedPath)resolution;
+        if (resolvedPath.Node is not IObjectNode objectNode)
         {
-            return InteractionResult.Failure<BaseNode>(
+            return Left(new InteractionError(
                 InteractionErrorCode.INVALID_INPUT,
-                "The current path no longer identifies a navigable object.");
+                "The current path no longer identifies a navigable object."));
         }
 
-        var typeName = resolution.Value.Node.ValueType.FullName ?? resolution.Value.Node.ValueType.Name;
+        var typeName = resolvedPath.Node.ValueType.FullName ?? resolvedPath.Node.ValueType.Name;
         if (!StringComparer.Ordinal.Equals(location.TypeName, typeName))
         {
-            return InteractionResult.Failure<BaseNode>(
+            return Left(new InteractionError(
                 InteractionErrorCode.TYPE_MISMATCH,
-                "The current path resolved to an incompatible object type.");
+                "The current path resolved to an incompatible object type."));
         }
 
         _Locations[^1] = location with
         {
-            Path = resolution.Value.CanonicalPath,
+            Path = resolvedPath.CanonicalPath,
             LastResolvedHandle = objectNode.Handle,
         };
-        return InteractionResult.Success(resolution.Value.Node);
+        return Right(resolvedPath.Node);
     }
 
-    private InteractionResult<BaseNode> _ResolveMember(
+    private Either<InteractionError, BaseNode> _ResolveMember(
         string memberName,
         Func<BaseNode, bool> matchesExpectedFacet,
         string expectedKind)
     {
         var resolved = _GetCurrentObjectNode();
-        if (!resolved.IsSuccess)
+        if (!resolved.IsRight)
         {
             return resolved;
         }
 
-        var members = ((IObjectNode)resolved.Value).Members
+        var members = ((IObjectNode)(BaseNode)resolved).Members
             .Where(member => StringComparer.Ordinal.Equals(member.Name, memberName))
             .ToArray();
         if (members.Length == 0)
         {
-            return InteractionResult.Failure<BaseNode>(
+            return Left(new InteractionError(
                 InteractionErrorCode.NOT_FOUND,
-                $"Member '{memberName}' was not found.");
+                $"Member '{memberName}' was not found."));
         }
 
         if (members.Length > 1)
         {
-            return InteractionResult.Failure<BaseNode>(
+            return Left(new InteractionError(
                 InteractionErrorCode.AMBIGUOUS,
-                $"Member '{memberName}' is ambiguous.");
+                $"Member '{memberName}' is ambiguous."));
         }
 
         return matchesExpectedFacet(members[0])
-            ? InteractionResult.Success(members[0])
-            : InteractionResult.Failure<BaseNode>(
+            ? Right(members[0])
+            : Left(new InteractionError(
                 InteractionErrorCode.TYPE_MISMATCH,
-                $"Member '{memberName}' is not a {expectedKind}.");
+                $"Member '{memberName}' is not a {expectedKind}."));
     }
 
-    private static InteractionResult<List<_LocationBinding>> _CaptureLocations(
+    private static Either<InteractionError, List<_LocationBinding>> _CaptureLocations(
         IReadOnlyList<ResolvedNode> resolutionChain)
     {
         var captured = new List<_LocationBinding>(resolutionChain.Count);
@@ -611,30 +629,30 @@ internal sealed class CliSession : IDisposable
                 objectNode.Handle));
         }
 
-        return InteractionResult.Success(captured);
+        return Right(captured);
     }
 
-    private static InteractionResult<_CollectionOptions> _ParseCollectionOptions(
+    private static Either<InteractionError, _CollectionOptions> _ParseCollectionOptions(
         IReadOnlyList<string> tokens)
     {
         if (tokens.Count < 2)
         {
-            return InteractionResult.Failure<_CollectionOptions>(
+            return Left(new InteractionError(
                 InteractionErrorCode.INVALID_INPUT,
-                "Usage: ls <collection> [offset=<n>] [limit=<n>]");
+                "Usage: ls <collection> [offset=<n>] [limit=<n>]"));
         }
 
         long offset = 0;
         int? limit = null;
-        var supplied = new HashSet<string>(StringComparer.Ordinal);
+        var supplied = new System.Collections.Generic.HashSet<string>(StringComparer.Ordinal);
         for (var index = 2; index < tokens.Count; index++)
         {
             var pair = tokens[index].Split('=', 2);
             if (pair.Length != 2 || !supplied.Add(pair[0]))
             {
-                return InteractionResult.Failure<_CollectionOptions>(
+                return Left(new InteractionError(
                     InteractionErrorCode.INVALID_INPUT,
-                    $"Collection option '{tokens[index]}' is malformed or duplicated.");
+                    $"Collection option '{tokens[index]}' is malformed or duplicated."));
             }
 
             switch (pair[0])
@@ -654,16 +672,16 @@ internal sealed class CliSession : IDisposable
                     limit = parsedLimit;
                     break;
                 default:
-                    return InteractionResult.Failure<_CollectionOptions>(
+                    return Left(new InteractionError(
                         InteractionErrorCode.INVALID_INPUT,
-                        $"Unknown or invalid collection option '{tokens[index]}'.");
+                        $"Unknown or invalid collection option '{tokens[index]}'."));
             }
         }
 
-        return InteractionResult.Success(new _CollectionOptions(offset, limit));
+        return Right(new _CollectionOptions(offset, limit));
     }
 
-    private static InteractionResult<IReadOnlyDictionary<string, object?>> _ParseArguments(
+    private static Either<InteractionError, IReadOnlyDictionary<string, object?>> _ParseArguments(
         IReadOnlyList<string> tokens)
     {
         var arguments = new Dictionary<string, object?>(StringComparer.Ordinal);
@@ -672,22 +690,22 @@ internal sealed class CliSession : IDisposable
             var separator = tokens[index].IndexOf('=');
             if (separator <= 0)
             {
-                return InteractionResult.Failure<IReadOnlyDictionary<string, object?>>(
+                return Left(new InteractionError(
                     InteractionErrorCode.INVALID_INPUT,
-                    $"Argument '{tokens[index]}' must use name=value syntax.");
+                    $"Argument '{tokens[index]}' must use name=value syntax."));
             }
 
             var name = tokens[index][..separator];
             var value = tokens[index][(separator + 1)..];
             if (!arguments.TryAdd(name, value))
             {
-                return InteractionResult.Failure<IReadOnlyDictionary<string, object?>>(
+                return Left(new InteractionError(
                     InteractionErrorCode.INVALID_INPUT,
-                    $"Argument '{name}' was supplied more than once.");
+                    $"Argument '{name}' was supplied more than once."));
             }
         }
 
-        return InteractionResult.Success<IReadOnlyDictionary<string, object?>>(arguments);
+        return Right((IReadOnlyDictionary<string, object?>)arguments);
     }
 
     private bool _HasArity(IReadOnlyList<string> tokens, int expected, string usage)
@@ -701,8 +719,8 @@ internal sealed class CliSession : IDisposable
         return false;
     }
 
-    private static InteractionResult<T> _Failure<T>(InteractionError error) =>
-        InteractionResult.Failure<T>(error.Code, error.Message, error.Issues);
+    private static Either<InteractionError, T> _Failure<T>(InteractionError error) =>
+        Left(error);
 
     private void _WriteFailure(InteractionError error)
     {

@@ -1,7 +1,9 @@
 using System.Reflection;
 using System.Runtime.CompilerServices;
+using LanguageExt;
 using Microsoft.Extensions.Logging;
 using UIEngine.Core.Attributes;
+using static LanguageExt.Prelude;
 
 namespace UIEngine.Core;
 
@@ -28,28 +30,28 @@ public sealed class UIEngineHost : IDisposable
         _Roots.Values.Select(static root => root.Registration).ToArray();
     internal int MaxCollectionItems => _Settings.MaxCollectionItems;
 
-    public InteractionResult<Guid> SetRoot(string name, object instance)
+    public Either<InteractionError, Guid> SetRoot(string name, object instance)
     {
         if (instance.GetType().IsValueType)
         {
-            return InteractionResult.Failure<Guid>(
+            return Left(new InteractionError(
                 InteractionErrorCode.TYPE_MISMATCH,
-                "A root must be a reference type.");
+                "A root must be a reference type."));
         }
 
         var handle = _GetOrCreateHandle(instance);
         var registration = new RootRegistration(name, handle);
         _Roots[name] = new _RootEntry(registration, instance);
-        return InteractionResult.Success(handle);
+        return Right(handle);
     }
 
-    public InteractionResult<RootRegistration> RemoveRoot(string name)
+    public Either<InteractionError, RootRegistration> RemoveRoot(string name)
     {
         return _Roots.Remove(name, out var root)
-            ? InteractionResult.Success(root.Registration)
-            : InteractionResult.Failure<RootRegistration>(
+            ? Right(root.Registration)
+            : Left(new InteractionError(
                 InteractionErrorCode.NOT_FOUND,
-                $"Root '{name}' was not found.");
+                $"Root '{name}' was not found."));
     }
 
     public Guid GetOrCreateHandle(object instance)
@@ -62,27 +64,27 @@ public sealed class UIEngineHost : IDisposable
         return _GetOrCreateHandle(instance);
     }
 
-    public InteractionResult<ResolvedNode> ResolveRootNode(string name)
+    public Either<InteractionError, ResolvedNode> ResolveRootNode(string name)
     {
         if (!_Roots.TryGetValue(name, out var root))
         {
-            return InteractionResult.Failure<ResolvedNode>(
+            return Left(new InteractionError(
                 InteractionErrorCode.NOT_FOUND,
-                $"Root '{name}' was not found.");
+                $"Root '{name}' was not found."));
         }
 
         var created = CreateObjectNode(root.Registration.Handle, name);
-        if (!created.IsSuccess)
+        if (!created.IsRight)
         {
-            return InteractionResult.Failure<ResolvedNode>(created.Error!);
+            return Left((InteractionError)created);
         }
 
-        return InteractionResult.Success(new ResolvedNode(
+        return Right(new ResolvedNode(
             LogicalPath.Root.Append(name),
-            created.Value));
+            (LiveObjectNode)created));
     }
 
-    public InteractionResult<ResolvedPath> ResolvePath(LogicalPath path) =>
+    public Either<InteractionError, ResolvedPath> ResolvePath(LogicalPath path) =>
         Execute(
             "resolve path",
             () => PathResolution.Resolve(this, path));
@@ -94,35 +96,38 @@ public sealed class UIEngineHost : IDisposable
         _Handles.Clear();
     }
 
-    internal InteractionResult<object> ResolveTarget(Guid handle)
+    internal Either<InteractionError, object> ResolveTarget(Guid handle)
     {
         if (_Objects.TryGetValue(handle, out var reference) && reference.TryGetTarget(out var target))
         {
-            return InteractionResult.Success(target);
+            return Right(target);
         }
 
         _Objects.Remove(handle);
-        return InteractionResult.Failure<object>(
+        return Left(new InteractionError(
             InteractionErrorCode.UNAVAILABLE,
-            "The target object is no longer available.");
+            "The target object is no longer available."));
     }
 
-    internal InteractionResult<LiveObjectNode> CreateObjectNode(
+    internal Either<InteractionError, LiveObjectNode> CreateObjectNode(
         Guid handle,
         string name)
     {
         var target = ResolveTarget(handle);
-        if (!target.IsSuccess)
+        if (!target.IsRight)
         {
-            return InteractionResult.Failure<LiveObjectNode>(target.Error!);
+            return Left((InteractionError)target);
         }
 
         return Execute(
             "create object node",
-            () => _CreateObjectNode(target.Value, handle, name));
+            () => _CreateObjectNode(
+                target.IfLeft(static error => throw new InvalidOperationException(error.Message)),
+                handle,
+                name));
     }
 
-    internal InteractionResult<T> Execute<T>(string operation, Func<InteractionResult<T>> action)
+    internal Either<InteractionError, T> Execute<T>(string operation, Func<Either<InteractionError, T>> action)
     {
         try
         {
@@ -154,7 +159,7 @@ public sealed class UIEngineHost : IDisposable
         return handle;
     }
 
-    private InteractionResult<LiveObjectNode> _CreateObjectNode(
+    private Either<InteractionError, LiveObjectNode> _CreateObjectNode(
         object instance,
         Guid handle,
         string name)
@@ -205,12 +210,12 @@ public sealed class UIEngineHost : IDisposable
                     break;
                 case ReflectedMemberKind.ACTION:
                     var methodNode = LiveMethodNode.Create(this, handle, member);
-                    if (!methodNode.IsSuccess)
+                    if (!methodNode.IsRight)
                     {
-                        return InteractionResult.Failure<LiveObjectNode>(methodNode.Error!);
+                        return Left((InteractionError)methodNode);
                     }
 
-                    members.Add(methodNode.Value);
+                    members.Add((LiveMethodNode)methodNode);
                     break;
                 default:
                     throw new InvalidOperationException("Unknown member kind.");
@@ -245,7 +250,7 @@ public sealed class UIEngineHost : IDisposable
             summary = ReflectionMetadata.Read(metadata.SummaryMember, instance)?.ToString();
         }
 
-        return InteractionResult.Success(new LiveObjectNode(
+        return Right(new LiveObjectNode(
             this,
             name,
             instance.GetType(),
@@ -261,12 +266,12 @@ public sealed class UIEngineHost : IDisposable
             exception,
             _Settings.IncludeSensitiveDiagnosticData);
 
-    private InteractionResult<T> _UnexpectedFailure<T>(string operation, Exception exception)
+    private Either<InteractionError, T> _UnexpectedFailure<T>(string operation, Exception exception)
     {
         _ReportUnexpected(operation, exception);
-        return InteractionResult.Failure<T>(
+        return Left(new InteractionError(
             InteractionErrorCode.FAULT,
-            $"The {operation} operation failed unexpectedly.");
+            $"The {operation} operation failed unexpectedly."));
     }
 
     private sealed record _HandleHolder(Guid Handle);

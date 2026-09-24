@@ -1,6 +1,9 @@
 using System.Reflection;
 using System.Runtime.InteropServices;
 
+using LanguageExt;
+using static LanguageExt.Prelude;
+
 namespace UIEngine.Core;
 
 internal abstract class LiveReflectedMemberNode : BaseNode, IDynamicInterfaceCastable
@@ -86,30 +89,31 @@ internal sealed class LiveReferenceNode : LiveReflectedMemberNode, IReferenceNod
 
     public Type ReferenceType => _Binding.ReferenceType;
 
-    public InteractionResult<Guid?> ReadReference() => _Binding.Read();
+    public Either<InteractionError, Option<Guid>> ReadReference() => _Binding.Read();
 
-    internal InteractionResult<LiveResolvedReferenceNode> ResolveTarget()
+    internal Either<InteractionError, LiveResolvedReferenceNode> ResolveTarget()
     {
         var read = ReadReference();
-        if (!read.IsSuccess)
+        if (!read.IsRight)
         {
-            return InteractionResult.Failure<LiveResolvedReferenceNode>(read.Error!);
+            return Left((InteractionError)read);
         }
 
-        if (read.Value is null)
+        var handle = (Option<Guid>)read;
+        if (handle.IsNone)
         {
-            return InteractionResult.Failure<LiveResolvedReferenceNode>(
+            return Left(new InteractionError(
                 InteractionErrorCode.UNAVAILABLE,
-                $"Reference '{Name}' is empty.");
+                $"Reference '{Name}' is empty."));
         }
 
-        var target = Host.CreateObjectNode(read.Value.Value, Name);
-        return target.IsSuccess
-            ? InteractionResult.Success(new LiveResolvedReferenceNode(
+        var target = Host.CreateObjectNode(handle.IfNone(Guid.Empty), Name);
+        return target.IsRight
+            ? Right(new LiveResolvedReferenceNode(
                 _Binding,
                 _Member,
-                target.Value))
-            : InteractionResult.Failure<LiveResolvedReferenceNode>(target.Error!);
+                (LiveObjectNode)target))
+            : Left((InteractionError)target);
     }
 }
 
@@ -123,7 +127,7 @@ internal sealed class LiveResolvedReferenceNode(
 {
     public Type ReferenceType => binding.ReferenceType;
 
-    public InteractionResult<Guid?> ReadReference() => binding.Read();
+    public Either<InteractionError, Option<Guid>> ReadReference() => binding.Read();
 
     public Guid Handle => target.Handle;
 
@@ -141,13 +145,13 @@ internal sealed class LiveCollectionNode(
 
     public Type? KeyType => binding.KeyType;
 
-    public InteractionResult<CollectionSlice> ReadEntries(long offset, int limit) =>
+    public Either<InteractionError, CollectionSlice> ReadEntries(long offset, int limit) =>
         binding.Read(offset, limit);
 
-    internal InteractionResult<IReadOnlyList<Guid>> Select(
+    internal Either<InteractionError, IReadOnlyList<Guid>> Select(
         ListLogicalPathSegment segment) => binding.Select(segment);
 
-    internal InteractionResult<IReadOnlyList<Guid>> Select(
+    internal Either<InteractionError, IReadOnlyList<Guid>> Select(
         DictLogicalPathSegment segment) => binding.Select(segment);
 }
 

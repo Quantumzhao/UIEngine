@@ -24,11 +24,11 @@ public sealed class TuiBoundaryTests
 
         Assert.NotSame(options, workspace.Options);
         Assert.Equal(options, workspace.Options);
-        Assert.True(host.ResolveRootNode("world").IsSuccess);
+        Assert.True(host.ResolveRootNode("world").IsRight);
 
         workspace.Dispose();
 
-        Assert.True(host.ResolveRootNode("world").IsSuccess);
+        Assert.True(host.ResolveRootNode("world").IsRight);
     }
 
     [Fact]

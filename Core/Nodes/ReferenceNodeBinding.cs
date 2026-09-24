@@ -1,3 +1,6 @@
+using LanguageExt;
+using static LanguageExt.Prelude;
+
 namespace UIEngine.Core;
 
 internal sealed class ReferenceNodeBinding(
@@ -13,29 +16,30 @@ internal sealed class ReferenceNodeBinding(
 
     public Type ReferenceType { get; } = referenceType;
 
-    public InteractionResult<Guid?> Read() => Host.Execute(
+    public Either<InteractionError, Option<Guid>> Read() => Host.Execute<Option<Guid>>(
         $"read reference {Name}",
         () =>
         {
             var target = Host.ResolveTarget(owner);
-            if (!target.IsSuccess)
+            if (!target.IsRight)
             {
-                return InteractionResult.Failure<Guid?>(target.Error!);
+                return Left((InteractionError)target);
             }
 
-            var value = read(target.Value);
+            var value = read(target.IfLeft(
+                static error => throw new InvalidOperationException(error.Message)));
             if (value is null)
             {
-                return InteractionResult.Success<Guid?>(null);
+                return Right(Option<Guid>.None);
             }
 
             if (value.GetType().IsValueType)
             {
-                return InteractionResult.Failure<Guid?>(
+                return Left(new InteractionError(
                     InteractionErrorCode.TYPE_MISMATCH,
-                    $"Reference '{Name}' returned a value type.");
+                    $"Reference '{Name}' returned a value type."));
             }
 
-            return InteractionResult.Success<Guid?>(Host.GetOrCreateHandle(value));
+            return Right(Some(Host.GetOrCreateHandle(value)));
         });
 }

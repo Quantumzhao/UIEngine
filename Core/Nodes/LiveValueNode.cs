@@ -1,6 +1,8 @@
 using System.Reflection;
 using System.Runtime.InteropServices;
 
+using LanguageExt;
+
 namespace UIEngine.Core;
 
 // Facets vary per occurrence. Dynamic interface casting keeps one concrete node type while
@@ -200,7 +202,7 @@ internal interface ILiveProgrammaticValueNodeImplementation : IProgrammaticValue
 [DynamicInterfaceCastableImplementation]
 internal interface ILiveReadableValueNodeImplementation : IReadableValueNode
 {
-    InteractionResult<object?> IReadableValueNode.ReadValue() =>
+    Either<InteractionError, Option<object>> IReadableValueNode.ReadValue() =>
         ((LiveValueNode)(object)this).Binding.Read();
 }
 
@@ -212,7 +214,7 @@ internal interface ILiveWritableValueNodeImplementation : IWritableValueNode
 
     IValueRange? IWritableValueNode.Range => ((LiveValueNode)(object)this).Binding.Range;
 
-    InteractionResult<object?> IWritableValueNode.WriteValue(object? value) =>
+    Either<InteractionError, Option<object>> IWritableValueNode.WriteValue(object? value) =>
         ((LiveValueNode)(object)this).Binding.Write(value);
 }
 

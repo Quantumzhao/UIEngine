@@ -1,43 +1,46 @@
+using LanguageExt;
+using static LanguageExt.Prelude;
+
 namespace UIEngine.Core;
 
 internal static class PathResolution
 {
-    public static InteractionResult<ResolvedPath> Resolve(
+    public static Either<InteractionError, ResolvedPath> Resolve(
         UIEngineHost host,
         LogicalPath path)
     {
         var segments = path.Segments;
         if (segments.Count == 0)
         {
-            return InteractionResult.Failure<ResolvedPath>(
+            return Left(new InteractionError(
                 InteractionErrorCode.INVALID_INPUT,
-                "The root list is not a navigable object.");
+                "The root list is not a navigable object."));
         }
 
         if (segments[0] is not MemberLogicalPathSegment rootSegment)
         {
-            return InteractionResult.Failure<ResolvedPath>(
+            return Left(new InteractionError(
                 InteractionErrorCode.INVALID_INPUT,
-                "The first path segment must identify a registered root.");
+                "The first path segment must identify a registered root."));
         }
 
         var root = host.Roots.FirstOrDefault(candidate =>
             StringComparer.Ordinal.Equals(candidate.Name, rootSegment.Name));
         if (root is null)
         {
-            return InteractionResult.Failure<ResolvedPath>(
+            return Left(new InteractionError(
                 InteractionErrorCode.NOT_FOUND,
-                $"Root '{rootSegment.Name}' was not found.");
+                $"Root '{rootSegment.Name}' was not found."));
         }
 
         var canonical = LogicalPath.Root.Append(root.Name);
         var rootNode = host.CreateObjectNode(root.Handle, root.Name);
-        if (!rootNode.IsSuccess)
+        if (!rootNode.IsRight)
         {
-            return InteractionResult.Failure<ResolvedPath>(rootNode.Error!);
+            return Left((InteractionError)rootNode);
         }
 
-        BaseNode current = rootNode.Value;
+        BaseNode current = (LiveObjectNode)rootNode;
         var resolutionChain = new List<ResolvedNode>
         {
             new(canonical, current),
@@ -46,30 +49,30 @@ internal static class PathResolution
         for (var index = 1; index < segments.Count; index++)
         {
             var segment = segments[index];
-            InteractionResult<BaseNode> resolved = segment switch
+            Either<InteractionError, BaseNode> resolved = segment switch
             {
                 MemberLogicalPathSegment member => _ResolveMember(current, member),
                 ListLogicalPathSegment list => _ResolveListElement(host, current, list),
                 DictLogicalPathSegment dictionary =>
                     _ResolveDictionaryValue(host, current, dictionary),
-                _ => InteractionResult.Failure<BaseNode>(
+                _ => Left(new InteractionError(
                     InteractionErrorCode.UNSUPPORTED,
-                    "The logical path contains an unsupported segment."),
+                    "The logical path contains an unsupported segment.")),
             };
-            if (!resolved.IsSuccess)
+            if (!resolved.IsRight)
             {
-                return InteractionResult.Failure<ResolvedPath>(resolved.Error!);
+                return Left((InteractionError)resolved);
             }
 
             canonical = canonical.Append(segment);
-            current = resolved.Value;
+            current = (BaseNode)resolved;
             resolutionChain.Add(new ResolvedNode(canonical, current));
         }
 
-        return InteractionResult.Success(new ResolvedPath(resolutionChain));
+        return Right(new ResolvedPath(resolutionChain));
     }
 
-    private static InteractionResult<BaseNode> _ResolveMember(
+    private static Either<InteractionError, BaseNode> _ResolveMember(
         BaseNode current,
         MemberLogicalPathSegment segment)
     {
@@ -83,30 +86,30 @@ internal static class PathResolution
             .ToArray();
         if (matches.Length == 0)
         {
-            return InteractionResult.Failure<BaseNode>(
+            return Left(new InteractionError(
                 InteractionErrorCode.NOT_FOUND,
-                $"Member '{segment.Name}' was not found.");
+                $"Member '{segment.Name}' was not found."));
         }
 
         if (matches.Length > 1)
         {
-            return InteractionResult.Failure<BaseNode>(
+            return Left(new InteractionError(
                 InteractionErrorCode.AMBIGUOUS,
-                $"Member '{segment.Name}' is ambiguous.");
+                $"Member '{segment.Name}' is ambiguous."));
         }
 
         if (matches[0] is not LiveReferenceNode reference)
         {
-            return InteractionResult.Success(matches[0]);
+            return Right(matches[0]);
         }
 
         var target = reference.ResolveTarget();
-        return target.IsSuccess
-            ? InteractionResult.Success<BaseNode>(target.Value)
-            : InteractionResult.Failure<BaseNode>(target.Error!);
+        return target.IsRight
+            ? Right((BaseNode)(LiveResolvedReferenceNode)target)
+            : Left((InteractionError)target);
     }
 
-    private static InteractionResult<BaseNode> _ResolveListElement(
+    private static Either<InteractionError, BaseNode> _ResolveListElement(
         UIEngineHost host,
         BaseNode current,
         ListLogicalPathSegment segment)
@@ -119,7 +122,7 @@ internal static class PathResolution
         return _ResolveSelectedObject(host, collection, collection.Select(segment));
     }
 
-    private static InteractionResult<BaseNode> _ResolveDictionaryValue(
+    private static Either<InteractionError, BaseNode> _ResolveDictionaryValue(
         UIEngineHost host,
         BaseNode current,
         DictLogicalPathSegment segment)
@@ -132,38 +135,39 @@ internal static class PathResolution
         return _ResolveSelectedObject(host, collection, collection.Select(segment));
     }
 
-    private static InteractionResult<BaseNode> _ResolveSelectedObject(
+    private static Either<InteractionError, BaseNode> _ResolveSelectedObject(
         UIEngineHost host,
         LiveCollectionNode collection,
-        InteractionResult<IReadOnlyList<Guid>> selected)
+        Either<InteractionError, IReadOnlyList<Guid>> selected)
     {
-        if (!selected.IsSuccess)
+        if (!selected.IsRight)
         {
-            return InteractionResult.Failure<BaseNode>(selected.Error!);
+            return Left((InteractionError)selected);
         }
 
-        if (selected.Value.Count == 0)
+        var handles = selected.IfLeft(static _ => System.Array.Empty<Guid>());
+        if (handles.Count == 0)
         {
-            return InteractionResult.Failure<BaseNode>(
+            return Left(new InteractionError(
                 InteractionErrorCode.NOT_FOUND,
-                $"Selection on collection '{collection.Name}' matched no object.");
+                $"Selection on collection '{collection.Name}' matched no object."));
         }
 
-        if (selected.Value.Count > 1)
+        if (handles.Count > 1)
         {
-            return InteractionResult.Failure<BaseNode>(
+            return Left(new InteractionError(
                 InteractionErrorCode.AMBIGUOUS,
-                $"Selection on collection '{collection.Name}' matched multiple objects.");
+                $"Selection on collection '{collection.Name}' matched multiple objects."));
         }
 
-        var resolved = host.CreateObjectNode(selected.Value[0], collection.Name);
-        return resolved.IsSuccess
-            ? InteractionResult.Success<BaseNode>(resolved.Value)
-            : InteractionResult.Failure<BaseNode>(resolved.Error!);
+        var resolved = host.CreateObjectNode(handles[0], collection.Name);
+        return resolved.IsRight
+            ? Right((BaseNode)(LiveObjectNode)resolved)
+            : Left((InteractionError)resolved);
     }
 
-    private static InteractionResult<BaseNode> _InvalidTraversal(string description) =>
-        InteractionResult.Failure<BaseNode>(
+    private static Either<InteractionError, BaseNode> _InvalidTraversal(string description) =>
+        Left(new InteractionError(
             InteractionErrorCode.INVALID_INPUT,
-            $"The {description} path segment cannot be applied at this location.");
+            $"The {description} path segment cannot be applied at this location."));
 }

@@ -13,9 +13,11 @@ public sealed class CliBehaviorTests
         var valid = CliTokenizer.Tokenize("call Rename name=\"New York\"");
         var invalid = CliTokenizer.Tokenize("set Name \"New York");
 
-        Assert.True(valid.IsSuccess);
-        Assert.Equal(["call", "Rename", "name=New York"], valid.Value);
-        Assert.Equal(InteractionErrorCode.INVALID_INPUT, invalid.Error?.Code);
+        Assert.True(valid.IsRight);
+        Assert.Equal(
+            ["call", "Rename", "name=New York"],
+            valid.IfLeft(static error => throw new InvalidOperationException(error.Message)));
+        Assert.Equal(InteractionErrorCode.INVALID_INPUT, ((InteractionError)invalid).Code);
     }
 
     [Fact]
@@ -25,9 +27,9 @@ public sealed class CliBehaviorTests
             "/world/Nations[index=2]/ByCode[key=N1]");
         var percentText = CliLogicalPathParser.Parse("/root%2Fname");
 
-        Assert.True(parsed.IsSuccess);
+        Assert.True(parsed.IsRight);
         Assert.Collection(
-            parsed.Value.Segments,
+            ((LogicalPath)parsed).Segments,
             segment => Assert.Equal(
                 "world",
                 Assert.IsType<MemberLogicalPathSegment>(segment).Name),
@@ -43,7 +45,7 @@ public sealed class CliBehaviorTests
                 Assert.IsType<DictLogicalPathSegment>(segment).Key));
         Assert.Equal(
             "root%2Fname",
-            Assert.IsType<MemberLogicalPathSegment>(percentText.Value.Segment).Name);
+            Assert.IsType<MemberLogicalPathSegment>(((LogicalPath)percentText).Segment).Name);
     }
 
     [Fact]

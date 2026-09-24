@@ -14,7 +14,7 @@ public sealed class WorkspaceAndNavigatorTests
         using var host = _CreateHost(model);
         using var workspace = new UIEngineWorkspace(host);
         var path = _Path(_Member("model"), _Member("Child"), _Member("Value"));
-        var supplied = host.ResolvePath(path).Value.ResolutionChain[^1];
+        var supplied = host.ResolvePath(path).RightValue().ResolutionChain[^1];
         var changes = new List<WorkspaceChange>();
         workspace.Changed += (_, eventArgs) => changes.Add(eventArgs.Change);
 
@@ -22,9 +22,9 @@ public sealed class WorkspaceAndNavigatorTests
         var pathAdded = workspace.AddNavigator("path", path);
         var occurrenceAdded = workspace.AddNavigator("occurrence", supplied);
 
-        Assert.True(rootAdded.IsSuccess);
-        Assert.True(pathAdded.IsSuccess);
-        Assert.True(occurrenceAdded.IsSuccess);
+        Assert.True(rootAdded.IsRight);
+        Assert.True(pathAdded.IsRight);
+        Assert.True(occurrenceAdded.IsRight);
         var rootNavigator = workspace.Navigators[0];
         var pathNavigator = workspace.Navigators[1];
         var occurrenceNavigator = workspace.Navigators[2];
@@ -36,9 +36,9 @@ public sealed class WorkspaceAndNavigatorTests
             pathNavigator.Entries.Select(static entry => entry.Path.ToString()));
         Assert.NotSame(supplied.Node, occurrenceNavigator.CurrentEntry.Node);
         Assert.NotSame(pathNavigator.CurrentEntry.Node, occurrenceNavigator.CurrentEntry.Node);
-        Assert.Same(rootAdded.Value, changes[0]);
-        Assert.Same(pathAdded.Value, changes[1]);
-        Assert.Same(occurrenceAdded.Value, changes[2]);
+        Assert.Same(rootAdded.RightValue(), changes[0]);
+        Assert.Same(pathAdded.RightValue(), changes[1]);
+        Assert.Same(occurrenceAdded.RightValue(), changes[2]);
     }
 
     [Fact]
@@ -53,36 +53,36 @@ public sealed class WorkspaceAndNavigatorTests
 
         var missing = navigator.Navigate(_Member("Missing"));
 
-        Assert.True(missing.IsSuccess);
-        Assert.Same(missing.Value, Assert.Single(changes));
+        Assert.True(missing.IsRight);
+        Assert.Same(missing.RightValue(), Assert.Single(changes));
         Assert.False(navigator.CurrentEntry.IsResolved);
         Assert.Equal(InteractionErrorCode.NOT_FOUND, navigator.CurrentEntry.Error?.Code);
         Assert.Equal("/model/Missing", navigator.CurrentEntry.Path.ToString());
 
         var fromBroken = navigator.Navigate(_Member("Anything"));
-        Assert.False(fromBroken.IsSuccess);
-        Assert.Equal(InteractionErrorCode.INVALID_INPUT, fromBroken.Error?.Code);
+        Assert.False(fromBroken.IsRight);
+        Assert.Equal(InteractionErrorCode.INVALID_INPUT, fromBroken.LeftValue().Code);
         Assert.Single(changes);
 
         var back = navigator.GoBack();
-        Assert.True(back.IsSuccess);
-        Assert.Same(missing.Value.Entry, back.Value.RemovedEntry);
+        Assert.True(back.IsRight);
+        Assert.Same(missing.RightValue().Entry, back.RightValue().RemovedEntry);
         Assert.Single(navigator.Entries);
         Assert.True(navigator.CurrentEntry.IsResolved);
 
         var name = navigator.Navigate(_Member("Name"));
         var terminalEntry = navigator.CurrentEntry;
         var terminalRejection = navigator.Navigate(_Member("Length"));
-        Assert.True(name.IsSuccess);
-        Assert.False(terminalRejection.IsSuccess);
-        Assert.Equal(InteractionErrorCode.UNSUPPORTED, terminalRejection.Error?.Code);
+        Assert.True(name.IsRight);
+        Assert.False(terminalRejection.IsRight);
+        Assert.Equal(InteractionErrorCode.UNSUPPORTED, terminalRejection.LeftValue().Code);
         Assert.Same(terminalEntry, navigator.CurrentEntry);
         Assert.Equal(2, navigator.Entries.Count);
 
         navigator.GoBack();
         var rootBack = navigator.GoBack();
-        Assert.False(rootBack.IsSuccess);
-        Assert.Equal(InteractionErrorCode.INVALID_INPUT, rootBack.Error?.Code);
+        Assert.False(rootBack.IsRight);
+        Assert.Equal(InteractionErrorCode.INVALID_INPUT, rootBack.LeftValue().Code);
         Assert.Single(navigator.Entries);
     }
 
@@ -98,7 +98,7 @@ public sealed class WorkspaceAndNavigatorTests
         var duplicated = workspace.DuplicateNavigator(first.Id, "second");
         var second = workspace.Navigators[1];
 
-        Assert.True(duplicated.IsSuccess);
+        Assert.True(duplicated.IsRight);
         Assert.NotEqual(first.Id, second.Id);
         Assert.NotSame(first.CurrentEntry.Node, second.CurrentEntry.Node);
 
@@ -108,8 +108,8 @@ public sealed class WorkspaceAndNavigatorTests
         var written = ((IWritableValueNode)first.CurrentEntry.Node!).WriteValue(7);
         var read = ((IReadableValueNode)second.CurrentEntry.Node!).ReadValue();
 
-        Assert.Equal(7, written.Value);
-        Assert.Equal(7, read.Value);
+        Assert.Equal(7, written.RightValue());
+        Assert.Equal(7, read.RightValue());
         first.GoBack();
         Assert.Single(first.Entries);
         Assert.Equal(2, second.Entries.Count);
@@ -117,7 +117,7 @@ public sealed class WorkspaceAndNavigatorTests
         workspace.RemoveNavigator(first.Id);
         Assert.Single(workspace.Navigators);
         Assert.Same(second, workspace.Navigators[0]);
-        Assert.Equal(7, ((IReadableValueNode)second.CurrentEntry.Node!).ReadValue().Value);
+        Assert.Equal(7, ((IReadableValueNode)second.CurrentEntry.Node!).ReadValue().RightValue());
     }
 
     [Fact]
@@ -137,17 +137,17 @@ public sealed class WorkspaceAndNavigatorTests
         var reordered = workspace.ReorderNavigator(one.Id, 2);
         var removed = workspace.RemoveNavigator(two.Id);
 
-        Assert.True(reordered.IsSuccess);
-        Assert.Same(reordered.Value, changes[0]);
+        Assert.True(reordered.IsRight);
+        Assert.Same(reordered.RightValue(), changes[0]);
         Assert.Equal([three.Id, one.Id], workspace.Navigators.Select(static item => item.Id));
-        Assert.True(removed.IsSuccess);
-        Assert.Same(removed.Value, changes[1]);
-        Assert.Equal(0, removed.Value.PreviousIndex);
-        Assert.Single(removed.Value.RemovedEntries);
+        Assert.True(removed.IsRight);
+        Assert.Same(removed.RightValue(), changes[1]);
+        Assert.Equal(0, removed.RightValue().PreviousIndex);
+        Assert.Single(removed.RightValue().RemovedEntries);
         Assert.Empty(two.Entries);
         Assert.Equal(
             InteractionErrorCode.DISPOSED,
-            two.GoBack().Error?.Code);
+            two.GoBack().LeftValue().Code);
 
         workspace.Dispose();
 
@@ -159,8 +159,8 @@ public sealed class WorkspaceAndNavigatorTests
         Assert.Empty(three.Entries);
         Assert.Equal(
             InteractionErrorCode.DISPOSED,
-            workspace.AddNavigator("later", "model").Error?.Code);
-        Assert.True(host.ResolveRootNode("model").IsSuccess);
+            workspace.AddNavigator("later", "model").LeftValue().Code);
+        Assert.True(host.ResolveRootNode("model").IsRight);
     }
 
     [Fact]
@@ -169,7 +169,7 @@ public sealed class WorkspaceAndNavigatorTests
         using var host = _CreateHost(new _Model());
         using var otherHost = _CreateHost(new _Model());
         using var workspace = new UIEngineWorkspace(host);
-        var foreign = otherHost.ResolveRootNode("model").Value;
+        var foreign = otherHost.ResolveRootNode("model").RightValue();
 
         var broken = workspace.AddNavigator(
             "broken",
@@ -177,15 +177,15 @@ public sealed class WorkspaceAndNavigatorTests
         var duplicateName = workspace.AddNavigator("broken", "model");
         var foreignNode = workspace.AddNavigator("foreign", foreign);
 
-        Assert.True(broken.IsSuccess);
+        Assert.True(broken.IsRight);
         var navigator = Assert.Single(workspace.Navigators);
         Assert.Equal(2, navigator.Entries.Count);
         Assert.False(navigator.CurrentEntry.IsResolved);
         Assert.Equal(InteractionErrorCode.NOT_FOUND, navigator.CurrentEntry.Error?.Code);
-        Assert.True(navigator.GoBack().IsSuccess);
+        Assert.True(navigator.GoBack().IsRight);
         Assert.True(navigator.CurrentEntry.IsResolved);
-        Assert.Equal(InteractionErrorCode.INVALID_INPUT, duplicateName.Error?.Code);
-        Assert.Equal(InteractionErrorCode.INVALID_INPUT, foreignNode.Error?.Code);
+        Assert.Equal(InteractionErrorCode.INVALID_INPUT, duplicateName.LeftValue().Code);
+        Assert.Equal(InteractionErrorCode.INVALID_INPUT, foreignNode.LeftValue().Code);
         Assert.Single(workspace.Navigators);
     }
 
@@ -205,14 +205,14 @@ public sealed class WorkspaceAndNavigatorTests
 
         workspace.Dispose();
 
-        Assert.Equal(InvocationStatus.RUNNING, started.Value);
+        Assert.Equal(InvocationStatus.RUNNING, started.RightValue());
         Assert.False(resultTask.IsCompleted);
         Assert.Empty(navigator.Entries);
-        Assert.True(host.ResolveRootNode("model").IsSuccess);
+        Assert.True(host.ResolveRootNode("model").IsRight);
 
         model.CompleteWork(42);
         var completed = await resultTask;
-        Assert.Equal(42, completed.Value);
+        Assert.Equal(42, completed.RightValue());
         Assert.Equal(InvocationStatus.SUCCEEDED, method.Status);
     }
 

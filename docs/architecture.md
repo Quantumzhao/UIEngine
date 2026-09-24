@@ -187,9 +187,10 @@ navigators. Serialization produces data; file storage remains the caller's respo
 ## Operations and Lifetime
 
 All live operations flow synchronously through the host on the domain model's owning thread.
-Expected outcomes use `InteractionResult<T>` with stable error codes and validation issues. If a
-frontend runs on another thread, the embedding application owns the request boundary into the
-domain thread; Core does not marshal work to or from UI threads.
+Expected outcomes use `Either<InteractionError, T>` with stable error codes and validation issues;
+nullable success values use `Either<InteractionError, Option<T>>`. If a frontend runs on another
+thread, the embedding application owns the request boundary into the domain thread; Core does not
+marshal work to or from UI threads.
 
 Collection access is always bounded. Collection windows retain positions, optional keys, nulls,
 scalar values, references, optional total counts, and whether more data is available.

@@ -19,8 +19,8 @@ public sealed class RuntimeBehaviorTests
 
         var resolved = host.ResolveRootNode("model");
 
-        Assert.True(resolved.IsSuccess);
-        var members = ((IObjectNode)resolved.Value.Node).Members;
+        Assert.True(resolved.IsRight);
+        var members = ((IObjectNode)resolved.RightValue().Node).Members;
         var count = Assert.Single(members, value => value.Name == "Count");
         var name = Assert.Single(members, value => value.Name == "Name");
         var optional = Assert.Single(members, value => value.Name == "Optional");
@@ -39,12 +39,14 @@ public sealed class RuntimeBehaviorTests
         var required = ((IWritableValueNode)name).WriteValue(null);
         var enumWrite = ((IWritableValueNode)state).WriteValue("READY");
 
-        Assert.True(converted.IsSuccess);
+        Assert.True(converted.IsRight);
         Assert.Equal(7, model.Count);
-        Assert.Equal(InteractionErrorCode.VALIDATION_FAILED, outOfRange.Error?.Code);
-        Assert.Equal(ValidationIssueCode.OUT_OF_RANGE, Assert.Single(outOfRange.Error!.Issues).Code);
-        Assert.Equal(InteractionErrorCode.VALIDATION_FAILED, required.Error?.Code);
-        Assert.Equal(_EditingState.READY, enumWrite.Value);
+        Assert.Equal(InteractionErrorCode.VALIDATION_FAILED, outOfRange.LeftValue().Code);
+        Assert.Equal(
+            ValidationIssueCode.OUT_OF_RANGE,
+            Assert.Single(outOfRange.LeftValue().Issues).Code);
+        Assert.Equal(InteractionErrorCode.VALIDATION_FAILED, required.LeftValue().Code);
+        Assert.Equal(_EditingState.READY, enumWrite.RightValue());
     }
 
     [Fact]
@@ -58,16 +60,16 @@ public sealed class RuntimeBehaviorTests
         host.SetRoot("economy", profile);
 
         var resolved = host.ResolveRootNode("economy");
-        var objectNode = (IObjectNode)resolved.Value.Node;
+        var objectNode = (IObjectNode)resolved.RightValue().Node;
         var valueNode = Assert.Single(objectNode.Members);
         Assert.True(valueNode is IWritableValueNode);
         var value = (IWritableValueNode)valueNode;
         var write = value.WriteValue("125.5");
         var rejected = value.WriteValue("10000001");
 
-        Assert.Equal(125.5m, write.Value);
+        Assert.Equal(125.5m, write.RightValue());
         Assert.Equal(125.5m, profile.GrossDomesticProduct);
-        Assert.Equal(InteractionErrorCode.VALIDATION_FAILED, rejected.Error?.Code);
+        Assert.Equal(InteractionErrorCode.VALIDATION_FAILED, rejected.LeftValue().Code);
     }
 
     [Fact]
@@ -97,7 +99,7 @@ public sealed class RuntimeBehaviorTests
         using var host = new UIEngineHost(new UIEngineHostOptions { MaxCollectionItems = 3 });
         host.SetRoot("model", model);
         var resolved = host.ResolveRootNode("model");
-        var members = ((IObjectNode)resolved.Value.Node).Members
+        var members = ((IObjectNode)resolved.RightValue().Node).Members
             .Where(static member => member is ICollectionNode)
             .ToDictionary(static member => member.Name, static member => (ICollectionNode)member);
 
@@ -106,13 +108,13 @@ public sealed class RuntimeBehaviorTests
         var lazy = members["Lazy"].ReadEntries(1, 2);
         var tooLarge = members["Items"].ReadEntries(0, 4);
 
-        Assert.IsType<NullCollectionEntry>(items.Value.Entries[0]);
-        Assert.Equal(7, Assert.IsType<ScalarCollectionEntry>(items.Value.Entries[1]).Value);
-        Assert.IsType<ReferenceCollectionEntry>(items.Value.Entries[2]);
-        Assert.Equal("none", dictionary.Value.Entries[0].Key);
-        Assert.Equal(1, Assert.IsType<ScalarCollectionEntry>(lazy.Value.Entries[0]).Value);
-        Assert.Equal(2, Assert.IsType<ScalarCollectionEntry>(lazy.Value.Entries[1]).Value);
-        Assert.Equal(InteractionErrorCode.INVALID_INPUT, tooLarge.Error?.Code);
+        Assert.IsType<NullCollectionEntry>(items.RightValue().Entries[0]);
+        Assert.Equal(7, Assert.IsType<ScalarCollectionEntry>(items.RightValue().Entries[1]).Value);
+        Assert.IsType<ReferenceCollectionEntry>(items.RightValue().Entries[2]);
+        Assert.Equal("none", dictionary.RightValue().Entries[0].Key);
+        Assert.Equal(1, Assert.IsType<ScalarCollectionEntry>(lazy.RightValue().Entries[0]).Value);
+        Assert.Equal(2, Assert.IsType<ScalarCollectionEntry>(lazy.RightValue().Entries[1]).Value);
+        Assert.Equal(InteractionErrorCode.INVALID_INPUT, tooLarge.LeftValue().Code);
     }
 
     [Fact]
@@ -130,16 +132,16 @@ public sealed class RuntimeBehaviorTests
         var legacyAlias = host.ResolvePath(_Path(
             _Member("world"), _Member("Nations"), _Member("0")));
 
-        Assert.True(nation.IsSuccess);
-        Assert.True(cycled.IsSuccess);
+        Assert.True(nation.IsRight);
+        Assert.True(cycled.IsRight);
         Assert.Equal(
-            ((IObjectNode)nation.Value.Node).Handle,
-            ((IObjectNode)cycled.Value.Node).Handle);
-        Assert.NotSame(nation.Value.Node, cycled.Value.Node);
+            ((IObjectNode)nation.RightValue().Node).Handle,
+            ((IObjectNode)cycled.RightValue().Node).Handle);
+        Assert.NotSame(nation.RightValue().Node, cycled.RightValue().Node);
         Assert.Equal(
             "/world/Nations[index=0]/Capital/OwnerNation",
-            cycled.Value.CanonicalPath.ToString());
-        Assert.False(legacyAlias.IsSuccess);
+            cycled.RightValue().CanonicalPath.ToString());
+        Assert.False(legacyAlias.IsRight);
 
         var original = host.ResolvePath(_Path(
             _Member("world"), _Member("Nations"), _Index(0)));
@@ -147,11 +149,11 @@ public sealed class RuntimeBehaviorTests
         var replacement = host.ResolvePath(_Path(
             _Member("world"), _Member("Nations"), _Index(0)));
 
-        Assert.True(original.IsSuccess);
-        Assert.True(replacement.IsSuccess);
+        Assert.True(original.IsRight);
+        Assert.True(replacement.IsRight);
         Assert.NotEqual(
-            ((IObjectNode)original.Value.Node).Handle,
-            ((IObjectNode)replacement.Value.Node).Handle);
+            ((IObjectNode)original.RightValue().Node).Handle,
+            ((IObjectNode)replacement.RightValue().Node).Handle);
     }
 
     [Fact]
@@ -174,19 +176,19 @@ public sealed class RuntimeBehaviorTests
         var reorderedByIndex = host.ResolvePath(_Path(
             _Member("model"), _Member("Items"), _Index(0)));
 
-        Assert.True(initialByKey.IsSuccess);
-        Assert.True(initialByIndex.IsSuccess);
-        Assert.True(remappedByKey.IsSuccess);
-        Assert.True(reorderedByIndex.IsSuccess);
+        Assert.True(initialByKey.IsRight);
+        Assert.True(initialByIndex.IsRight);
+        Assert.True(remappedByKey.IsRight);
+        Assert.True(reorderedByIndex.IsRight);
         Assert.Equal(
-            ((IObjectNode)initialByKey.Value.Node).Handle,
-            ((IObjectNode)initialByIndex.Value.Node).Handle);
+            ((IObjectNode)initialByKey.RightValue().Node).Handle,
+            ((IObjectNode)initialByIndex.RightValue().Node).Handle);
         Assert.Equal(
-            ((IObjectNode)remappedByKey.Value.Node).Handle,
-            ((IObjectNode)reorderedByIndex.Value.Node).Handle);
+            ((IObjectNode)remappedByKey.RightValue().Node).Handle,
+            ((IObjectNode)reorderedByIndex.RightValue().Node).Handle);
         Assert.NotEqual(
-            ((IObjectNode)initialByIndex.Value.Node).Handle,
-            ((IObjectNode)reorderedByIndex.Value.Node).Handle);
+            ((IObjectNode)initialByIndex.RightValue().Node).Handle,
+            ((IObjectNode)reorderedByIndex.RightValue().Node).Handle);
     }
 
     [Fact]
@@ -203,14 +205,14 @@ public sealed class RuntimeBehaviorTests
             _Index(0),
             _Member("AdvanceTurn")));
 
-        Assert.True(firstName.IsSuccess);
-        Assert.True(secondName.IsSuccess);
-        Assert.NotSame(firstName.Value.Node, secondName.Value.Node);
-        Assert.True(firstName.Value.Node is IReadableValueNode and IStringNode);
-        Assert.True(firstName.Value.Node.IsTerminal);
-        Assert.IsAssignableFrom<ICollectionNode>(nations.Value.Node);
-        Assert.IsAssignableFrom<IMethodNode>(advance.Value.Node);
-        Assert.True(advance.Value.Node.IsTerminal);
+        Assert.True(firstName.IsRight);
+        Assert.True(secondName.IsRight);
+        Assert.NotSame(firstName.RightValue().Node, secondName.RightValue().Node);
+        Assert.True(firstName.RightValue().Node is IReadableValueNode and IStringNode);
+        Assert.True(firstName.RightValue().Node.IsTerminal);
+        Assert.IsAssignableFrom<ICollectionNode>(nations.RightValue().Node);
+        Assert.IsAssignableFrom<IMethodNode>(advance.RightValue().Node);
+        Assert.True(advance.RightValue().Node.IsTerminal);
     }
 
     [Fact]
@@ -231,17 +233,17 @@ public sealed class RuntimeBehaviorTests
             _Index(0),
             _Member("AdvanceTurn")));
 
-        Assert.IsAssignableFrom<IObjectNode>(root.Value.Node);
-        Assert.True(scalar.Value.Node is IReadableValueNode);
-        Assert.IsAssignableFrom<ICollectionNode>(collection.Value.Node);
-        Assert.IsAssignableFrom<IObjectNode>(selected.Value.Node);
-        Assert.IsAssignableFrom<IObjectNode>(reference.Value.Node);
-        Assert.True(reference.Value.Node is IReferenceNode);
-        Assert.True(reference.Value.Node is IPropertyNode);
-        Assert.IsAssignableFrom<IMethodNode>(method.Value.Node);
-        Assert.Equal(typeof(City), reference.Value.Node.ValueType);
-        Assert.Equal(typeof(City), ((IReferenceNode)reference.Value.Node).ReferenceType);
-        Assert.Equal(typeof(Nation), ((IPropertyNode)reference.Value.Node).DeclaringType);
+        Assert.IsAssignableFrom<IObjectNode>(root.RightValue().Node);
+        Assert.True(scalar.RightValue().Node is IReadableValueNode);
+        Assert.IsAssignableFrom<ICollectionNode>(collection.RightValue().Node);
+        Assert.IsAssignableFrom<IObjectNode>(selected.RightValue().Node);
+        Assert.IsAssignableFrom<IObjectNode>(reference.RightValue().Node);
+        Assert.True(reference.RightValue().Node is IReferenceNode);
+        Assert.True(reference.RightValue().Node is IPropertyNode);
+        Assert.IsAssignableFrom<IMethodNode>(method.RightValue().Node);
+        Assert.Equal(typeof(City), reference.RightValue().Node.ValueType);
+        Assert.Equal(typeof(City), ((IReferenceNode)reference.RightValue().Node).ReferenceType);
+        Assert.Equal(typeof(Nation), ((IPropertyNode)reference.RightValue().Node).DeclaringType);
     }
 
     [Fact]
@@ -258,8 +260,8 @@ public sealed class RuntimeBehaviorTests
         var first = host.ResolvePath(path);
         var second = host.ResolvePath(path);
 
-        Assert.True(first.IsSuccess);
-        Assert.True(second.IsSuccess);
+        Assert.True(first.IsRight);
+        Assert.True(second.IsRight);
         Assert.Equal(
             [
                 "/world",
@@ -268,14 +270,14 @@ public sealed class RuntimeBehaviorTests
                 "/world/Nations[index=0]/Capital",
                 "/world/Nations[index=0]/Capital/Name",
             ],
-            first.Value.ResolutionChain.Select(static node => node.CanonicalPath.ToString()));
-        Assert.Same(first.Value.Node, first.Value.ResolutionChain[^1].Node);
+            first.RightValue().ResolutionChain.Select(static node => node.CanonicalPath.ToString()));
+        Assert.Same(first.RightValue().Node, first.RightValue().ResolutionChain[^1].Node);
         Assert.All(
-            first.Value.ResolutionChain.Zip(second.Value.ResolutionChain),
-            static pair => Assert.NotSame(pair.First.Node, pair.Second.Node));
+            first.RightValue().ResolutionChain.Zip(second.RightValue().ResolutionChain),
+            static pair => Assert.NotSame(pair.Item1.Node, pair.Item2.Node));
         Assert.Equal(
-            ((IObjectNode)first.Value.ResolutionChain[2].Node).Handle,
-            ((IObjectNode)second.Value.ResolutionChain[2].Node).Handle);
+            ((IObjectNode)first.RightValue().ResolutionChain[2].Node).Handle,
+            ((IObjectNode)second.RightValue().ResolutionChain[2].Node).Handle);
     }
 
     [Fact]
@@ -303,13 +305,13 @@ public sealed class RuntimeBehaviorTests
         var wrongMemberCase = host.ResolvePath(_Path(
             _Member("root/name"), _Member("Value/name")));
 
-        Assert.True(resolved.IsSuccess);
+        Assert.True(resolved.IsRight);
         Assert.Equal("root/name", ((MemberLogicalPathSegment)
-            resolved.Value.CanonicalPath.Parent!.Segment!).Name);
+            resolved.RightValue().CanonicalPath.Parent!.Segment!).Name);
         Assert.Equal("value/name", ((MemberLogicalPathSegment)
-            resolved.Value.CanonicalPath.Segment!).Name);
-        Assert.Equal(InteractionErrorCode.NOT_FOUND, wrongRootCase.Error?.Code);
-        Assert.Equal(InteractionErrorCode.NOT_FOUND, wrongMemberCase.Error?.Code);
+            resolved.RightValue().CanonicalPath.Segment!).Name);
+        Assert.Equal(InteractionErrorCode.NOT_FOUND, wrongRootCase.LeftValue().Code);
+        Assert.Equal(InteractionErrorCode.NOT_FOUND, wrongMemberCase.LeftValue().Code);
     }
 
     [Fact]
@@ -338,16 +340,16 @@ public sealed class RuntimeBehaviorTests
         var runtimeDictionary = host.ResolvePath(_Path(
             _Member("model"), _Member("DictView"), _Key("item")));
 
-        Assert.Equal(InteractionErrorCode.UNAVAILABLE, nullReference.Error?.Code);
-        Assert.Equal(InteractionErrorCode.NOT_FOUND, missingMember.Error?.Code);
-        Assert.Equal(InteractionErrorCode.NOT_FOUND, missingElement.Error?.Code);
-        Assert.Equal(InteractionErrorCode.TYPE_MISMATCH, scalarElement.Error?.Code);
-        Assert.Equal(InteractionErrorCode.AMBIGUOUS, ambiguousElement.Error?.Code);
-        Assert.True(fieldReference.Value.Node is IObjectNode and IReferenceNode and IFieldNode);
-        Assert.Equal(InteractionErrorCode.TYPE_MISMATCH, keyedList.Error?.Code);
-        Assert.Equal(InteractionErrorCode.TYPE_MISMATCH, indexedDictionary.Error?.Code);
-        Assert.True(runtimeList.IsSuccess);
-        Assert.True(runtimeDictionary.IsSuccess);
+        Assert.Equal(InteractionErrorCode.UNAVAILABLE, nullReference.LeftValue().Code);
+        Assert.Equal(InteractionErrorCode.NOT_FOUND, missingMember.LeftValue().Code);
+        Assert.Equal(InteractionErrorCode.NOT_FOUND, missingElement.LeftValue().Code);
+        Assert.Equal(InteractionErrorCode.TYPE_MISMATCH, scalarElement.LeftValue().Code);
+        Assert.Equal(InteractionErrorCode.AMBIGUOUS, ambiguousElement.LeftValue().Code);
+        Assert.True(fieldReference.RightValue().Node is IObjectNode and IReferenceNode and IFieldNode);
+        Assert.Equal(InteractionErrorCode.TYPE_MISMATCH, keyedList.LeftValue().Code);
+        Assert.Equal(InteractionErrorCode.TYPE_MISMATCH, indexedDictionary.LeftValue().Code);
+        Assert.True(runtimeList.IsRight);
+        Assert.True(runtimeDictionary.IsRight);
     }
 
     [Fact]
@@ -367,7 +369,7 @@ public sealed class RuntimeBehaviorTests
         var read = childMember.ReadValue();
 
         Assert.False(target.IsAlive);
-        Assert.Equal(InteractionErrorCode.UNAVAILABLE, read.Error?.Code);
+        Assert.Equal(InteractionErrorCode.UNAVAILABLE, read.LeftValue().Code);
     }
 
     [Fact]
@@ -377,7 +379,7 @@ public sealed class RuntimeBehaviorTests
         using var host = new UIEngineHost();
         host.SetRoot("model", model);
         var resolved = host.ResolveRootNode("model");
-        var actions = ((IObjectNode)resolved.Value.Node).Members
+        var actions = ((IObjectNode)resolved.RightValue().Node).Members
             .Where(static member => member is IMethodNode)
             .ToDictionary(static member => member.Name, static member => (IMethodNode)member);
 
@@ -385,10 +387,10 @@ public sealed class RuntimeBehaviorTests
         Assert.Null(actions["ObserveStatus"].ResultTask);
         model.ReadInvocationStatus = () => actions["ObserveStatus"].Status;
         var observed = actions["ObserveStatus"].Invoke(new Dictionary<string, object?>());
-        Assert.Equal(InvocationStatus.SUCCEEDED, observed.Value);
+        Assert.Equal(InvocationStatus.SUCCEEDED, observed.RightValue());
         Assert.Equal(
             InvocationStatus.RUNNING,
-            (await actions["ObserveStatus"].ResultTask!).Value);
+            (await actions["ObserveStatus"].ResultTask!).RightValue());
         Assert.Equal(InvocationStatus.SUCCEEDED, actions["ObserveStatus"].Status);
 
         var added = actions["Add"].Invoke(new Dictionary<string, object?>
@@ -396,23 +398,23 @@ public sealed class RuntimeBehaviorTests
             ["left"] = "2",
             ["right"] = 3,
         });
-        Assert.Equal(InvocationStatus.SUCCEEDED, added.Value);
+        Assert.Equal(InvocationStatus.SUCCEEDED, added.RightValue());
         Assert.True(actions["Add"].ResultTask!.IsCompletedSuccessfully);
-        Assert.Equal(5, (await actions["Add"].ResultTask!).Value);
+        Assert.Equal(5, (await actions["Add"].ResultTask!).RightValue());
 
         var previousResultTask = actions["Add"].ResultTask;
         var rejected = actions["Add"].Invoke(new Dictionary<string, object?>
         {
             ["missing"] = 1,
         });
-        Assert.Equal(InteractionErrorCode.INVALID_INPUT, rejected.Error?.Code);
+        Assert.Equal(InteractionErrorCode.INVALID_INPUT, rejected.LeftValue().Code);
         Assert.Same(previousResultTask, actions["Add"].ResultTask);
 
         var worked = actions["WorkAsync"].Invoke(new Dictionary<string, object?>
         {
             ["steps"] = 3,
         });
-        Assert.Equal(InvocationStatus.RUNNING, worked.Value);
+        Assert.Equal(InvocationStatus.RUNNING, worked.RightValue());
         Assert.Equal(InvocationStatus.RUNNING, actions["WorkAsync"].Status);
         var workResultTask = actions["WorkAsync"].ResultTask!;
         Assert.False(workResultTask.IsCompleted);
@@ -421,32 +423,32 @@ public sealed class RuntimeBehaviorTests
         {
             ["steps"] = 4,
         });
-        Assert.Equal(InteractionErrorCode.UNAVAILABLE, overlapping.Error?.Code);
+        Assert.Equal(InteractionErrorCode.UNAVAILABLE, overlapping.LeftValue().Code);
         Assert.Equal(invocationCount, model.InvocationCount);
         model.CompleteWork();
-        Assert.Equal(3, (await workResultTask).Value);
+        Assert.Equal(3, (await workResultTask).RightValue());
         Assert.Equal(InvocationStatus.SUCCEEDED, actions["WorkAsync"].Status);
         var completedWork = actions["WorkAsync"].ResultTask;
         var workedAgain = actions["WorkAsync"].Invoke(new Dictionary<string, object?>
         {
             ["steps"] = 2,
         });
-        Assert.Equal(InvocationStatus.SUCCEEDED, workedAgain.Value);
+        Assert.Equal(InvocationStatus.SUCCEEDED, workedAgain.RightValue());
         Assert.NotSame(completedWork, actions["WorkAsync"].ResultTask);
-        Assert.Equal(3, (await completedWork!).Value);
-        Assert.Equal(2, (await actions["WorkAsync"].ResultTask!).Value);
+        Assert.Equal(3, (await completedWork!).RightValue());
+        Assert.Equal(2, (await actions["WorkAsync"].ResultTask!).RightValue());
 
         var failed = actions["Fail"].Invoke(new Dictionary<string, object?>());
-        Assert.Equal(InvocationStatus.FAILED, failed.Value);
+        Assert.Equal(InvocationStatus.FAILED, failed.RightValue());
         var fault = await actions["Fail"].ResultTask!;
-        Assert.Equal(InteractionErrorCode.FAULT, fault.Error?.Code);
+        Assert.Equal(InteractionErrorCode.FAULT, fault.LeftValue().Code);
         Assert.Equal(InvocationStatus.FAILED, actions["Fail"].Status);
 
         var failedAsync = actions["FailAsync"].Invoke(new Dictionary<string, object?>());
-        Assert.True(failedAsync.IsSuccess);
+        Assert.True(failedAsync.IsRight);
         var asyncFault = await actions["FailAsync"].ResultTask!;
         Assert.Equal(InvocationStatus.FAILED, actions["FailAsync"].Status);
-        Assert.Equal(InteractionErrorCode.FAULT, asyncFault.Error?.Code);
+        Assert.Equal(InteractionErrorCode.FAULT, asyncFault.LeftValue().Code);
     }
 
     [Fact]
@@ -456,24 +458,24 @@ public sealed class RuntimeBehaviorTests
         using var host = new UIEngineHost();
         host.SetRoot("model", model);
         var first = (IMethodNode)Assert.Single(
-            ((IObjectNode)host.ResolveRootNode("model").Value.Node).Members,
+            ((IObjectNode)host.ResolveRootNode("model").RightValue().Node).Members,
             static member => member.Name == "WorkAsync");
         var second = (IMethodNode)Assert.Single(
-            ((IObjectNode)host.ResolveRootNode("model").Value.Node).Members,
+            ((IObjectNode)host.ResolveRootNode("model").RightValue().Node).Members,
             static member => member.Name == "WorkAsync");
 
         var firstStarted = first.Invoke(new Dictionary<string, object?> { ["steps"] = 1 });
         var secondStarted = second.Invoke(new Dictionary<string, object?> { ["steps"] = 2 });
 
-        Assert.Equal(InvocationStatus.RUNNING, firstStarted.Value);
-        Assert.Equal(InvocationStatus.RUNNING, secondStarted.Value);
+        Assert.Equal(InvocationStatus.RUNNING, firstStarted.RightValue());
+        Assert.Equal(InvocationStatus.RUNNING, secondStarted.RightValue());
         Assert.NotSame(first.ResultTask, second.ResultTask);
         Assert.Equal(2, model.InvocationCount);
 
         model.CompleteWork();
         var results = await Task.WhenAll(first.ResultTask!, second.ResultTask!);
-        Assert.Equal(1, results[0].Value);
-        Assert.Equal(2, results[1].Value);
+        Assert.Equal(1, results[0].RightValue());
+        Assert.Equal(2, results[1].RightValue());
     }
 
     [Fact]
@@ -484,7 +486,7 @@ public sealed class RuntimeBehaviorTests
         host.SetRoot("model", model);
         var resolved = host.ResolveRootNode("model");
         var work = Assert.Single(
-            ((IObjectNode)resolved.Value.Node).Members,
+            ((IObjectNode)resolved.RightValue().Node).Members,
             action => action.Name == "WorkAsync");
         var method = (IMethodNode)work;
         var started = method.Invoke(new Dictionary<string, object?> { ["steps"] = 5 });
@@ -492,14 +494,14 @@ public sealed class RuntimeBehaviorTests
 
         host.Dispose();
 
-        Assert.Equal(InvocationStatus.RUNNING, started.Value);
+        Assert.Equal(InvocationStatus.RUNNING, started.RightValue());
         Assert.False(resultTask.IsCompleted);
         Assert.Equal(InvocationStatus.RUNNING, method.Status);
 
         model.CompleteWork();
         var result = await resultTask;
         Assert.Equal(InvocationStatus.SUCCEEDED, method.Status);
-        Assert.Equal(5, result.Value);
+        Assert.Equal(5, result.RightValue());
     }
 
     [Fact]
@@ -604,16 +606,16 @@ public sealed class RuntimeBehaviorTests
                 type == typeof(string));
         Assert.Null(typeof(LogicalPath).GetMethod("Parse", [typeof(string)]));
         Assert.Equal(
-            typeof(InteractionResult<object?>),
+            typeof(Either<InteractionError, Option<object>>),
             typeof(IReadableValueNode).GetMethod(nameof(IReadableValueNode.ReadValue))!.ReturnType);
         Assert.Equal(
-            typeof(InteractionResult<InvocationStatus>),
+            typeof(Either<InteractionError, InvocationStatus>),
             typeof(IMethodNode).GetMethod(nameof(IMethodNode.Invoke))!.ReturnType);
         Assert.Equal(
             typeof(InvocationStatus?),
             typeof(IMethodNode).GetProperty(nameof(IMethodNode.Status))!.PropertyType);
         Assert.Equal(
-            typeof(Task<InteractionResult<object>>),
+            typeof(Task<Either<InteractionError, Option<object>>>),
             typeof(IMethodNode).GetProperty(nameof(IMethodNode.ResultTask))!.PropertyType);
         Assert.Null(typeof(IMethodNode).GetProperty("Completion"));
         Assert.Null(typeof(IMethodNode).GetProperty("Result"));
@@ -661,10 +663,10 @@ public sealed class RuntimeBehaviorTests
     private static void _StartWorkWithoutRetainingNode(UIEngineHost host)
     {
         var work = (IMethodNode)Assert.Single(
-            ((IObjectNode)host.ResolveRootNode("model").Value.Node).Members,
+            ((IObjectNode)host.ResolveRootNode("model").RightValue().Node).Members,
             static member => member.Name == "WorkAsync");
         var started = work.Invoke(new Dictionary<string, object?> { ["steps"] = 1 });
-        Assert.Equal(InvocationStatus.RUNNING, started.Value);
+        Assert.Equal(InvocationStatus.RUNNING, started.RightValue());
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]
@@ -677,7 +679,7 @@ public sealed class RuntimeBehaviorTests
         model.Child = child;
         var resolved = host.ResolvePath(_Path(_Member("model"), _Member("Child")));
         var member = Assert.Single(
-            ((IObjectNode)resolved.Value.Node).Members,
+            ((IObjectNode)resolved.RightValue().Node).Members,
             static candidate => candidate.Name == nameof(_DomainObject.Key));
         model.Child = null;
         return ((IReadableValueNode)member, target);

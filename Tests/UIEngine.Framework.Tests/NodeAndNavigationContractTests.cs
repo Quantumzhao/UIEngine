@@ -164,11 +164,11 @@ public sealed class NodeAndNavigationContractTests
 
         public IValueRange? Range => null;
 
-        public InteractionResult<object?> ReadValue() =>
-            InteractionResult.Success<object?>(_State.READY);
+        public Either<InteractionError, Option<object>> ReadValue() =>
+            Right(Some<object>(_State.READY));
 
-        public InteractionResult<object?> WriteValue(object? value) =>
-            InteractionResult.Success(value);
+        public Either<InteractionError, Option<object>> WriteValue(object? value) =>
+            Right(Optional(value));
     }
 
     private sealed class _ProgrammaticStringNode(UIEngineHost host)
@@ -177,8 +177,8 @@ public sealed class NodeAndNavigationContractTests
             IStringNode,
             IReadableValueNode
     {
-        public InteractionResult<object?> ReadValue() =>
-            InteractionResult.Success<object?>("name");
+        public Either<InteractionError, Option<object>> ReadValue() =>
+            Right(Some<object>("name"));
     }
 
     private sealed class _ObjectNode(UIEngineHost host)
@@ -198,9 +198,9 @@ public sealed class NodeAndNavigationContractTests
 
         public Type? KeyType => null;
 
-        public InteractionResult<CollectionSlice> ReadEntries(
+        public Either<InteractionError, CollectionSlice> ReadEntries(
             long offset,
-            int limit) => InteractionResult.Success(new CollectionSlice(offset, [], 0, false));
+            int limit) => Right(new CollectionSlice(offset, [], 0, false));
     }
 
     private sealed class _MethodNode(UIEngineHost host)
@@ -216,9 +216,9 @@ public sealed class NodeAndNavigationContractTests
 
         public InvocationStatus? Status => null;
 
-        public Task<InteractionResult<object?>>? ResultTask => null;
+        public Task<Either<InteractionError, Option<object>>>? ResultTask => null;
 
-        public InteractionResult<InvocationStatus> Invoke(
+        public Either<InteractionError, InvocationStatus> Invoke(
             IReadOnlyDictionary<string, object?> arguments) => throw new NotSupportedException();
     }
 

@@ -1,5 +1,7 @@
 using System.ComponentModel.DataAnnotations;
 using System.Reflection;
+using LanguageExt;
+using static LanguageExt.Prelude;
 
 namespace UIEngine.Core;
 
@@ -9,9 +11,9 @@ internal sealed class LiveMethodNode : LiveReflectedMemberNode, IMethodNode
     private readonly MethodInfo _Method;
     private readonly List<IReadOnlyList<ValidationAttribute>> _ValidationAttributes;
     private readonly Lock _InvocationGate = new();
-    private Task<InteractionResult<object?>>? _ResultTask;
+    private Task<Either<InteractionError, Option<object>>>? _ResultTask;
 
-    public static InteractionResult<LiveMethodNode> Create(
+    public static Either<InteractionError, LiveMethodNode> Create(
         UIEngineHost host,
         Guid owner,
         ReflectedMember member)
@@ -53,14 +55,14 @@ internal sealed class LiveMethodNode : LiveReflectedMemberNode, IMethodNode
             resultType = returnType;
         }
 
-        return InteractionResult.Success(new LiveMethodNode(
+        return Right(new LiveMethodNode(
             host, owner, member, method, parameters, resultType));
     }
 
-    private static InteractionResult<LiveMethodNode> _Unsupported(MethodInfo method, string reason) =>
-        InteractionResult.Failure<LiveMethodNode>(
+    private static Either<InteractionError, LiveMethodNode> _Unsupported(MethodInfo method, string reason) =>
+        Left(new InteractionError(
             InteractionErrorCode.UNSUPPORTED,
-            $"Action '{method.Name}' is unsupported because {reason}.");
+            $"Action '{method.Name}' is unsupported because {reason}."));
 
     private LiveMethodNode(
         UIEngineHost host,
@@ -117,7 +119,7 @@ internal sealed class LiveMethodNode : LiveReflectedMemberNode, IMethodNode
         }
     }
 
-    public Task<InteractionResult<object?>>? ResultTask
+    public Task<Either<InteractionError, Option<object>>>? ResultTask
     {
         get
         {
@@ -128,7 +130,7 @@ internal sealed class LiveMethodNode : LiveReflectedMemberNode, IMethodNode
         }
     }
 
-    public InteractionResult<InvocationStatus> Invoke(
+    public Either<InteractionError, InvocationStatus> Invoke(
         IReadOnlyDictionary<string, object?> arguments) => Host.Execute(
         $"invoke action {Name}",
         () =>
@@ -142,18 +144,18 @@ internal sealed class LiveMethodNode : LiveReflectedMemberNode, IMethodNode
             }
 
             var target = Host.ResolveTarget(_Owner);
-            if (!target.IsSuccess)
+            if (!target.IsRight)
             {
-                return InteractionResult.Failure<InvocationStatus>(target.Error!);
+                return Left((InteractionError)target);
             }
 
             var unknown = arguments.Keys.FirstOrDefault(name =>
                 Parameters.All(parameter => !StringComparer.Ordinal.Equals(parameter.Name, name)));
             if (unknown is not null)
             {
-                return InteractionResult.Failure<InvocationStatus>(
+                return Left(new InteractionError(
                     InteractionErrorCode.INVALID_INPUT,
-                    $"Action '{Name}' has no parameter named '{unknown}'.");
+                    $"Action '{Name}' has no parameter named '{unknown}'."));
             }
 
             var bound = new object?[Parameters.Count];
@@ -165,13 +167,13 @@ internal sealed class LiveMethodNode : LiveReflectedMemberNode, IMethodNode
                     if (metadata.IsRequired)
                     {
                         var message = $"Required parameter '{metadata.Name}' was not supplied.";
-                        return InteractionResult.Failure<InvocationStatus>(
+                        return Left(new InteractionError(
                             InteractionErrorCode.INVALID_INPUT,
                             message,
                             [new ValidationIssue(
                                 ValidationIssueCode.REQUIRED,
                                 metadata.Name,
-                                message)]);
+                                message)]));
                     }
 
                     bound[index] = metadata.HasDefaultValue
@@ -181,31 +183,32 @@ internal sealed class LiveMethodNode : LiveReflectedMemberNode, IMethodNode
                 }
 
                 var converted = ValueConversion.Convert(supplied, metadata.ParameterType);
-                if (!converted.IsSuccess)
+                if (!converted.IsRight)
                 {
-                    return InteractionResult.Failure<InvocationStatus>(converted.Error!);
+                    return Left((InteractionError)converted);
                 }
 
+                var convertedValue = ((Option<object>)converted).IfNoneUnsafe((object?)null);
                 var issues = ValueConversion.Validate(
-                    converted.Value,
+                    convertedValue,
                     metadata.IsNullable,
                     metadata.Options,
                     metadata.Range,
                     _ValidationAttributes[index],
-                    target.Value,
+                    target.IfLeft(static error => throw new InvalidOperationException(error.Message)),
                     metadata.Name);
                 if (issues.Count > 0)
                 {
-                    return InteractionResult.Failure<InvocationStatus>(
+                    return Left(new InteractionError(
                         InteractionErrorCode.VALIDATION_FAILED,
                         $"Parameter '{metadata.Name}' failed validation.",
-                        issues);
+                        issues));
                 }
 
-                bound[index] = converted.Value;
+                bound[index] = convertedValue;
             }
 
-            TaskCompletionSource<InteractionResult<object?>> completion;
+            TaskCompletionSource<Either<InteractionError, Option<object>>> completion;
             lock (_InvocationGate)
             {
                 if (_ResultTask is { IsCompleted: false })
@@ -213,14 +216,16 @@ internal sealed class LiveMethodNode : LiveReflectedMemberNode, IMethodNode
                     return _AlreadyRunning();
                 }
 
-                completion = new TaskCompletionSource<InteractionResult<object?>>(
+                completion = new TaskCompletionSource<Either<InteractionError, Option<object>>>(
                     TaskCreationOptions.RunContinuationsAsynchronously);
                 _ResultTask = completion.Task;
             }
 
             try
             {
-                var returned = _Method.Invoke(target.Value, bound);
+                var returned = _Method.Invoke(
+                    target.IfLeft(static error => throw new InvalidOperationException(error.Message)),
+                    bound);
                 if (IsAsynchronous)
                 {
                     if (returned is Task task)
@@ -237,7 +242,8 @@ internal sealed class LiveMethodNode : LiveReflectedMemberNode, IMethodNode
                 }
                 else
                 {
-                    completion.TrySetResult(InteractionResult.Success(returned));
+                    completion.TrySetResult(Right(
+                        Optional(returned)));
                 }
             }
             catch (TargetInvocationException exception)
@@ -249,19 +255,19 @@ internal sealed class LiveMethodNode : LiveReflectedMemberNode, IMethodNode
                 _CompleteFailure(completion, exception);
             }
 
-            return InteractionResult.Success(_GetStatus(completion.Task));
+            return Right(_GetStatus(completion.Task));
         });
 
-    private static InvocationStatus _GetStatus(Task<InteractionResult<object?>> resultTask)
+    private static InvocationStatus _GetStatus(Task<Either<InteractionError, Option<object>>> resultTask)
     {
         if (!resultTask.IsCompletedSuccessfully) return InvocationStatus.RUNNING;
-        return resultTask.Result.IsSuccess
+        return resultTask.Result.IsRight
             ? InvocationStatus.SUCCEEDED
             : InvocationStatus.FAILED;
     }
 
     private async Task _CompleteAsync(
-        TaskCompletionSource<InteractionResult<object?>> completion,
+        TaskCompletionSource<Either<InteractionError, Option<object>>> completion,
         Task task)
     {
         try
@@ -270,7 +276,7 @@ internal sealed class LiveMethodNode : LiveReflectedMemberNode, IMethodNode
             var result = ResultType is null
                 ? null
                 : task.GetType().GetProperty(nameof(Task<object>.Result))?.GetValue(task);
-            completion.TrySetResult(InteractionResult.Success(result));
+            completion.TrySetResult(Right(Optional(result)));
         }
         catch (Exception exception)
         {
@@ -278,20 +284,20 @@ internal sealed class LiveMethodNode : LiveReflectedMemberNode, IMethodNode
         }
     }
 
-    private InteractionResult<InvocationStatus> _AlreadyRunning() =>
-        InteractionResult.Failure<InvocationStatus>(
+    private Either<InteractionError, InvocationStatus> _AlreadyRunning() =>
+        Left(new InteractionError(
             InteractionErrorCode.UNAVAILABLE,
-            $"Action '{Name}' is already running on this method node.");
+            $"Action '{Name}' is already running on this method node."));
 
     private void _CompleteFailure(
-        TaskCompletionSource<InteractionResult<object?>> completion,
+        TaskCompletionSource<Either<InteractionError, Option<object>>> completion,
         Exception exception)
     {
-        completion.TrySetResult(InteractionResult.Failure<object?>(
+        completion.TrySetResult(Left(new InteractionError(
             exception is UnauthorizedAccessException
                 ? InteractionErrorCode.PERMISSION_DENIED
                 : InteractionErrorCode.FAULT,
-            exception.Message));
+            exception.Message)));
         Host.ReportInvocationFault(exception);
     }
 }

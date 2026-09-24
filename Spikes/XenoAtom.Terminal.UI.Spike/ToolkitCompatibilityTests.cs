@@ -98,7 +98,7 @@ public sealed class ToolkitCompatibilityTests
         host.SetRoot("model", source);
         var resolved = host.ResolveRootNode("model");
         var collection = Assert.IsAssignableFrom<ICollectionNode>(Assert.Single(
-            ((IObjectNode)resolved.Value.Node).Members));
+            ((IObjectNode)((ResolvedNode)resolved).Node).Members));
         var list = new ListBox<string>();
         var templateProbe = new _TemplateProbe();
         list.ItemTemplate = new DataTemplate<string>(
@@ -118,12 +118,12 @@ public sealed class ToolkitCompatibilityTests
                 switch (phase)
                 {
                     case 0:
-                        _ReplaceItems(list, collection.ReadEntries(0, 3).Value);
+                        _ReplaceItems(list, (CollectionSlice)collection.ReadEntries(0, 3));
                         enumerationCounts.Add(source.MoveNextCount);
                         phase = 1;
                         return TerminalLoopResult.Continue;
                     case 1:
-                        _UpdateItems(list, collection.ReadEntries(3, 3).Value);
+                        _UpdateItems(list, (CollectionSlice)collection.ReadEntries(3, 3));
                         enumerationCounts.Add(source.MoveNextCount);
                         phase = 2;
                         return TerminalLoopResult.Continue;

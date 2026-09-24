@@ -1,34 +1,36 @@
 using System.ComponentModel.DataAnnotations;
 using System.Globalization;
+using LanguageExt;
+using static LanguageExt.Prelude;
 
 namespace UIEngine.Core;
 
 internal static class ValueConversion
 {
-    public static InteractionResult<object?> Convert(object? value, Type destinationType)
+    public static Either<InteractionError, Option<object>> Convert(object? value, Type destinationType)
     {
         var nullableType = Nullable.GetUnderlyingType(destinationType);
         var effectiveType = nullableType ?? destinationType;
         if (value is null)
         {
             return !destinationType.IsValueType || nullableType is not null
-                ? InteractionResult.Success<object?>(null)
-                : InteractionResult.Failure<object?>(
+                ? Right(Option<object>.None)
+                : Left(new InteractionError(
                     InteractionErrorCode.VALIDATION_FAILED,
-                    $"A null value is not valid for '{destinationType.Name}'.");
+                    $"A null value is not valid for '{destinationType.Name}'."));
         }
 
         if (effectiveType.IsInstanceOfType(value))
         {
-            return InteractionResult.Success<object?>(value);
+            return Right(Some(value));
         }
 
         try
         {
             if (effectiveType == typeof(string))
             {
-                return InteractionResult.Success<object?>(
-                    System.Convert.ToString(value, CultureInfo.InvariantCulture) ?? string.Empty);
+                return Right(Some<object>(
+                    System.Convert.ToString(value, CultureInfo.InvariantCulture) ?? string.Empty));
             }
 
             if (effectiveType.IsEnum)
@@ -37,14 +39,14 @@ internal static class ValueConversion
                 return text is not null &&
                     Enum.TryParse(effectiveType, text, ignoreCase: true, out var parsed) &&
                     Enum.IsDefined(effectiveType, parsed)
-                        ? InteractionResult.Success<object?>(parsed)
+                        ? Right(Some(parsed))
                         : _Failure(value, destinationType);
             }
 
             if (effectiveType == typeof(bool))
             {
                 return value is string boolean && bool.TryParse(boolean, out var parsed)
-                    ? InteractionResult.Success<object?>(parsed)
+                    ? Right(Some<object>(parsed))
                     : _Failure(value, destinationType);
             }
 
@@ -52,16 +54,14 @@ internal static class ValueConversion
             {
                 var text = System.Convert.ToString(value, CultureInfo.InvariantCulture);
                 return text?.Length == 1
-                    ? InteractionResult.Success<object?>(text[0])
+                    ? Right(Some<object>(text[0]))
                     : _Failure(value, destinationType);
             }
 
             if (IsNumeric(effectiveType))
             {
-                return InteractionResult.Success<object?>(System.Convert.ChangeType(
-                    value,
-                    effectiveType,
-                    CultureInfo.InvariantCulture));
+                return Right(Some(
+                    System.Convert.ChangeType(value, effectiveType, CultureInfo.InvariantCulture)));
             }
         }
         catch (Exception exception) when (
@@ -184,8 +184,8 @@ internal static class ValueConversion
         }
     }
 
-    private static InteractionResult<object?> _Failure(object value, Type destinationType) =>
-        InteractionResult.Failure<object?>(
+    private static Either<InteractionError, Option<object>> _Failure(object value, Type destinationType) =>
+        Left(new InteractionError(
             InteractionErrorCode.CONVERSION_FAILED,
-            $"'{value}' cannot be converted to '{destinationType.Name}'.");
+            $"'{value}' cannot be converted to '{destinationType.Name}'."));
 }

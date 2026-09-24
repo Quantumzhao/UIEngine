@@ -44,47 +44,6 @@ public sealed record InteractionError(
     }
 }
 
-/// <summary>Represents either a successful value or one structured interaction error.</summary>
-public sealed class InteractionResult<T>
-{
-    private readonly T? _Value;
-
-    internal InteractionResult(T value)
-    {
-        IsSuccess = true;
-        _Value = value;
-    }
-
-    internal InteractionResult(InteractionError error)
-    {
-        Error = error;
-    }
-
-    public bool IsSuccess { get; }
-
-    public T Value => IsSuccess
-        ? _Value!
-        : throw new InvalidOperationException("A failed interaction result has no value.");
-
-    public InteractionError? Error { get; }
-}
-
-public static class InteractionResult
-{
-    public static InteractionResult<T> Success<T>(T value) => new(value);
-
-    public static InteractionResult<T> Failure<T>(InteractionErrorCode code, string message) =>
-        new(new InteractionError(code, message));
-
-    public static InteractionResult<T> Failure<T>(
-        InteractionErrorCode code,
-        string message,
-        IReadOnlyList<ValidationIssue> issues) =>
-        new(new InteractionError(code, message, issues));
-
-    internal static InteractionResult<T> Failure<T>(InteractionError error) => new(error);
-}
-
 public sealed record SelectionOption(object? Value, string DisplayName);
 
 /// <summary>Untyped range metadata for runtime-discovered values.</summary>

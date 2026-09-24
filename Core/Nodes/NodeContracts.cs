@@ -1,3 +1,5 @@
+using LanguageExt;
+
 namespace UIEngine.Core;
 
 /// <summary>
@@ -61,13 +63,13 @@ public interface IReferenceNode : INavigableNode
 {
     Type ReferenceType { get; }
 
-    InteractionResult<Guid?> ReadReference();
+    Either<InteractionError, Option<Guid>> ReadReference();
 }
 
 /// <summary>Identifies a node with a readable scalar value.</summary>
 public interface IReadableValueNode
 {
-    InteractionResult<object?> ReadValue();
+    Either<InteractionError, Option<object>> ReadValue();
 }
 
 /// <summary>Identifies a node with a writable scalar value.</summary>
@@ -77,7 +79,7 @@ public interface IWritableValueNode
 
     IValueRange? Range { get; }
 
-    InteractionResult<object?> WriteValue(object? value);
+    Either<InteractionError, Option<object>> WriteValue(object? value);
 }
 
 /// <summary>Identifies a value node that accepts <see langword="null"/>.</summary>
@@ -108,7 +110,7 @@ public interface ICollectionNode : INavigableNode
 
     Type? KeyType { get; }
 
-    InteractionResult<CollectionSlice> ReadEntries(long offset, int limit);
+    Either<InteractionError, CollectionSlice> ReadEntries(long offset, int limit);
 }
 
 /// <summary>Describes one user-supplied method parameter.</summary>
@@ -135,8 +137,8 @@ public interface IMethodNode : IMemberNode
     InvocationStatus? Status { get; }
 
     /// <summary>A task carrying the current invocation's structured outcome.</summary>
-    Task<InteractionResult<object?>>? ResultTask { get; }
+    Task<Either<InteractionError, Option<object>>>? ResultTask { get; }
 
-    InteractionResult<InvocationStatus> Invoke(
+    Either<InteractionError, InvocationStatus> Invoke(
         IReadOnlyDictionary<string, object?> arguments);
 }

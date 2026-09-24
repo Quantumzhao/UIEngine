@@ -14,14 +14,14 @@ public sealed class SynchronousInteractionTests
         host.SetRoot("model", model);
         model.Attach(host);
         var resolved = host.ResolveRootNode("model");
-        var valueNode = Assert.Single(((IObjectNode)resolved.Value.Node).Members);
+        var valueNode = Assert.Single(((IObjectNode)resolved.RightValue().Node).Members);
         Assert.True(valueNode is IReadableValueNode);
         var value = (IReadableValueNode)valueNode;
 
         var read = value.ReadValue();
 
-        Assert.True(read.IsSuccess);
-        Assert.Equal(17, read.Value);
+        Assert.True(read.IsRight);
+        Assert.Equal(17, read.RightValue());
         Assert.True(model.ReentrantDescribeSucceeded);
     }
 
@@ -35,7 +35,7 @@ public sealed class SynchronousInteractionTests
         {
             get
             {
-                ReentrantDescribeSucceeded = _Host!.ResolveRootNode("model").IsSuccess;
+                ReentrantDescribeSucceeded = _Host!.ResolveRootNode("model").IsRight;
                 return 17;
             }
         }

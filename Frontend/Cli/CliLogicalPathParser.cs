@@ -1,12 +1,14 @@
 using System.Globalization;
+using LanguageExt;
 using UIEngine.Core;
+using static LanguageExt.Prelude;
 
 namespace UIEngine.Frontend.Cli;
 
 /// <summary>Parses the CLI's command-text path syntax into Core semantic path segments.</summary>
 internal static class CliLogicalPathParser
 {
-    public static InteractionResult<LogicalPath> Parse(string text)
+    public static Either<InteractionError, LogicalPath> Parse(string text)
     {
         if (string.IsNullOrEmpty(text) || text[0] != '/')
         {
@@ -15,7 +17,7 @@ internal static class CliLogicalPathParser
 
         if (text == "/")
         {
-            return InteractionResult.Success(LogicalPath.Root);
+            return Right(LogicalPath.Root);
         }
 
         var rawSegments = text[1..].Split('/', StringSplitOptions.None);
@@ -28,18 +30,18 @@ internal static class CliLogicalPathParser
         for (var index = 0; index < rawSegments.Length; index++)
         {
             var parsed = _AppendSegment(path, rawSegments[index], index == 0);
-            if (!parsed.IsSuccess)
+            if (!parsed.IsRight)
             {
                 return parsed;
             }
 
-            path = parsed.Value;
+            path = (LogicalPath)parsed;
         }
 
-        return InteractionResult.Success(path);
+        return Right(path);
     }
 
-    private static InteractionResult<LogicalPath> _AppendSegment(
+    private static Either<InteractionError, LogicalPath> _AppendSegment(
         LogicalPath path,
         string raw,
         bool isRoot)
@@ -49,7 +51,7 @@ internal static class CliLogicalPathParser
         {
             return raw.IndexOfAny([']', '=']) >= 0
                 ? _Invalid("A CLI path segment contains an unexpected delimiter.")
-                : InteractionResult.Success(path.Append(raw));
+                : Right(path.Append(raw));
         }
 
         if (isRoot)
@@ -80,15 +82,17 @@ internal static class CliLogicalPathParser
                 value,
                 NumberStyles.None,
                 CultureInfo.InvariantCulture,
-                out var parsedIndex) => InteractionResult.Success(
+                out var parsedIndex) => Right(
                     path.Append(new ListLogicalPathSegment(parsedIndex))),
             "index" => _Invalid("A list index requires a non-negative integer."),
-            "key" => InteractionResult.Success(
+            "key" => Right(
                 path.Append(new DictLogicalPathSegment(value))),
             _ => _Invalid("A CLI collection selection kind is unknown."),
         };
     }
 
-    private static InteractionResult<LogicalPath> _Invalid(string message) =>
-        InteractionResult.Failure<LogicalPath>(InteractionErrorCode.INVALID_INPUT, message);
+    private static Either<InteractionError, LogicalPath> _Invalid(string message) =>
+        Left(new InteractionError(
+            InteractionErrorCode.INVALID_INPUT,
+            message));
 }

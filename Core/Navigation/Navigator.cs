@@ -1,4 +1,6 @@
 using System.Collections.ObjectModel;
+using LanguageExt;
+using static LanguageExt.Prelude;
 
 namespace UIEngine.Core;
 
@@ -43,7 +45,7 @@ public sealed class Navigator
     /// A resolution failure is committed as a broken entry so that <see cref="GoBack"/> can
     /// return to the previous location.
     /// </remarks>
-    public InteractionResult<NavigationPushedChange> Navigate(
+    public Either<InteractionError, NavigationPushedChange> Navigate(
         ILogicalPathSegment segment)
     {
         if (_IsRemoved)
@@ -54,16 +56,16 @@ public sealed class Navigator
         var current = _Entries[^1];
         if (!current.IsResolved)
         {
-            return InteractionResult.Failure<NavigationPushedChange>(
+            return Left(new InteractionError(
                 InteractionErrorCode.INVALID_INPUT,
-                "A broken navigation entry has no child locations.");
+                "A broken navigation entry has no child locations."));
         }
 
         if (current.Node!.IsTerminal)
         {
-            return InteractionResult.Failure<NavigationPushedChange>(
+            return Left(new InteractionError(
                 InteractionErrorCode.UNSUPPORTED,
-                $"Node '{current.Node.Name}' is terminal and cannot be navigated further.");
+                $"Node '{current.Node.Name}' is terminal and cannot be navigated further."));
         }
 
         LogicalPath target;
@@ -73,24 +75,26 @@ public sealed class Navigator
         }
         catch (ArgumentException exception)
         {
-            return InteractionResult.Failure<NavigationPushedChange>(
+            return Left(new InteractionError(
                 InteractionErrorCode.INVALID_INPUT,
-                exception.Message);
+                exception.Message));
         }
 
         var resolved = _Workspace.Host.ResolvePath(target);
-        var entry = resolved.IsSuccess
-            ? new NavigationEntry(resolved.Value.CanonicalPath, resolved.Value.Node)
-            : new NavigationEntry(target, resolved.Error!);
+        var entry = resolved.IsRight
+            ? new NavigationEntry(
+                ((ResolvedPath)resolved).CanonicalPath,
+                ((ResolvedPath)resolved).Node)
+            : new NavigationEntry(target, (InteractionError)resolved);
         _Entries.Add(entry);
 
         var change = new NavigationPushedChange(Id, entry);
         _Workspace.Publish(change);
-        return InteractionResult.Success(change);
+        return Right(change);
     }
 
     /// <summary>Permanently removes the current entry and reveals its parent entry.</summary>
-    public InteractionResult<NavigationPoppedChange> GoBack()
+    public Either<InteractionError, NavigationPoppedChange> GoBack()
     {
         if (_IsRemoved)
         {
@@ -99,16 +103,16 @@ public sealed class Navigator
 
         if (_Entries.Count == 1)
         {
-            return InteractionResult.Failure<NavigationPoppedChange>(
+            return Left(new InteractionError(
                 InteractionErrorCode.INVALID_INPUT,
-                "The navigator is already at its root entry.");
+                "The navigator is already at its root entry."));
         }
 
         var removed = _Entries[^1];
         _Entries.RemoveAt(_Entries.Count - 1);
         var change = new NavigationPoppedChange(Id, removed, _Entries[^1]);
         _Workspace.Publish(change);
-        return InteractionResult.Success(change);
+        return Right(change);
     }
 
     internal IReadOnlyList<NavigationEntry> Remove()
@@ -119,7 +123,8 @@ public sealed class Navigator
         return entries;
     }
 
-    private static InteractionResult<T> _Disposed<T>() => InteractionResult.Failure<T>(
-        InteractionErrorCode.DISPOSED,
-        "The navigator has been removed from its workspace.");
+    private static Either<InteractionError, T> _Disposed<T>() =>
+        Left(new InteractionError(
+            InteractionErrorCode.DISPOSED,
+            "The navigator has been removed from its workspace."));
 }

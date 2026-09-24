@@ -1,5 +1,7 @@
 using System.ComponentModel.DataAnnotations;
 using System.Reflection;
+using LanguageExt;
+using static LanguageExt.Prelude;
 
 namespace UIEngine.Core;
 
@@ -42,70 +44,75 @@ internal sealed class ValueNodeBinding(
 
     public IValueRange? Range { get; } = range;
 
-    public InteractionResult<object?> Read() => _Host.Execute(
+    public Either<InteractionError, Option<object>> Read() => _Host.Execute<Option<object>>(
         $"read value {Name}",
         () =>
         {
             if (!CanRead)
             {
-                return InteractionResult.Failure<object?>(
+                return Left(new InteractionError(
                     InteractionErrorCode.UNSUPPORTED,
-                    $"Value '{Name}' is not readable.");
+                    $"Value '{Name}' is not readable."));
             }
 
             var target = _Host.ResolveTarget(_Owner);
-            if (!target.IsSuccess)
+            if (!target.IsRight)
             {
-                return InteractionResult.Failure<object?>(target.Error!);
+                return Left((InteractionError)target);
             }
 
-            return InteractionResult.Success(_Read(target.Value));
+            return Right(Optional(_Read(target.IfLeft(
+                static error => throw new InvalidOperationException(error.Message)))));
         });
 
-    public InteractionResult<object?> Write(object? value) => _Host.Execute(
+    public Either<InteractionError, Option<object>> Write(object? value) =>
+        _Host.Execute<Option<object>>(
         $"write value {Name}",
         () =>
         {
             if (!CanWrite || _Write is null)
             {
                 var message = $"Value '{Name}' is read-only.";
-                return InteractionResult.Failure<object?>(
+                return Left(new InteractionError(
                     InteractionErrorCode.VALIDATION_FAILED,
                     message,
-                    [new ValidationIssue(ValidationIssueCode.READ_ONLY, Name, message)]);
+                    [new ValidationIssue(ValidationIssueCode.READ_ONLY, Name, message)]));
             }
 
             var target = _Host.ResolveTarget(_Owner);
-            if (!target.IsSuccess)
+            if (!target.IsRight)
             {
-                return InteractionResult.Failure<object?>(target.Error!);
+                return Left((InteractionError)target);
             }
 
             var converted = ValueConversion.Convert(value, ValueType);
-            if (!converted.IsSuccess)
+            if (!converted.IsRight)
             {
-                return InteractionResult.Failure<object?>(converted.Error!);
+                return Left((InteractionError)converted);
             }
 
+            var convertedValue = ((Option<object>)converted).IfNoneUnsafe((object?)null);
             var issues = ValueConversion.Validate(
-                converted.Value,
+                convertedValue,
                 IsNullable,
                 Options,
                 Range,
                 _ValidationAttributes,
-                target.Value,
+                target.IfLeft(static error => throw new InvalidOperationException(error.Message)),
                 Name);
             if (issues.Count > 0)
             {
-                return InteractionResult.Failure<object?>(
+                return Left(new InteractionError(
                     InteractionErrorCode.VALIDATION_FAILED,
                     $"Value '{Name}' failed validation.",
-                    issues);
+                    issues));
             }
 
             try
             {
-                _Write(target.Value, converted.Value);
+                _Write(
+                    target.IfLeft(static error => throw new InvalidOperationException(error.Message)),
+                    convertedValue);
             }
             catch (TargetInvocationException exception)
                 when (exception.InnerException is ArgumentException or InvalidOperationException)
@@ -117,12 +124,12 @@ internal sealed class ValueNodeBinding(
                 return _SetterRejected(exception);
             }
 
-            return InteractionResult.Success(converted.Value);
+            return Right(Optional(convertedValue));
         });
 
-    private InteractionResult<object?> _SetterRejected(Exception exception) =>
-        InteractionResult.Failure<object?>(
+    private Either<InteractionError, Option<object>> _SetterRejected(Exception exception) =>
+        Left(new InteractionError(
             InteractionErrorCode.VALIDATION_FAILED,
             exception.Message,
-            [new ValidationIssue(ValidationIssueCode.RULE_FAILED, Name, exception.Message)]);
+            [new ValidationIssue(ValidationIssueCode.RULE_FAILED, Name, exception.Message)]));
 }

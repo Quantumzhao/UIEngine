@@ -1,5 +1,7 @@
 using System.Collections;
 using System.Globalization;
+using LanguageExt;
+using static LanguageExt.Prelude;
 
 namespace UIEngine.Core;
 
@@ -20,20 +22,20 @@ internal sealed class CollectionNodeBinding(
 
     public Type? KeyType { get; } = CollectionReflection.GetKeyType(collectionType);
 
-    public InteractionResult<CollectionSlice> Read(long offset, int limit)
+    public Either<InteractionError, CollectionSlice> Read(long offset, int limit)
     {
         if (offset < 0 || limit <= 0)
         {
-            return InteractionResult.Failure<CollectionSlice>(
+            return Left(new InteractionError(
                 InteractionErrorCode.INVALID_INPUT,
-                "Collection offset must be non-negative and limit must be positive.");
+                "Collection offset must be non-negative and limit must be positive."));
         }
 
         if (limit > Host.MaxCollectionItems)
         {
-            return InteractionResult.Failure<CollectionSlice>(
+            return Left(new InteractionError(
                 InteractionErrorCode.INVALID_INPUT,
-                $"Collection limit {limit} exceeds the host maximum {Host.MaxCollectionItems}.");
+                $"Collection limit {limit} exceeds the host maximum {Host.MaxCollectionItems}."));
         }
 
         return Host.Execute(
@@ -41,102 +43,112 @@ internal sealed class CollectionNodeBinding(
             () =>
             {
                 var source = _ReadSource();
-                return source.IsSuccess
-                    ? _ReadSlice(source.Value, offset, limit)
-                    : InteractionResult.Failure<CollectionSlice>(source.Error!);
+                return source.IsRight
+                    ? _ReadSlice(
+                        source.IfLeft(static error =>
+                            throw new InvalidOperationException(error.Message)),
+                        offset,
+                        limit)
+                    : Left((InteractionError)source);
             });
     }
 
-    public InteractionResult<IReadOnlyList<Guid>> Select(ListLogicalPathSegment segment)
+    public Either<InteractionError, IReadOnlyList<Guid>> Select(ListLogicalPathSegment segment)
     {
         return Host.Execute(
             $"select from list {Name}",
             () =>
             {
                 var source = _ReadSource();
-                if (!source.IsSuccess)
+                if (!source.IsRight)
                 {
-                    return InteractionResult.Failure<IReadOnlyList<Guid>>(source.Error!);
+                    return Left((InteractionError)source);
                 }
 
-                if (!CollectionReflection.IsList(source.Value.GetType()))
+                var enumerable = source.IfLeft(
+                    static error => throw new InvalidOperationException(error.Message));
+                if (!CollectionReflection.IsList(enumerable.GetType()))
                 {
-                    return InteractionResult.Failure<IReadOnlyList<Guid>>(
+                    return Left(new InteractionError(
                         InteractionErrorCode.TYPE_MISMATCH,
-                        $"Collection '{Name}' does not provide list semantics.");
+                        $"Collection '{Name}' does not provide list semantics."));
                 }
 
                 if (segment.Index > int.MaxValue)
                 {
-                    return InteractionResult.Success<IReadOnlyList<Guid>>([]);
+                    return Right((IReadOnlyList<Guid>)[]);
                 }
 
-                var slice = _ReadSlice(source.Value, segment.Index, 1);
-                return slice.IsSuccess
-                    ? _ReferenceHandles(slice.Value.Entries)
-                    : InteractionResult.Failure<IReadOnlyList<Guid>>(slice.Error!);
+                var slice = _ReadSlice(enumerable, segment.Index, 1);
+                return slice.IsRight
+                    ? _ReferenceHandles(((CollectionSlice)slice).Entries)
+                    : Left((InteractionError)slice);
             });
     }
 
-    public InteractionResult<IReadOnlyList<Guid>> Select(DictLogicalPathSegment segment)
+    public Either<InteractionError, IReadOnlyList<Guid>> Select(DictLogicalPathSegment segment)
     {
-        return Host.Execute(
+        return Host.Execute<IReadOnlyList<Guid>>(
             $"select from dictionary {Name}",
             () =>
             {
                 var source = _ReadSource();
-                if (!source.IsSuccess)
+                if (!source.IsRight)
                 {
-                    return InteractionResult.Failure<IReadOnlyList<Guid>>(source.Error!);
+                    return Left((InteractionError)source);
                 }
 
-                if (CollectionReflection.GetKeyType(source.Value.GetType()) is null)
+                var enumerable = source.IfLeft(
+                    static error => throw new InvalidOperationException(error.Message));
+                if (CollectionReflection.GetKeyType(enumerable.GetType()) is null)
                 {
-                    return InteractionResult.Failure<IReadOnlyList<Guid>>(
+                    return Left(new InteractionError(
                         InteractionErrorCode.TYPE_MISMATCH,
-                        $"Collection '{Name}' does not provide dictionary semantics.");
+                        $"Collection '{Name}' does not provide dictionary semantics."));
                 }
 
-                var snapshot = _ReadSlice(source.Value, 0, Host.MaxCollectionItems);
-                if (!snapshot.IsSuccess)
+                var snapshot = _ReadSlice(enumerable, 0, Host.MaxCollectionItems);
+                if (!snapshot.IsRight)
                 {
-                    return InteractionResult.Failure<IReadOnlyList<Guid>>(snapshot.Error!);
+                    return Left((InteractionError)snapshot);
                 }
 
-                if (snapshot.Value.HasMore)
+                var slice = (CollectionSlice)snapshot;
+                if (slice.HasMore)
                 {
-                    return InteractionResult.Failure<IReadOnlyList<Guid>>(
+                    return Left(new InteractionError(
                         InteractionErrorCode.UNSUPPORTED,
-                        $"Collection '{Name}' is too large for bounded selector lookup.");
+                        $"Collection '{Name}' is too large for bounded selector lookup."));
                 }
 
-                var matches = snapshot.Value.Entries
+                var matches = slice.Entries
                     .OfType<ReferenceCollectionEntry>()
                     .Where(entry => StringComparer.Ordinal.Equals(
                         Convert.ToString(entry.Key, CultureInfo.InvariantCulture),
                         segment.Key))
                     .Select(static entry => entry.Handle)
                     .ToArray();
-                return InteractionResult.Success<IReadOnlyList<Guid>>(matches);
+                return Right((IReadOnlyList<Guid>)matches);
             });
     }
 
-    private InteractionResult<IEnumerable> _ReadSource()
+    private Either<InteractionError, IEnumerable> _ReadSource()
     {
         var target = Host.ResolveTarget(owner);
-        if (!target.IsSuccess)
+        if (!target.IsRight)
         {
-            return InteractionResult.Failure<IEnumerable>(target.Error!);
+            return Left((InteractionError)target);
         }
 
-        return read(target.Value) is IEnumerable source
-            ? InteractionResult.Success(source)
-            : InteractionResult.Failure<IEnumerable>(
+        return read(target.IfLeft(
+            static error => throw new InvalidOperationException(error.Message))) is IEnumerable source
+            ? Right(source)
+            : Left(new InteractionError(
                 InteractionErrorCode.UNAVAILABLE,
-                $"Collection '{Name}' is null or unavailable.");
+                $"Collection '{Name}' is null or unavailable."));
     }
 
-    private InteractionResult<CollectionSlice> _ReadSlice(
+    private Either<InteractionError, CollectionSlice> _ReadSlice(
         IEnumerable source,
         long offset,
         int limit)
@@ -160,9 +172,9 @@ internal sealed class CollectionNodeBinding(
         {
             if (offset + limit > Host.MaxCollectionItems)
             {
-                return InteractionResult.Failure<CollectionSlice>(
+                return Left(new InteractionError(
                     InteractionErrorCode.UNSUPPORTED,
-                    "A non-indexed collection read would exceed the host's bounded scan limit.");
+                    "A non-indexed collection read would exceed the host's bounded scan limit."));
             }
 
             if (CollectionReflection.TryGetCount(source, out count))
@@ -191,7 +203,8 @@ internal sealed class CollectionNodeBinding(
             }
         }
 
-        return InteractionResult.Success(new CollectionSlice(offset, entries, total, hasMore));
+        return Right(
+            new CollectionSlice(offset, entries, total, hasMore));
     }
 
     private CollectionEntry _CreateEntry(long position, object? key, object? value)
@@ -209,21 +222,20 @@ internal sealed class CollectionNodeBinding(
         return new ReferenceCollectionEntry(position, Host.GetOrCreateHandle(value), key);
     }
 
-    private static InteractionResult<IReadOnlyList<Guid>> _ReferenceHandles(
+    private static Either<InteractionError, IReadOnlyList<Guid>> _ReferenceHandles(
         IReadOnlyList<CollectionEntry> entries)
     {
         if (entries.Count == 0)
         {
-            return InteractionResult.Success<IReadOnlyList<Guid>>([]);
+            return Right((IReadOnlyList<Guid>)[]);
         }
 
         return entries.All(static entry => entry is ReferenceCollectionEntry)
-            ? InteractionResult.Success<IReadOnlyList<Guid>>(
-                entries.Cast<ReferenceCollectionEntry>()
+            ? Right((IReadOnlyList<Guid>)entries.Cast<ReferenceCollectionEntry>()
                     .Select(static entry => entry.Handle)
                     .ToArray())
-            : InteractionResult.Failure<IReadOnlyList<Guid>>(
+            : Left(new InteractionError(
                 InteractionErrorCode.TYPE_MISMATCH,
-                "The collection selector does not identify a reference object.");
+                "The collection selector does not identify a reference object."));
     }
 }

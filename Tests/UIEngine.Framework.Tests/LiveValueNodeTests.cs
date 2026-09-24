@@ -63,11 +63,11 @@ public sealed class LiveValueNodeTests
         var writeWithoutRead = ((IWritableValueNode)writeOnly).WriteValue("updated");
         var read = ((IReadableValueNode)second[nameof(_ReflectedModel.State)]).ReadValue();
 
-        Assert.True(write.IsSuccess);
-        Assert.True(writeWithoutRead.IsSuccess);
+        Assert.True(write.IsRight);
+        Assert.True(writeWithoutRead.IsRight);
         Assert.Equal(_State.READY, model.State);
         Assert.Equal("updated", model.WrittenValue);
-        Assert.Equal(_State.READY, read.Value);
+        Assert.Equal(_State.READY, read.RightValue());
     }
 
     [Fact]
@@ -100,9 +100,9 @@ public sealed class LiveValueNodeTests
         var write = writable.WriteValue("12.5");
         var read = ((IReadableValueNode)second).ReadValue();
 
-        Assert.True(write.IsSuccess);
+        Assert.True(write.IsRight);
         Assert.Equal(12.5m, model.Amount);
-        Assert.Equal(12.5m, read.Value);
+        Assert.Equal(12.5m, read.RightValue());
     }
 
     private static Dictionary<string, BaseNode> _ResolveMembers(
@@ -110,8 +110,8 @@ public sealed class LiveValueNodeTests
         string rootName)
     {
         var resolved = host.ResolveRootNode(rootName);
-        Assert.True(resolved.IsSuccess);
-        return ((IObjectNode)resolved.Value.Node).Members.ToDictionary(
+        Assert.True(resolved.IsRight);
+        return ((IObjectNode)resolved.RightValue().Node).Members.ToDictionary(
             static node => node.Name,
             StringComparer.Ordinal);
     }

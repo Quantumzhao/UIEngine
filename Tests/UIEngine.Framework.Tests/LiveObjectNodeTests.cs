@@ -11,48 +11,48 @@ public sealed class LiveObjectNodeTests
     {
         var model = new _Model();
         using var host = new UIEngineHost(new UIEngineHostOptions { MaxCollectionItems = 2 });
-        var handle = host.SetRoot("model", model).Value;
+        var handle = host.SetRoot("model", model).RightValue();
 
         var first = host.ResolveRootNode("model");
         var second = host.ResolveRootNode("model");
 
-        Assert.True(first.IsSuccess);
-        Assert.True(second.IsSuccess);
-        Assert.Equal("/model", first.Value.CanonicalPath.ToString());
-        Assert.NotSame(first.Value.Node, second.Value.Node);
-        var firstObject = Assert.IsAssignableFrom<IObjectNode>(first.Value.Node);
-        var secondObject = Assert.IsAssignableFrom<IObjectNode>(second.Value.Node);
+        Assert.True(first.IsRight);
+        Assert.True(second.IsRight);
+        Assert.Equal("/model", first.RightValue().CanonicalPath.ToString());
+        Assert.NotSame(first.RightValue().Node, second.RightValue().Node);
+        var firstObject = Assert.IsAssignableFrom<IObjectNode>(first.RightValue().Node);
+        var secondObject = Assert.IsAssignableFrom<IObjectNode>(second.RightValue().Node);
         Assert.Equal(handle, firstObject.Handle);
         Assert.Equal("model summary", firstObject.Summary);
-        Assert.Equal(typeof(_Model), first.Value.Node.ValueType);
+        Assert.Equal(typeof(_Model), first.RightValue().Node.ValueType);
         Assert.DoesNotContain(firstObject.Members, static node => node.Name == nameof(_Model.Hidden));
         Assert.Equal(
             firstObject.Members.Select(static node => node.Name),
             secondObject.Members.Select(static node => node.Name));
         Assert.All(firstObject.Members.Zip(secondObject.Members),
-            static pair => Assert.NotSame(pair.First, pair.Second));
+            static pair => Assert.NotSame(pair.Item1, pair.Item2));
 
         var members = firstObject.Members.ToDictionary(static node => node.Name);
         var child = members[nameof(_Model.Child)];
         Assert.True(child is IReferenceNode);
         Assert.True(child is IPropertyNode);
         Assert.False(child.IsTerminal);
-        Assert.Null(((IReferenceNode)child).ReadReference().Value);
+        Assert.True(((IReferenceNode)child).ReadReference().RightValue().IsNone);
 
         model.Child = new _Child("one");
         var childRead = ((IReferenceNode)child).ReadReference();
-        Assert.True(childRead.IsSuccess);
-        Assert.NotNull(childRead.Value);
+        Assert.True(childRead.IsRight);
+        Assert.True(childRead.RightValue().IsSome);
 
         var items = members[nameof(_Model.Items)];
         Assert.True(items is ICollectionNode);
         Assert.True(items is IPropertyNode);
         var slice = ((ICollectionNode)items).ReadEntries(0, 2);
         var tooLarge = ((ICollectionNode)items).ReadEntries(0, 3);
-        Assert.IsType<NullCollectionEntry>(slice.Value.Entries[0]);
-        Assert.Equal(7, Assert.IsType<ScalarCollectionEntry>(slice.Value.Entries[1]).Value);
-        Assert.True(slice.Value.HasMore);
-        Assert.Equal(InteractionErrorCode.INVALID_INPUT, tooLarge.Error?.Code);
+        Assert.IsType<NullCollectionEntry>(slice.RightValue().Entries[0]);
+        Assert.Equal(7, Assert.IsType<ScalarCollectionEntry>(slice.RightValue().Entries[1]).Value);
+        Assert.True(slice.RightValue().HasMore);
+        Assert.Equal(InteractionErrorCode.INVALID_INPUT, tooLarge.LeftValue().Code);
 
         var add = members[nameof(_Model.Add)];
         var method = Assert.IsAssignableFrom<IMethodNode>(add);
@@ -69,8 +69,8 @@ public sealed class LiveObjectNodeTests
         {
             ["left"] = "2",
         });
-        Assert.Equal(InvocationStatus.SUCCEEDED, invocation.Value);
-        Assert.Equal(3, (await method.ResultTask!).Value);
+        Assert.Equal(InvocationStatus.SUCCEEDED, invocation.RightValue());
+        Assert.Equal(3, (await method.ResultTask!).RightValue());
         Assert.Equal(1, model.InvocationCount);
     }
 
@@ -81,7 +81,7 @@ public sealed class LiveObjectNodeTests
 
         var missing = host.ResolveRootNode("missing");
 
-        Assert.Equal(InteractionErrorCode.NOT_FOUND, missing.Error?.Code);
+        Assert.Equal(InteractionErrorCode.NOT_FOUND, missing.LeftValue().Code);
     }
 
     private sealed class _Model

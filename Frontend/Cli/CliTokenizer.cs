@@ -1,12 +1,14 @@
 using System.Text;
+using LanguageExt;
 using UIEngine.Core;
+using static LanguageExt.Prelude;
 
 namespace UIEngine.Frontend.Cli;
 
 /// <summary>Splits a CLI command line while preserving whitespace inside double quotes.</summary>
 internal static class CliTokenizer
 {
-    public static InteractionResult<IReadOnlyList<string>> Tokenize(string line)
+    public static Either<InteractionError, IReadOnlyList<string>> Tokenize(string line)
     {
         var tokens = new List<string>();
         var current = new StringBuilder();
@@ -49,13 +51,13 @@ internal static class CliTokenizer
 
         if (inQuotes || escaping)
         {
-            return InteractionResult.Failure<IReadOnlyList<string>>(
+            return Left(new InteractionError(
                 InteractionErrorCode.INVALID_INPUT,
-                "The command contains an unterminated quoted value.");
+                "The command contains an unterminated quoted value."));
         }
 
         _AddToken(tokens, current, ref tokenStarted);
-        return InteractionResult.Success<IReadOnlyList<string>>(tokens);
+        return Right((IReadOnlyList<string>)tokens);
     }
 
     private static void _AddToken(
