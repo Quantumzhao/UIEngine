@@ -14,7 +14,7 @@ collections, and structured failures.
 ## Delivered
 
 - Runtime handles distinct from logical paths.
-- Canonical percent-escaped paths with index and key collection selectors.
+- Canonical structured paths with list-index and dictionary-key segments.
 - Replacement-aware path and member resolution that follows the current graph.
 - Invariant conversion, nullability, enum, range, and DataAnnotations validation.
 - Bounded collection windows for indexed and lazy sources.

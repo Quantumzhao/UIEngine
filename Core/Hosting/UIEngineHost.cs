@@ -82,14 +82,6 @@ public sealed class UIEngineHost : IDisposable
             created.Value));
     }
 
-    public InteractionResult<ResolvedPath> ResolvePath(string path)
-    {
-        var parsed = LogicalPath.Parse(path);
-        return parsed.IsSuccess
-            ? ResolvePath(parsed.Value)
-            : InteractionResult.Failure<ResolvedPath>(parsed.Error!);
-    }
-
     public InteractionResult<ResolvedPath> ResolvePath(LogicalPath path) =>
         Execute(
             "resolve path",

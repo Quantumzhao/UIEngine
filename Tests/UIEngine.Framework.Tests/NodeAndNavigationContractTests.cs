@@ -49,7 +49,7 @@ public sealed class NodeAndNavigationContractTests
     public void ResolvedOccurrencesKeepPathsOffNodesAndRemainFresh()
     {
         using var host = new UIEngineHost();
-        var path = LogicalPath.Parse("/model/State").Value;
+        var path = _Path(_Member("model"), _Member("State"));
         var first = new ResolvedNode(path, new _EnumPropertyNode(host));
         var second = new ResolvedNode(path, new _EnumPropertyNode(host));
 
@@ -64,7 +64,7 @@ public sealed class NodeAndNavigationContractTests
     [Fact]
     public void BrokenEntryCarriesFailureInsteadOfFakeNode()
     {
-        var path = LogicalPath.Parse("/missing").Value;
+        var path = _Path(_Member("missing"));
         var error = new InteractionError(InteractionErrorCode.NOT_FOUND, "Missing node.");
         var entry = new NavigationEntry(path, error);
 
@@ -80,10 +80,10 @@ public sealed class NodeAndNavigationContractTests
         using var host = new UIEngineHost();
         var navigatorId = Guid.NewGuid();
         var oldEntry = new NavigationEntry(
-            LogicalPath.Parse("/model/Name").Value,
+            _Path(_Member("model"), _Member("Name")),
             new _ProgrammaticStringNode(host));
         var currentEntry = new NavigationEntry(
-            LogicalPath.Parse("/model").Value,
+            _Path(_Member("model")),
             new _ObjectNode(host));
         var change = new NavigationPoppedChange(navigatorId, oldEntry, currentEntry);
         var notification = new WorkspaceChangedEventArgs(change);
@@ -93,46 +93,61 @@ public sealed class NodeAndNavigationContractTests
         Assert.Same(currentEntry, change.CurrentEntry);
     }
 
-    [Theory]
-    [InlineData("/world", null)]
-    [InlineData("/world/Name", "/world")]
-    [InlineData("/world/Nations", "/world")]
-    [InlineData("/world/Nations[index=0]", "/world/Nations")]
-    [InlineData(
-        "/world/Nations[index=0]/Name",
-        "/world/Nations[index=0]")]
-    public void LogicalPathsExposeSemanticParents(string path, string? expectedParent)
+    [Fact]
+    public void LogicalPathsExposeLinkedSemanticParents()
     {
-        var parsed = LogicalPath.Parse(path);
+        var world = _Path(_Member("world"));
+        var name = world.Append("Name");
+        var nations = world.Append("Nations");
+        var selectedNation = nations.Append(new ListLogicalPathSegment(0));
+        var selectedName = selectedNation.Append("Name");
 
-        Assert.True(parsed.IsSuccess);
-        Assert.Equal(expectedParent, parsed.Value.Parent?.ToString());
+        Assert.Null(world.Parent);
+        Assert.Same(world, name.Parent);
+        Assert.Same(world, nations.Parent);
+        Assert.Same(nations, selectedNation.Parent);
+        Assert.Same(selectedNation, selectedName.Parent);
     }
 
     [Fact]
     public void LogicalPathSegmentsRepresentMemberListAndDictionarySemantics()
     {
-        var memberPath = LogicalPath.Parse("/world/Nations").Value;
-        var listPath = LogicalPath.Parse("/world/Nations[index=2]").Value;
-        var dictionaryPath = LogicalPath.Parse("/catalog/Items[key=SKU%2F42]").Value;
+        var memberPath = _Path(_Member("world"), _Member("Nations"));
+        var listPath = memberPath.Append(new ListLogicalPathSegment(2));
+        var dictionaryPath = _Path(
+            _Member("catalog"),
+            _Member("Items"),
+            new DictLogicalPathSegment("SKU/42"));
 
         Assert.Equal("Nations", Assert.IsType<MemberLogicalPathSegment>(
             memberPath.Segments[^1]).Name);
         var list = Assert.IsType<ListLogicalPathSegment>(listPath.Segments[^1]);
-        Assert.Equal("Nations", list.Name);
         Assert.Equal(2, list.Index);
         var dictionary = Assert.IsType<DictLogicalPathSegment>(dictionaryPath.Segments[^1]);
-        Assert.Equal("Items", dictionary.Name);
         Assert.Equal("SKU/42", dictionary.Key);
-        Assert.Equal("/catalog/Items[key=SKU%2F42]", dictionaryPath.ToString());
+        Assert.Equal("/catalog/Items[key=SKU/42]", dictionaryPath.ToString());
 
         var constructed = LogicalPath.Root
             .Append("world")
-            .Append(new ListLogicalPathSegment("Nations", 2));
+            .Append("Nations")
+            .Append(new ListLogicalPathSegment(2));
         Assert.Equal(listPath, constructed);
         Assert.Throws<ArgumentException>(() => LogicalPath.Root.Append(
-            new ListLogicalPathSegment("Nations", 0)));
+            new ListLogicalPathSegment(0)));
     }
+
+    private static LogicalPath _Path(params ILogicalPathSegment[] segments)
+    {
+        var path = LogicalPath.Root;
+        foreach (var segment in segments)
+        {
+            path = path.Append(segment);
+        }
+
+        return path;
+    }
+
+    private static MemberLogicalPathSegment _Member(string name) => new(name);
 
     private sealed class _EnumPropertyNode(UIEngineHost host)
         : BaseNode(host, "State", typeof(_State)),

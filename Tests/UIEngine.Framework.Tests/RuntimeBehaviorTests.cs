@@ -119,10 +119,16 @@ public sealed class RuntimeBehaviorTests
     public void PathsPreserveCyclesSharedReferencesAndReplacementObjects()
     {
         using var host = _CreateWorldHost();
-        var nation = host.ResolvePath("/world/Nations[index=0]");
-        var cycled = host.ResolvePath(
-            "/world/Nations[index=0]/Capital/OwnerNation");
-        var legacyAlias = host.ResolvePath("/world/Nations/0");
+        var nation = host.ResolvePath(_Path(
+            _Member("world"), _Member("Nations"), _Index(0)));
+        var cycled = host.ResolvePath(_Path(
+            _Member("world"),
+            _Member("Nations"),
+            _Index(0),
+            _Member("Capital"),
+            _Member("OwnerNation")));
+        var legacyAlias = host.ResolvePath(_Path(
+            _Member("world"), _Member("Nations"), _Member("0")));
 
         Assert.True(nation.IsSuccess);
         Assert.True(cycled.IsSuccess);
@@ -135,9 +141,11 @@ public sealed class RuntimeBehaviorTests
             cycled.Value.CanonicalPath.ToString());
         Assert.False(legacyAlias.IsSuccess);
 
-        var original = host.ResolvePath("/world/Nations[index=0]");
+        var original = host.ResolvePath(_Path(
+            _Member("world"), _Member("Nations"), _Index(0)));
         host.SetRoot("world", CyclicWorldFactory.Create());
-        var replacement = host.ResolvePath("/world/Nations[index=0]");
+        var replacement = host.ResolvePath(_Path(
+            _Member("world"), _Member("Nations"), _Index(0)));
 
         Assert.True(original.IsSuccess);
         Assert.True(replacement.IsSuccess);
@@ -155,12 +163,16 @@ public sealed class RuntimeBehaviorTests
         using var host = new UIEngineHost();
         host.SetRoot("model", model);
 
-        var initialByKey = host.ResolvePath("/model/ByKey[key=a]");
-        var initialByIndex = host.ResolvePath("/model/Items[index=0]");
+        var initialByKey = host.ResolvePath(_Path(
+            _Member("model"), _Member("ByKey"), _Key("a")));
+        var initialByIndex = host.ResolvePath(_Path(
+            _Member("model"), _Member("Items"), _Index(0)));
         model.ByKey["a"] = second;
         model.Items.Reverse();
-        var remappedByKey = host.ResolvePath("/model/ByKey[key=a]");
-        var reorderedByIndex = host.ResolvePath("/model/Items[index=0]");
+        var remappedByKey = host.ResolvePath(_Path(
+            _Member("model"), _Member("ByKey"), _Key("a")));
+        var reorderedByIndex = host.ResolvePath(_Path(
+            _Member("model"), _Member("Items"), _Index(0)));
 
         Assert.True(initialByKey.IsSuccess);
         Assert.True(initialByIndex.IsSuccess);
@@ -182,11 +194,14 @@ public sealed class RuntimeBehaviorTests
     {
         using var host = _CreateWorldHost();
 
-        var firstName = host.ResolvePath("/world/Name");
-        var secondName = host.ResolvePath("/world/Name");
-        var nations = host.ResolvePath("/world/Nations");
-        var advance = host.ResolvePath(
-            "/world/Nations[index=0]/AdvanceTurn");
+        var firstName = host.ResolvePath(_Path(_Member("world"), _Member("Name")));
+        var secondName = host.ResolvePath(_Path(_Member("world"), _Member("Name")));
+        var nations = host.ResolvePath(_Path(_Member("world"), _Member("Nations")));
+        var advance = host.ResolvePath(_Path(
+            _Member("world"),
+            _Member("Nations"),
+            _Index(0),
+            _Member("AdvanceTurn")));
 
         Assert.True(firstName.IsSuccess);
         Assert.True(secondName.IsSuccess);
@@ -203,12 +218,18 @@ public sealed class RuntimeBehaviorTests
     {
         using var host = _CreateWorldHost();
 
-        var root = host.ResolvePath("/world");
-        var scalar = host.ResolvePath("/world/Name");
-        var collection = host.ResolvePath("/world/Nations");
-        var selected = host.ResolvePath("/world/Nations[index=0]");
-        var reference = host.ResolvePath("/world/Nations[index=0]/Capital");
-        var method = host.ResolvePath("/world/Nations[index=0]/AdvanceTurn");
+        var root = host.ResolvePath(_Path(_Member("world")));
+        var scalar = host.ResolvePath(_Path(_Member("world"), _Member("Name")));
+        var collection = host.ResolvePath(_Path(_Member("world"), _Member("Nations")));
+        var selected = host.ResolvePath(_Path(
+            _Member("world"), _Member("Nations"), _Index(0)));
+        var reference = host.ResolvePath(_Path(
+            _Member("world"), _Member("Nations"), _Index(0), _Member("Capital")));
+        var method = host.ResolvePath(_Path(
+            _Member("world"),
+            _Member("Nations"),
+            _Index(0),
+            _Member("AdvanceTurn")));
 
         Assert.IsAssignableFrom<IObjectNode>(root.Value.Node);
         Assert.True(scalar.Value.Node is IReadableValueNode);
@@ -228,10 +249,14 @@ public sealed class RuntimeBehaviorTests
     {
         using var host = _CreateWorldHost();
 
-        var first = host.ResolvePath(
-            "/world/Nations[index=0]/Capital/Name");
-        var second = host.ResolvePath(
-            "/world/Nations[index=0]/Capital/Name");
+        var path = _Path(
+            _Member("world"),
+            _Member("Nations"),
+            _Index(0),
+            _Member("Capital"),
+            _Member("Name"));
+        var first = host.ResolvePath(path);
+        var second = host.ResolvePath(path);
 
         Assert.True(first.IsSuccess);
         Assert.True(second.IsSuccess);
@@ -254,16 +279,16 @@ public sealed class RuntimeBehaviorTests
     }
 
     [Fact]
-    public void PathsPreserveEscapingAndCaseSensitivity()
+    public void StructuredPathsPreserveDelimiterCharactersAndCaseSensitivity()
     {
-        var model = new _EscapedModel();
+        var model = new _StructuredNameModel();
         using var host = new UIEngineHost(new UIEngineHostOptions
         {
             Exposures =
             [
-                new TypeExposure<_EscapedModel>(
+                new TypeExposure<_StructuredNameModel>(
                 [
-                    new ValueExposure<_EscapedModel, string>(
+                    new ValueExposure<_StructuredNameModel, string>(
                         "value/name",
                         static value => value.Value),
                 ]),
@@ -271,12 +296,18 @@ public sealed class RuntimeBehaviorTests
         });
         host.SetRoot("root/name", model);
 
-        var resolved = host.ResolvePath("/root%2Fname/value%2Fname");
-        var wrongRootCase = host.ResolvePath("/Root%2Fname/value%2Fname");
-        var wrongMemberCase = host.ResolvePath("/root%2Fname/Value%2Fname");
+        var resolved = host.ResolvePath(_Path(
+            _Member("root/name"), _Member("value/name")));
+        var wrongRootCase = host.ResolvePath(_Path(
+            _Member("Root/name"), _Member("value/name")));
+        var wrongMemberCase = host.ResolvePath(_Path(
+            _Member("root/name"), _Member("Value/name")));
 
         Assert.True(resolved.IsSuccess);
-        Assert.Equal("/root%2Fname/value%2Fname", resolved.Value.CanonicalPath.ToString());
+        Assert.Equal("root/name", ((MemberLogicalPathSegment)
+            resolved.Value.CanonicalPath.Parent!.Segment!).Name);
+        Assert.Equal("value/name", ((MemberLogicalPathSegment)
+            resolved.Value.CanonicalPath.Segment!).Name);
         Assert.Equal(InteractionErrorCode.NOT_FOUND, wrongRootCase.Error?.Code);
         Assert.Equal(InteractionErrorCode.NOT_FOUND, wrongMemberCase.Error?.Code);
     }
@@ -288,16 +319,24 @@ public sealed class RuntimeBehaviorTests
         using var host = new UIEngineHost();
         host.SetRoot("model", model);
 
-        var nullReference = host.ResolvePath("/model/Child");
-        var missingMember = host.ResolvePath("/model/Missing");
-        var missingElement = host.ResolvePath("/model/Items[index=2]");
-        var scalarElement = host.ResolvePath("/model/Items[index=0]");
-        var ambiguousElement = host.ResolvePath("/model/Duplicates[key=duplicate]");
-        var fieldReference = host.ResolvePath("/model/FieldChild");
-        var keyedList = host.ResolvePath("/model/Items[key=0]");
-        var indexedDictionary = host.ResolvePath("/model/Duplicates[index=0]");
-        var runtimeList = host.ResolvePath("/model/ListView[index=0]");
-        var runtimeDictionary = host.ResolvePath("/model/DictView[key=item]");
+        var nullReference = host.ResolvePath(_Path(_Member("model"), _Member("Child")));
+        var missingMember = host.ResolvePath(_Path(_Member("model"), _Member("Missing")));
+        var missingElement = host.ResolvePath(_Path(
+            _Member("model"), _Member("Items"), _Index(2)));
+        var scalarElement = host.ResolvePath(_Path(
+            _Member("model"), _Member("Items"), _Index(0)));
+        var ambiguousElement = host.ResolvePath(_Path(
+            _Member("model"), _Member("Duplicates"), _Key("duplicate")));
+        var fieldReference = host.ResolvePath(_Path(
+            _Member("model"), _Member("FieldChild")));
+        var keyedList = host.ResolvePath(_Path(
+            _Member("model"), _Member("Items"), _Key("0")));
+        var indexedDictionary = host.ResolvePath(_Path(
+            _Member("model"), _Member("Duplicates"), _Index(0)));
+        var runtimeList = host.ResolvePath(_Path(
+            _Member("model"), _Member("ListView"), _Index(0)));
+        var runtimeDictionary = host.ResolvePath(_Path(
+            _Member("model"), _Member("DictView"), _Key("item")));
 
         Assert.Equal(InteractionErrorCode.UNAVAILABLE, nullReference.Error?.Code);
         Assert.Equal(InteractionErrorCode.NOT_FOUND, missingMember.Error?.Code);
@@ -558,6 +597,12 @@ public sealed class RuntimeBehaviorTests
         Assert.DoesNotContain(
             typeof(UIEngineHost).GetMethods(),
             static method => method.Name is "ResolveRootNodeAsync" or "ResolvePathAsync");
+        Assert.DoesNotContain(
+            typeof(UIEngineHost).GetMethods(),
+            static method => method.Name == nameof(UIEngineHost.ResolvePath) &&
+                method.GetParameters() is [{ ParameterType: var type }] &&
+                type == typeof(string));
+        Assert.Null(typeof(LogicalPath).GetMethod("Parse", [typeof(string)]));
         Assert.Equal(
             typeof(InteractionResult<object?>),
             typeof(IReadableValueNode).GetMethod(nameof(IReadableValueNode.ReadValue))!.ReturnType);
@@ -596,6 +641,23 @@ public sealed class RuntimeBehaviorTests
         return host;
     }
 
+    private static LogicalPath _Path(params ILogicalPathSegment[] segments)
+    {
+        var path = LogicalPath.Root;
+        foreach (var segment in segments)
+        {
+            path = path.Append(segment);
+        }
+
+        return path;
+    }
+
+    private static MemberLogicalPathSegment _Member(string name) => new(name);
+
+    private static ListLogicalPathSegment _Index(long index) => new(index);
+
+    private static DictLogicalPathSegment _Key(string key) => new(key);
+
     private static void _StartWorkWithoutRetainingNode(UIEngineHost host)
     {
         var work = (IMethodNode)Assert.Single(
@@ -613,7 +675,7 @@ public sealed class RuntimeBehaviorTests
         var child = new _DomainObject("temporary");
         var target = new WeakReference(child);
         model.Child = child;
-        var resolved = host.ResolvePath("/model/Child");
+        var resolved = host.ResolvePath(_Path(_Member("model"), _Member("Child")));
         var member = Assert.Single(
             ((IObjectNode)resolved.Value.Node).Members,
             static candidate => candidate.Name == nameof(_DomainObject.Key));
@@ -691,7 +753,7 @@ public sealed class RuntimeBehaviorTests
         public List<_DomainObject> Items { get; } = [first, second];
     }
 
-    private sealed class _EscapedModel
+    private sealed class _StructuredNameModel
     {
         public string Value { get; } = "escaped";
     }

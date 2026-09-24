@@ -18,7 +18,7 @@ Output is human-readable and is not a machine protocol.
 - Double quotes preserve whitespace: `set Motto "New Horizon"`.
 - Inside quotes, `\` escapes the following character.
 - Values use invariant-culture conversion.
-- Paths are absolute and percent-escaped.
+- CLI paths are absolute command text.
 
 ## Commands
 
@@ -49,6 +49,10 @@ cd /world/Nations[index=0]/Capital/OwnerNation
 Selectors are `[index=<non-negative integer>]` and `[key=<value>]`. The old `/Collection/0` form
 is deliberately unsupported. `cd` must end at an object, not a scalar, action, or unselected
 collection.
+
+The CLI grammar reserves `/`, `[`, `]`, and `=` as delimiters and does not interpret percent
+escapes. Core logical paths store names and keys directly as structured segments; this textual
+grammar belongs only to the CLI.
 
 The session re-resolves its canonical path before each operation and follows the object currently
 located there.

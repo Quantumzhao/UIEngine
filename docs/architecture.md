@@ -100,8 +100,8 @@ UIEngine keeps two concepts separate:
 | `Guid` | Identifies one live reference within a host lifetime. |
 | `LogicalPath` | Identifies how a navigator reached an exposed node. |
 
-Logical paths are absolute, case-sensitive, and percent-escaped. Collection elements use an
-explicit index or key selector.
+Logical paths are immutable, case-sensitive linked structures. Core stores member names, list
+indices, and dictionary keys directly without encoding them into a string.
 
 ```text
 /world
@@ -111,11 +111,11 @@ explicit index or key selector.
 /catalog/Items[key=SKU-42]
 ```
 
-Parsed path segments express navigation semantics explicitly. `MemberLogicalPathSegment` names an
-unselected member, `ListLogicalPathSegment` identifies one list index, and
-`DictLogicalPathSegment` identifies one dictionary key. Resolution verifies that the live
-collection provides the corresponding list or dictionary semantics. Future selection or batch
-operations extend the model with additional logical-path segment variants.
+Each linked segment expresses one navigation step. `MemberLogicalPathSegment` names an unselected
+member, `ListLogicalPathSegment` identifies one list index, and `DictLogicalPathSegment` identifies
+one dictionary key. Resolution verifies that the live collection provides the corresponding list
+or dictionary semantics. Future selection or batch operations extend the model with additional
+logical-path segment variants.
 
 A path can end at any node, not only a reference object. Parent traversal follows navigation
 semantics: the parent of a selected collection element is its collection node, and the parent of a
@@ -125,9 +125,12 @@ Path resolution returns a fresh node plus its canonical path. It follows the cur
 path naturally resolves to a replacement object when the corresponding root, member, or collection
 entry changes.
 
-The returned resolution chain contains one fresh `ResolvedNode` for every semantic location from
-the registered root through the current node. A selected collection element therefore follows its
-collection node in the chain even though both locations share one encoded path segment.
+The returned resolution chain contains one fresh `ResolvedNode` for every linked semantic location
+from the registered root through the current node. A selected collection element therefore follows
+its collection node directly in both the logical path and the resolution chain.
+
+`LogicalPath.ToString()` is diagnostic display only and is not a serialization format. Frontends
+own any command-text grammar, while layout persistence stores structured path segments.
 
 `ResolvedNode` is the Core-owned hand-off for that pair. It retains its originating host
 internally so a workspace can reject an occurrence from another host, while neither

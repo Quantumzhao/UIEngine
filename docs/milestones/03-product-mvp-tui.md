@@ -198,8 +198,8 @@ roots, members, collections, selected elements, scalars, and methods.
      `/world/Nations[index=0]`.
 5. [x] Return enough semantic ancestor information to initialize a navigator or rebuild its destructive
    stack from one saved current path.
-6. [x] Preserve canonical escaping, case sensitivity, cycles, shared references, and replacement
-   through current path resolution.
+6. [x] Preserve structured member names and dictionary keys, case sensitivity, cycles, shared
+   references, and replacement through current path resolution.
 7. [x] Keep path results node-based and remove legacy member-kind and binding-specific resolution once
    all consumers use resolved nodes.
 

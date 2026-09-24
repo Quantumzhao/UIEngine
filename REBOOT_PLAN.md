@@ -78,7 +78,8 @@ facets, and frontends choose controls from those semantics.
 
 - Resolve roots, members, collections, and selected collection elements to fresh nodes.
 - Define parent traversal for member and collection-selector paths.
-- Preserve canonical escaping and resolve replacements through their current paths.
+- Preserve structured member names and dictionary keys and resolve replacements through their
+  current paths.
 - Test cycles, shared references, replacement, nulls, and unavailable targets.
 
 ### 3. Add workspace and navigator state

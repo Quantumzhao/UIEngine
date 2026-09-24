@@ -19,6 +19,34 @@ public sealed class CliBehaviorTests
     }
 
     [Fact]
+    public void CliPathParserCreatesSemanticSegmentsWithoutCoreEncoding()
+    {
+        var parsed = CliLogicalPathParser.Parse(
+            "/world/Nations[index=2]/ByCode[key=N1]");
+        var percentText = CliLogicalPathParser.Parse("/root%2Fname");
+
+        Assert.True(parsed.IsSuccess);
+        Assert.Collection(
+            parsed.Value.Segments,
+            segment => Assert.Equal(
+                "world",
+                Assert.IsType<MemberLogicalPathSegment>(segment).Name),
+            segment => Assert.Equal(
+                "Nations",
+                Assert.IsType<MemberLogicalPathSegment>(segment).Name),
+            segment => Assert.Equal(2, Assert.IsType<ListLogicalPathSegment>(segment).Index),
+            segment => Assert.Equal(
+                "ByCode",
+                Assert.IsType<MemberLogicalPathSegment>(segment).Name),
+            segment => Assert.Equal(
+                "N1",
+                Assert.IsType<DictLogicalPathSegment>(segment).Key));
+        Assert.Equal(
+            "root%2Fname",
+            Assert.IsType<MemberLogicalPathSegment>(percentText.Value.Segment).Name);
+    }
+
+    [Fact]
     public async Task RedirectedWorkflowCoversNavigationInspectionMutationCollectionsAndActions()
     {
         var input = new StringReader(

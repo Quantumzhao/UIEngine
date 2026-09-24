@@ -240,7 +240,14 @@ internal sealed class CliSession : IDisposable
             return;
         }
 
-        var resolution = _Host.ResolvePath(tokens[1]);
+        var path = CliLogicalPathParser.Parse(tokens[1]);
+        if (!path.IsSuccess)
+        {
+            _WriteFailure(path.Error!);
+            return;
+        }
+
+        var resolution = _Host.ResolvePath(path.Value);
         if (!resolution.IsSuccess)
         {
             _WriteFailure(resolution.Error!);
