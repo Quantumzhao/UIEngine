@@ -20,8 +20,8 @@
 - [x] Resolve every exposed root and member to a fresh node instance.
 - [x] Preserve validation, dispatch, collection bounds, and invocation behavior.
 - [x] Resolve logical paths to terminal as well as navigable nodes.
-- [ ] Define semantic parent traversal for members and selected collection elements.
-- [ ] Cover cycles, shared references, replacement, nulls, and unavailable targets.
+- [x] Define semantic parent traversal for members and selected collection elements.
+- [x] Cover cycles, shared references, replacement, nulls, and unavailable targets.
 
 ## Workspaces and Navigators
 

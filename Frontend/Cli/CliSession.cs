@@ -255,7 +255,7 @@ internal sealed class CliSession : IDisposable
             return;
         }
 
-        var captured = _CaptureLocations(resolution.Value.Locations);
+        var captured = _CaptureLocations(resolution.Value.ResolutionChain);
         if (!captured.IsSuccess)
         {
             _WriteFailure(captured.Error!);
@@ -587,28 +587,20 @@ internal sealed class CliSession : IDisposable
                 $"Member '{memberName}' is not a {expectedKind}.");
     }
 
-    private InteractionResult<List<_LocationBinding>> _CaptureLocations(
-        IReadOnlyList<PathLocation> locations)
+    private static InteractionResult<List<_LocationBinding>> _CaptureLocations(
+        IReadOnlyList<ResolvedNode> resolutionChain)
     {
-        var captured = new List<_LocationBinding>(locations.Count);
-        foreach (var location in locations)
+        var captured = new List<_LocationBinding>(resolutionChain.Count);
+        foreach (var resolved in resolutionChain)
         {
-            var resolved = _Host.ResolvePath(location.Path);
-            if (!resolved.IsSuccess)
+            if (resolved.Node is not IObjectNode objectNode)
             {
-                return _Failure<List<_LocationBinding>>(resolved.Error!);
-            }
-
-            if (resolved.Value.Node is not IObjectNode objectNode)
-            {
-                return InteractionResult.Failure<List<_LocationBinding>>(
-                    InteractionErrorCode.TYPE_MISMATCH,
-                    $"Path '{location.Path}' no longer identifies an object.");
+                continue;
             }
 
             captured.Add(new _LocationBinding(
-                location.Path,
-                resolved.Value.Node.ValueType.FullName ?? resolved.Value.Node.ValueType.Name,
+                resolved.CanonicalPath,
+                resolved.Node.ValueType.FullName ?? resolved.Node.ValueType.Name,
                 objectNode.Handle));
         }
 

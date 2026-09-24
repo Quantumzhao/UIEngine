@@ -93,6 +93,22 @@ public sealed class NodeAndNavigationContractTests
         Assert.Same(currentEntry, change.CurrentEntry);
     }
 
+    [Theory]
+    [InlineData("/world", null)]
+    [InlineData("/world/Name", "/world")]
+    [InlineData("/world/Nations", "/world")]
+    [InlineData("/world/Nations[index=0]", "/world/Nations")]
+    [InlineData(
+        "/world/Nations[index=0]/Name",
+        "/world/Nations[index=0]")]
+    public void LogicalPathsExposeSemanticParents(string path, string? expectedParent)
+    {
+        var parsed = LogicalPath.Parse(path);
+
+        Assert.True(parsed.IsSuccess);
+        Assert.Equal(expectedParent, parsed.Value.Parent?.ToString());
+    }
+
     private sealed class _EnumPropertyNode(UIEngineHost host)
         : BaseNode(host, "State", typeof(_State)),
             IPropertyNode,

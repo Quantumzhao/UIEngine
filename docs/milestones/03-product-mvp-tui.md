@@ -98,18 +98,16 @@ do not defer Core or lifetime coverage to the final TUI acceptance pass.
 ### Migration assumptions
 
 - `BaseNode` is the sole frontend-facing and runtime interaction model. Reflection and
-  programmatic exposure metadata create nodes directly rather than maintaining a parallel model.
+  programmatic exposure metadata create nodes directly.
 - Nodes expose language semantics through a small base contract plus composable facets. Avoid a
   separate concrete class for every possible combination of property, field, value kind,
   nullability, and mutability.
-- A node has no public logical-path property. Path plus resolution state belongs to a navigation
-  entry or another Core-owned resolution envelope.
-- `UIEngineWorkspace` and `Navigator` do not own the `UIEngineHost`. A TUI-created Core workspace
-  may be owned by `TuiWorkspace`; a caller-supplied Core workspace remains caller-owned.
+- Path plus resolution state belongs to a navigation entry or another Core-owned resolution envelope.
+- A TUI-created Core workspace may be owned by `TuiWorkspace`; a caller-supplied Core workspace is caller-owned.
 - Core produces versioned layout data but does not choose a file, perform file I/O, or persist live
   state. The TUI owns its stable presentation fields and maps them into that data contract.
 - The existing conversion, validation, runtime-handle, domain-thread affinity, bounded-collection,
-  and method-occurrence invocation behavior are behavior to preserve, not subsystems to redesign.
+  and method-occurrence invocation behavior are behavior to preserve.
 
 ### Completed foundation
 
@@ -122,63 +120,63 @@ do not defer Core or lifetime coverage to the final TUI acceptance pass.
 
 Before moving behavior, define and test the smallest public contracts needed by both frontends.
 
-1. Define `BaseNode` and composable language-semantic facets for:
+1. [x] Define `BaseNode` and composable language-semantic facets for:
    - object and reference access;
    - property, field, and method membership;
    - readable, writable, and nullable values;
    - string/character, boolean, number, and enum values;
    - collections and their bounded entry shapes; and
    - method parameters, results, and invocation-status metadata.
-2. Record how reflected properties and fields combine with value/reference/collection facets. For
+2. [x] Record how reflected properties and fields combine with value/reference/collection facets. For
    example, a writable enum property must remain identifiable as a property, enum, readable value,
    and writable value without Core naming a control.
-3. Define the semantic treatment of programmatic scalar exposures so they do not falsely claim to
+3. [x] Define the semantic treatment of programmatic scalar exposures so they do not falsely claim to
    be reflected fields or properties.
-4. Define a resolved-node envelope or equivalent Core-owned location token. It must carry the
+4. [x] Define a resolved-node envelope or equivalent Core-owned location token. It must carry the
    canonical path beside a node, allow a workspace to start from an already resolved occurrence,
    and still keep logical paths off the node itself.
-5. Define `NavigationEntry` as path plus either a fresh node or a structured resolution failure.
+5. [x] Define `NavigationEntry` as path plus either a fresh node or a structured resolution failure.
    A broken entry is navigation state, not a fake node kind.
-6. Define synchronous mutation results and frontend-neutral change notifications for navigator add,
+6. [x] Define synchronous mutation results and frontend-neutral change notifications for navigator add,
    navigate, back, duplicate, reorder, and remove operations. Notifications must let the TUI
    retire exactly the control and scope associated with a removed entry without exposing toolkit
    types from Core.
-7. Keep mutation and resolution synchronous on the domain thread so no queued older resolution can
+7. [x] Keep mutation and resolution synchronous on the domain thread so no queued older resolution can
    publish after navigation, back, removal, or disposal.
 
 Verification:
 
-- Add contract tests for overlapping facets, fresh occurrences, terminal nodes, structured
+- [x] Add contract tests for overlapping facets, fresh occurrences, terminal nodes, structured
   broken entries, and host/workspace ownership.
-- Keep Core free of XenoAtom references and presentation terminology.
+- [x] Keep Core free of XenoAtom references and presentation terminology.
 
 ### 2. Create live nodes directly
 
 Build nodes from exposure metadata while preserving the live-domain guarantees.
 
-1. Keep conversion, validation, collection access, and invocation in node-owned operation
+1. [x] Keep conversion, validation, collection access, and invocation in node-owned operation
    bindings. Do not retain a second public or internal object/member model.
-2. Resolve a registered root to an object node and every exposed member to a node with the correct
+2. [x] Resolve a registered root to an object node and every exposed member to a node with the correct
    overlapping facets. Continue to expose only opted-in reflection members and configured
    programmatic values.
-3. Create new node instances on each resolution. Nodes may share the same host, live target, and
+3. [x] Create new node instances on each resolution. Nodes may share the same host, live target, and
    runtime handle, but never the same node occurrence across navigator entries.
-4. Keep live operations host-mediated:
-   - reads and writes resolve the current owner synchronously on the domain thread;
-   - writes use the existing invariant conversion and validation pipeline;
-   - reference access handles null and unavailable targets explicitly;
-   - collection reads retain the host maximum and closed entry variants; and
-   - each method node exposes its latest status and a result task carrying that call's
+4. [x] Keep live operations host-mediated:
+   - [x] reads and writes resolve the current owner synchronously on the domain thread;
+   - [x] writes use the existing invariant conversion and validation pipeline;
+   - [x] reference access handles null and unavailable targets explicitly;
+   - [x] collection reads retain the host maximum and closed entry variants; and
+   - [x] each method node exposes its latest status and a result task carrying that call's
      structured result while the returned domain task executes independently.
-5. Preserve metadata needed by generated controls: runtime type, summary, read/write capability,
+5. [x] Preserve metadata needed by generated controls: runtime type, summary, read/write capability,
    nullability, enum members, numeric range, method defaults, result type, and invocation status.
 Verification:
 
-- Port the existing Core behavior tests to nodes and delete the legacy model coverage.
-- Add focused tests for property versus field semantics, enum and numeric overlap, read-only and
+- [x] Port the existing Core behavior tests to nodes and delete the legacy model coverage.
+- [x] Add focused tests for property versus field semantics, enum and numeric overlap, read-only and
   nullable values, null references, programmatic values, and two fresh nodes operating on the same
   live value.
-- Confirm bounded collection, validation, domain-affinity, and invocation tests retain their
+- [x] Confirm bounded collection, validation, domain-affinity, and invocation tests retain their
   current behavior.
 
 ### 3. Resolve logical paths to every node kind
@@ -186,31 +184,31 @@ Verification:
 Replace the current owner-plus-optional-member result with node resolution that works uniformly for
 roots, members, collections, selected elements, scalars, and methods.
 
-1. Resolve root paths to object nodes and member paths to the member node itself, including
+1. [x] Resolve root paths to object nodes and member paths to the member node itself, including
    terminal scalar and method nodes.
-2. Resolve reference members without recursively materializing their target graph. A successfully
+2. [x] Resolve reference members without recursively materializing their target graph. A successfully
    resolved reference can expose object semantics for its current live target while retaining its
    reference and property/field semantics.
-3. Resolve a collection path to its collection node and a selector path to the selected reference
+3. [x] Resolve a collection path to its collection node and a selector path to the selected reference
    element. Keep selector lookup bounded and retain index and key selectors.
-4. Define semantic parent calculation rather than only removing the final path segment:
+4. [x] Define semantic parent calculation rather than only removing the final path segment:
    - the parent of `/world/Name` is `/world`;
    - the parent of `/world/Nations[index=0]` is `/world/Nations`; and
    - the parent of `/world/Nations[index=0]/Name` is
      `/world/Nations[index=0]`.
-5. Return enough semantic ancestor information to initialize a navigator or rebuild its destructive
+5. [x] Return enough semantic ancestor information to initialize a navigator or rebuild its destructive
    stack from one saved current path.
-6. Preserve canonical escaping, case sensitivity, cycles, shared references, and replacement
+6. [x] Preserve canonical escaping, case sensitivity, cycles, shared references, and replacement
    through current path resolution.
-7. Keep path results node-based and remove legacy member-kind and binding-specific resolution once
+7. [x] Keep path results node-based and remove legacy member-kind and binding-specific resolution once
    all consumers use resolved nodes.
 
 Verification:
 
-- Cover every node kind as the end of a path.
-- Cover both selector kinds, collection-to-element parent traversal, cycles, shared references,
+- [x] Cover every node kind as the end of a path.
+- [x] Cover both selector kinds, collection-to-element parent traversal, cycles, shared references,
   replacement, null, missing, ambiguous, and unavailable targets.
-- Assert that resolving the same path twice returns distinct nodes with the expected shared runtime
+- [x] Assert that resolving the same path twice returns distinct nodes with the expected shared runtime
   handle.
 
 ### 4. Implement `UIEngineWorkspace` and `Navigator`

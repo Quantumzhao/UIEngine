@@ -1,5 +1,6 @@
 using System.Collections;
 using System.ComponentModel.DataAnnotations;
+using System.Runtime.CompilerServices;
 using UIEngine.Core;
 using UIEngine.Core.Attributes;
 using UIEngine.Examples.CyclicDomain;
@@ -115,7 +116,7 @@ public sealed class RuntimeBehaviorTests
     }
 
     [Fact]
-    public void PathsPreserveCyclesAndFollowReplacementObjects()
+    public void PathsPreserveCyclesSharedReferencesAndReplacementObjects()
     {
         using var host = _CreateWorldHost();
         var nation = host.ResolvePath("/world/Nations[index=0]");
@@ -128,6 +129,7 @@ public sealed class RuntimeBehaviorTests
         Assert.Equal(
             ((IObjectNode)nation.Value.Node).Handle,
             ((IObjectNode)cycled.Value.Node).Handle);
+        Assert.NotSame(nation.Value.Node, cycled.Value.Node);
         Assert.Equal(
             "/world/Nations[index=0]/Capital/OwnerNation",
             cycled.Value.CanonicalPath.ToString());
@@ -194,6 +196,131 @@ public sealed class RuntimeBehaviorTests
         Assert.IsAssignableFrom<ICollectionNode>(nations.Value.Node);
         Assert.IsAssignableFrom<IMethodNode>(advance.Value.Node);
         Assert.True(advance.Value.Node.IsTerminal);
+    }
+
+    [Fact]
+    public void PathsResolveEveryNodeKindAndRetainReferenceFacets()
+    {
+        using var host = _CreateWorldHost();
+
+        var root = host.ResolvePath("/world");
+        var scalar = host.ResolvePath("/world/Name");
+        var collection = host.ResolvePath("/world/Nations");
+        var selected = host.ResolvePath("/world/Nations[index=0]");
+        var reference = host.ResolvePath("/world/Nations[index=0]/Capital");
+        var method = host.ResolvePath("/world/Nations[index=0]/AdvanceTurn");
+
+        Assert.IsAssignableFrom<IObjectNode>(root.Value.Node);
+        Assert.True(scalar.Value.Node is IReadableValueNode);
+        Assert.IsAssignableFrom<ICollectionNode>(collection.Value.Node);
+        Assert.IsAssignableFrom<IObjectNode>(selected.Value.Node);
+        Assert.IsAssignableFrom<IObjectNode>(reference.Value.Node);
+        Assert.True(reference.Value.Node is IReferenceNode);
+        Assert.True(reference.Value.Node is IPropertyNode);
+        Assert.IsAssignableFrom<IMethodNode>(method.Value.Node);
+        Assert.Equal(typeof(City), reference.Value.Node.ValueType);
+        Assert.Equal(typeof(City), ((IReferenceNode)reference.Value.Node).ReferenceType);
+        Assert.Equal(typeof(Nation), ((IPropertyNode)reference.Value.Node).DeclaringType);
+    }
+
+    [Fact]
+    public void ResolutionChainContainsEverySemanticAncestor()
+    {
+        using var host = _CreateWorldHost();
+
+        var first = host.ResolvePath(
+            "/world/Nations[index=0]/Capital/Name");
+        var second = host.ResolvePath(
+            "/world/Nations[index=0]/Capital/Name");
+
+        Assert.True(first.IsSuccess);
+        Assert.True(second.IsSuccess);
+        Assert.Equal(
+            [
+                "/world",
+                "/world/Nations",
+                "/world/Nations[index=0]",
+                "/world/Nations[index=0]/Capital",
+                "/world/Nations[index=0]/Capital/Name",
+            ],
+            first.Value.ResolutionChain.Select(static node => node.CanonicalPath.ToString()));
+        Assert.Same(first.Value.Node, first.Value.ResolutionChain[^1].Node);
+        Assert.All(
+            first.Value.ResolutionChain.Zip(second.Value.ResolutionChain),
+            static pair => Assert.NotSame(pair.First.Node, pair.Second.Node));
+        Assert.Equal(
+            ((IObjectNode)first.Value.ResolutionChain[2].Node).Handle,
+            ((IObjectNode)second.Value.ResolutionChain[2].Node).Handle);
+    }
+
+    [Fact]
+    public void PathsPreserveEscapingAndCaseSensitivity()
+    {
+        var model = new _EscapedModel();
+        using var host = new UIEngineHost(new UIEngineHostOptions
+        {
+            Exposures =
+            [
+                new TypeExposure<_EscapedModel>(
+                [
+                    new ValueExposure<_EscapedModel, string>(
+                        "value/name",
+                        static value => value.Value),
+                ]),
+            ],
+        });
+        host.SetRoot("root/name", model);
+
+        var resolved = host.ResolvePath("/root%2Fname/value%2Fname");
+        var wrongRootCase = host.ResolvePath("/Root%2Fname/value%2Fname");
+        var wrongMemberCase = host.ResolvePath("/root%2Fname/Value%2Fname");
+
+        Assert.True(resolved.IsSuccess);
+        Assert.Equal("/root%2Fname/value%2Fname", resolved.Value.CanonicalPath.ToString());
+        Assert.Equal(InteractionErrorCode.NOT_FOUND, wrongRootCase.Error?.Code);
+        Assert.Equal(InteractionErrorCode.NOT_FOUND, wrongMemberCase.Error?.Code);
+    }
+
+    [Fact]
+    public void PathFailuresRemainStructured()
+    {
+        var model = new _PathFailureModel();
+        using var host = new UIEngineHost();
+        host.SetRoot("model", model);
+
+        var nullReference = host.ResolvePath("/model/Child");
+        var missingMember = host.ResolvePath("/model/Missing");
+        var missingElement = host.ResolvePath("/model/Items[index=2]");
+        var scalarElement = host.ResolvePath("/model/Items[index=0]");
+        var ambiguousElement = host.ResolvePath("/model/Duplicates[key=duplicate]");
+        var fieldReference = host.ResolvePath("/model/FieldChild");
+
+        Assert.Equal(InteractionErrorCode.UNAVAILABLE, nullReference.Error?.Code);
+        Assert.Equal(InteractionErrorCode.NOT_FOUND, missingMember.Error?.Code);
+        Assert.Equal(InteractionErrorCode.NOT_FOUND, missingElement.Error?.Code);
+        Assert.Equal(InteractionErrorCode.TYPE_MISMATCH, scalarElement.Error?.Code);
+        Assert.Equal(InteractionErrorCode.AMBIGUOUS, ambiguousElement.Error?.Code);
+        Assert.True(fieldReference.Value.Node is IObjectNode and IReferenceNode and IFieldNode);
+    }
+
+    [Fact]
+    public void ResolvedReferenceMembersReportUnavailableCollectedTargets()
+    {
+        var model = new _PathFailureModel();
+        using var host = new UIEngineHost();
+        host.SetRoot("model", model);
+        var (childMember, target) = _ResolveTemporaryChild(host, model);
+
+        for (var attempt = 0; attempt < 3 && target.IsAlive; attempt++)
+        {
+            GC.Collect();
+            GC.WaitForPendingFinalizers();
+        }
+
+        var read = childMember.ReadValue();
+
+        Assert.False(target.IsAlive);
+        Assert.Equal(InteractionErrorCode.UNAVAILABLE, read.Error?.Code);
     }
 
     [Fact]
@@ -372,6 +499,7 @@ public sealed class RuntimeBehaviorTests
             "ObservationSubscription",
             "ObservationValue",
             "ObjectIdentity",
+            "PathLocation",
             "ReferenceDescriptor",
             "ResolvedBinding",
             "BindingResolution",
@@ -440,6 +568,7 @@ public sealed class RuntimeBehaviorTests
         Assert.DoesNotContain(
             assembly.GetExportedTypes(),
             static type => type.Name == "InvocationProgress");
+        Assert.Null(typeof(ResolvedPath).GetProperty("Locations"));
     }
 
     private static UIEngineHost _CreateWorldHost()
@@ -459,6 +588,22 @@ public sealed class RuntimeBehaviorTests
             static member => member.Name == "WorkAsync");
         var started = work.Invoke(new Dictionary<string, object?> { ["steps"] = 1 });
         Assert.Equal(InvocationStatus.RUNNING, started.Value);
+    }
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private static (IReadableValueNode Member, WeakReference Target) _ResolveTemporaryChild(
+        UIEngineHost host,
+        _PathFailureModel model)
+    {
+        var child = new _DomainObject("temporary");
+        var target = new WeakReference(child);
+        model.Child = child;
+        var resolved = host.ResolvePath("/model/Child");
+        var member = Assert.Single(
+            ((IObjectNode)resolved.Value.Node).Members,
+            static candidate => candidate.Name == nameof(_DomainObject.Key));
+        model.Child = null;
+        return ((IReadableValueNode)member, target);
     }
 
     private enum _EditingState
@@ -529,6 +674,61 @@ public sealed class RuntimeBehaviorTests
 
         [Children]
         public List<_DomainObject> Items { get; } = [first, second];
+    }
+
+    private sealed class _EscapedModel
+    {
+        public string Value { get; } = "escaped";
+    }
+
+    private sealed class _PathFailureModel
+    {
+        [Expose]
+        public _DomainObject? Child { get; set; }
+
+        [Expose]
+        public _DomainObject FieldChild = new("field");
+
+        [Children]
+        public object[] Items { get; } = [1];
+
+        [Children]
+        public IReadOnlyDictionary<string, _DomainObject> Duplicates { get; } =
+            new _DuplicateKeyDictionary();
+    }
+
+    private sealed class _DuplicateKeyDictionary : IReadOnlyDictionary<string, _DomainObject>
+    {
+        private readonly KeyValuePair<string, _DomainObject>[] _Entries =
+        [
+            new("duplicate", new _DomainObject("first")),
+            new("duplicate", new _DomainObject("second")),
+        ];
+
+        public _DomainObject this[string key] =>
+            _Entries.First(entry => StringComparer.Ordinal.Equals(entry.Key, key)).Value;
+
+        public IEnumerable<string> Keys => _Entries.Select(static entry => entry.Key);
+
+        public IEnumerable<_DomainObject> Values => _Entries.Select(static entry => entry.Value);
+
+        public int Count => _Entries.Length;
+
+        public bool ContainsKey(string key) =>
+            _Entries.Any(entry => StringComparer.Ordinal.Equals(entry.Key, key));
+
+        public IEnumerator<KeyValuePair<string, _DomainObject>> GetEnumerator() =>
+            ((IEnumerable<KeyValuePair<string, _DomainObject>>)_Entries).GetEnumerator();
+
+        public bool TryGetValue(string key, out _DomainObject value)
+        {
+            value = _Entries
+                .FirstOrDefault(entry => StringComparer.Ordinal.Equals(entry.Key, key))
+                .Value;
+            return value is not null;
+        }
+
+        IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
     }
 
     private sealed class _ActionModel
