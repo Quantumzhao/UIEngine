@@ -31,6 +31,14 @@ internal static class CollectionReflection
         typeof(IReadOnlyDictionary<,>))?.GetGenericArguments()[0] ??
         (typeof(IDictionary).IsAssignableFrom(collectionType) ? typeof(object) : null);
 
+    public static bool IsList(Type collectionType) =>
+        collectionType.IsArray ||
+        typeof(IList).IsAssignableFrom(collectionType) ||
+        _FindGenericShape(
+            collectionType,
+            typeof(IList<>),
+            typeof(IReadOnlyList<>)) is not null;
+
     public static bool TryGetCount(IEnumerable collection, out int count)
     {
         if (collection is ICollection nonGeneric)

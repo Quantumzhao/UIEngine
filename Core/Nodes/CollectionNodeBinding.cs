@@ -47,48 +47,78 @@ internal sealed class CollectionNodeBinding(
             });
     }
 
-    public InteractionResult<IReadOnlyList<Guid>> Select(
-        CollectionSelector selector)
+    public InteractionResult<IReadOnlyList<Guid>> Select(ListLogicalPathSegment segment)
     {
-        if (selector.Kind == CollectionSelectorKind.INDEX)
-        {
-            var index = long.Parse(selector.Value, NumberStyles.None, CultureInfo.InvariantCulture);
-            if (index > int.MaxValue)
+        return Host.Execute(
+            $"select from list {Name}",
+            () =>
             {
-                return InteractionResult.Success<IReadOnlyList<Guid>>([]);
-            }
+                var source = _ReadSource();
+                if (!source.IsSuccess)
+                {
+                    return InteractionResult.Failure<IReadOnlyList<Guid>>(source.Error!);
+                }
 
-            var slice = Read(index, 1);
-            return slice.IsSuccess
-                ? _ReferenceHandles(slice.Value.Entries)
-                : InteractionResult.Failure<IReadOnlyList<Guid>>(slice.Error!);
-        }
+                if (!CollectionReflection.IsList(source.Value.GetType()))
+                {
+                    return InteractionResult.Failure<IReadOnlyList<Guid>>(
+                        InteractionErrorCode.TYPE_MISMATCH,
+                        $"Collection '{Name}' does not provide list semantics.");
+                }
 
-        var snapshot = Read(0, Host.MaxCollectionItems);
-        if (!snapshot.IsSuccess)
-        {
-            return InteractionResult.Failure<IReadOnlyList<Guid>>(snapshot.Error!);
-        }
+                if (segment.Index > int.MaxValue)
+                {
+                    return InteractionResult.Success<IReadOnlyList<Guid>>([]);
+                }
 
-        if (snapshot.Value.HasMore)
-        {
-            return InteractionResult.Failure<IReadOnlyList<Guid>>(
-                InteractionErrorCode.UNSUPPORTED,
-                $"Collection '{Name}' is too large for bounded selector lookup.");
-        }
+                var slice = _ReadSlice(source.Value, segment.Index, 1);
+                return slice.IsSuccess
+                    ? _ReferenceHandles(slice.Value.Entries)
+                    : InteractionResult.Failure<IReadOnlyList<Guid>>(slice.Error!);
+            });
+    }
 
-        var matches = snapshot.Value.Entries
-            .OfType<ReferenceCollectionEntry>()
-            .Where(entry => selector.Kind switch
+    public InteractionResult<IReadOnlyList<Guid>> Select(DictLogicalPathSegment segment)
+    {
+        return Host.Execute(
+            $"select from dictionary {Name}",
+            () =>
             {
-                CollectionSelectorKind.KEY => StringComparer.Ordinal.Equals(
-                    Convert.ToString(entry.Key, CultureInfo.InvariantCulture),
-                    selector.Value),
-                _ => false,
-            })
-            .Select(static entry => entry.Handle)
-            .ToArray();
-        return InteractionResult.Success<IReadOnlyList<Guid>>(matches);
+                var source = _ReadSource();
+                if (!source.IsSuccess)
+                {
+                    return InteractionResult.Failure<IReadOnlyList<Guid>>(source.Error!);
+                }
+
+                if (CollectionReflection.GetKeyType(source.Value.GetType()) is null)
+                {
+                    return InteractionResult.Failure<IReadOnlyList<Guid>>(
+                        InteractionErrorCode.TYPE_MISMATCH,
+                        $"Collection '{Name}' does not provide dictionary semantics.");
+                }
+
+                var snapshot = _ReadSlice(source.Value, 0, Host.MaxCollectionItems);
+                if (!snapshot.IsSuccess)
+                {
+                    return InteractionResult.Failure<IReadOnlyList<Guid>>(snapshot.Error!);
+                }
+
+                if (snapshot.Value.HasMore)
+                {
+                    return InteractionResult.Failure<IReadOnlyList<Guid>>(
+                        InteractionErrorCode.UNSUPPORTED,
+                        $"Collection '{Name}' is too large for bounded selector lookup.");
+                }
+
+                var matches = snapshot.Value.Entries
+                    .OfType<ReferenceCollectionEntry>()
+                    .Where(entry => StringComparer.Ordinal.Equals(
+                        Convert.ToString(entry.Key, CultureInfo.InvariantCulture),
+                        segment.Key))
+                    .Select(static entry => entry.Handle)
+                    .ToArray();
+                return InteractionResult.Success<IReadOnlyList<Guid>>(matches);
+            });
     }
 
     private InteractionResult<IEnumerable> _ReadSource()

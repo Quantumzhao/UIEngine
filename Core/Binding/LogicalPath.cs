@@ -3,81 +3,98 @@ using System.Text;
 
 namespace UIEngine.Core;
 
-public enum CollectionSelectorKind
+public interface ILogicalPathSegment
 {
-    INDEX,
-    KEY,
+    string Name { get; }
 }
 
-public sealed record CollectionSelector
+public sealed record MemberLogicalPathSegment(string Name) : ILogicalPathSegment;
+
+public sealed record ListLogicalPathSegment : ILogicalPathSegment
 {
-    public CollectionSelector(CollectionSelectorKind kind, string value)
-    {
-        if (!Enum.IsDefined(kind))
-        {
-            throw new ArgumentOutOfRangeException(nameof(kind));
-        }
-
-        if (string.IsNullOrEmpty(value))
-        {
-            throw new ArgumentException("A selector value cannot be empty.", nameof(value));
-        }
-
-        if (kind == CollectionSelectorKind.INDEX)
-        {
-            if (!long.TryParse(value, NumberStyles.None, CultureInfo.InvariantCulture, out var index))
-            {
-                throw new ArgumentException("An index selector requires a non-negative integer.", nameof(value));
-            }
-
-            value = index.ToString(CultureInfo.InvariantCulture);
-        }
-
-        Kind = kind;
-        Value = value;
-    }
-
-    public CollectionSelectorKind Kind { get; }
-
-    public string Value { get; }
-
-    public static CollectionSelector AtIndex(long index)
+    public ListLogicalPathSegment(string name, long index)
     {
         ArgumentOutOfRangeException.ThrowIfNegative(index);
-        return new CollectionSelector(
-            CollectionSelectorKind.INDEX,
-            index.ToString(CultureInfo.InvariantCulture));
+        Name = name;
+        Index = index;
     }
+
+    public string Name { get; }
+
+    public long Index { get; }
 }
 
-public sealed record LogicalPathSegment(string Name, CollectionSelector? Selector = null);
+public sealed record DictLogicalPathSegment : ILogicalPathSegment
+{
+    public DictLogicalPathSegment(string name, string key)
+    {
+        if (string.IsNullOrEmpty(key))
+        {
+            throw new ArgumentException("A dictionary key cannot be empty.", nameof(key));
+        }
+
+        Name = name;
+        Key = key;
+    }
+
+    public string Name { get; }
+
+    public string Key { get; }
+}
 
 public sealed class LogicalPath : IEquatable<LogicalPath>
 {
-    private readonly LogicalPathSegment[] _Segments;
+    private readonly ILogicalPathSegment[] _Segments;
 
-    private LogicalPath(IEnumerable<LogicalPathSegment> segments)
+    private LogicalPath(IEnumerable<ILogicalPathSegment> segments)
     {
         _Segments = [.. segments];
     }
 
     public static LogicalPath Root { get; } = new([]);
 
-    public IReadOnlyList<LogicalPathSegment> Segments => _Segments;
+    public IReadOnlyList<ILogicalPathSegment> Segments => _Segments;
 
-    public LogicalPath Append(string name, CollectionSelector? selector = null)
+    /// <summary>
+    /// The semantic parent node path, or <see langword="null"/> when this path identifies a root.
+    /// A selected collection element has its collection path as its parent.
+    /// </summary>
+    public LogicalPath? Parent
     {
-        if (string.IsNullOrEmpty(name))
+        get
         {
-            throw new ArgumentException("A path name cannot be empty.", nameof(name));
+            if (_Segments.Length <= 1)
+            {
+                return null;
+            }
+
+            var final = _Segments[^1];
+            if (final is MemberLogicalPathSegment)
+            {
+                return new LogicalPath(_Segments[..^1]);
+            }
+
+            var parent = (ILogicalPathSegment[])_Segments.Clone();
+            parent[^1] = new MemberLogicalPathSegment(final.Name);
+            return new LogicalPath(parent);
+        }
+    }
+
+    public LogicalPath Append(string name) => Append(new MemberLogicalPathSegment(name));
+
+    public LogicalPath Append(ILogicalPathSegment segment)
+    {
+        if (string.IsNullOrEmpty(segment.Name))
+        {
+            throw new ArgumentException("A path name cannot be empty.", nameof(segment));
         }
 
-        if (_Segments.Length == 0 && selector is not null)
+        if (_Segments.Length == 0 && segment is not MemberLogicalPathSegment)
         {
-            throw new ArgumentException("A root cannot have a selector.", nameof(selector));
+            throw new ArgumentException("A root cannot have a selector.", nameof(segment));
         }
 
-        return new LogicalPath(_Segments.Append(new LogicalPathSegment(name, selector)));
+        return new LogicalPath(_Segments.Append(segment));
     }
 
     public static InteractionResult<LogicalPath> Parse(string path)
@@ -98,7 +115,7 @@ public sealed class LogicalPath : IEquatable<LogicalPath>
             return _Invalid("A logical path cannot contain an empty segment.");
         }
 
-        var segments = new List<LogicalPathSegment>(encodedSegments.Length);
+        var segments = new List<ILogicalPathSegment>(encodedSegments.Length);
         for (var index = 0; index < encodedSegments.Length; index++)
         {
             var parsed = _ParseSegment(encodedSegments[index]);
@@ -107,7 +124,7 @@ public sealed class LogicalPath : IEquatable<LogicalPath>
                 return InteractionResult.Failure<LogicalPath>(parsed.Error!);
             }
 
-            if (index == 0 && parsed.Value.Selector is not null)
+            if (index == 0 && parsed.Value is not MemberLogicalPathSegment)
             {
                 return _Invalid("A root cannot have a selector.");
             }
@@ -140,7 +157,7 @@ public sealed class LogicalPath : IEquatable<LogicalPath>
 
     internal static string Escape(string value) => Uri.EscapeDataString(value);
 
-    private static InteractionResult<LogicalPathSegment> _ParseSegment(string encoded)
+    private static InteractionResult<ILogicalPathSegment> _ParseSegment(string encoded)
     {
         var selectorStart = encoded.IndexOf('[');
         if (selectorStart < 0)
@@ -152,8 +169,9 @@ public sealed class LogicalPath : IEquatable<LogicalPath>
 
             var name = _Decode(encoded);
             return name.IsSuccess
-                ? InteractionResult.Success(new LogicalPathSegment(name.Value))
-                : InteractionResult.Failure<LogicalPathSegment>(name.Error!);
+                ? InteractionResult.Success<ILogicalPathSegment>(
+                    new MemberLogicalPathSegment(name.Value))
+                : InteractionResult.Failure<ILogicalPathSegment>(name.Error!);
         }
 
         if (selectorStart == 0 || encoded[^1] != ']' ||
@@ -166,7 +184,7 @@ public sealed class LogicalPath : IEquatable<LogicalPath>
         var nameResult = _Decode(encoded[..selectorStart]);
         if (!nameResult.IsSuccess)
         {
-            return InteractionResult.Failure<LogicalPathSegment>(nameResult.Error!);
+            return InteractionResult.Failure<ILogicalPathSegment>(nameResult.Error!);
         }
 
         var selectorText = encoded[(selectorStart + 1)..^1];
@@ -177,28 +195,28 @@ public sealed class LogicalPath : IEquatable<LogicalPath>
             return _InvalidSegment("A path selector is malformed.");
         }
 
-        var kind = selectorText[..equals] switch
-        {
-            "index" => CollectionSelectorKind.INDEX,
-            "key" => CollectionSelectorKind.KEY,
-            _ => (CollectionSelectorKind?)null,
-        };
-        if (kind is null)
-        {
-            return _InvalidSegment("A path selector kind is unknown.");
-        }
-
         var value = _Decode(selectorText[(equals + 1)..]);
         if (!value.IsSuccess)
         {
-            return InteractionResult.Failure<LogicalPathSegment>(value.Error!);
+            return InteractionResult.Failure<ILogicalPathSegment>(value.Error!);
         }
 
         try
         {
-            return InteractionResult.Success(new LogicalPathSegment(
-                nameResult.Value,
-                new CollectionSelector(kind.Value, value.Value)));
+            return selectorText[..equals] switch
+            {
+                "index" when long.TryParse(
+                    value.Value,
+                    NumberStyles.None,
+                    CultureInfo.InvariantCulture,
+                    out var index) => InteractionResult.Success<ILogicalPathSegment>(
+                        new ListLogicalPathSegment(nameResult.Value, index)),
+                "index" => _InvalidSegment(
+                    "An index selector requires a non-negative integer."),
+                "key" => InteractionResult.Success<ILogicalPathSegment>(
+                    new DictLogicalPathSegment(nameResult.Value, value.Value)),
+                _ => _InvalidSegment("A path selector kind is unknown."),
+            };
         }
         catch (ArgumentException exception)
         {
@@ -206,21 +224,18 @@ public sealed class LogicalPath : IEquatable<LogicalPath>
         }
     }
 
-    private static string _FormatSegment(LogicalPathSegment segment)
+    private static string _FormatSegment(ILogicalPathSegment segment)
     {
         var name = Escape(segment.Name);
-        if (segment.Selector is null)
+        return segment switch
         {
-            return name;
-        }
-
-        var selector = segment.Selector.Kind switch
-        {
-            CollectionSelectorKind.INDEX => "index",
-            CollectionSelectorKind.KEY => "key",
-            _ => throw new InvalidOperationException("Unknown collection selector kind."),
+            MemberLogicalPathSegment => name,
+            ListLogicalPathSegment list =>
+                $"{name}[index={list.Index.ToString(CultureInfo.InvariantCulture)}]",
+            DictLogicalPathSegment dictionary =>
+                $"{name}[key={Escape(dictionary.Key)}]",
+            _ => throw new InvalidOperationException("Unknown logical path segment type."),
         };
-        return $"{name}[{selector}={Escape(segment.Selector.Value)}]";
     }
 
     private static InteractionResult<string> _Decode(string encoded)
@@ -286,6 +301,6 @@ public sealed class LogicalPath : IEquatable<LogicalPath>
     private static InteractionResult<LogicalPath> _Invalid(string message) =>
         InteractionResult.Failure<LogicalPath>(InteractionErrorCode.INVALID_INPUT, message);
 
-    private static InteractionResult<LogicalPathSegment> _InvalidSegment(string message) =>
-        InteractionResult.Failure<LogicalPathSegment>(InteractionErrorCode.INVALID_INPUT, message);
+    private static InteractionResult<ILogicalPathSegment> _InvalidSegment(string message) =>
+        InteractionResult.Failure<ILogicalPathSegment>(InteractionErrorCode.INVALID_INPUT, message);
 }

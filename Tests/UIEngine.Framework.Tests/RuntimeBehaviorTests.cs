@@ -294,6 +294,10 @@ public sealed class RuntimeBehaviorTests
         var scalarElement = host.ResolvePath("/model/Items[index=0]");
         var ambiguousElement = host.ResolvePath("/model/Duplicates[key=duplicate]");
         var fieldReference = host.ResolvePath("/model/FieldChild");
+        var keyedList = host.ResolvePath("/model/Items[key=0]");
+        var indexedDictionary = host.ResolvePath("/model/Duplicates[index=0]");
+        var runtimeList = host.ResolvePath("/model/ListView[index=0]");
+        var runtimeDictionary = host.ResolvePath("/model/DictView[key=item]");
 
         Assert.Equal(InteractionErrorCode.UNAVAILABLE, nullReference.Error?.Code);
         Assert.Equal(InteractionErrorCode.NOT_FOUND, missingMember.Error?.Code);
@@ -301,6 +305,10 @@ public sealed class RuntimeBehaviorTests
         Assert.Equal(InteractionErrorCode.TYPE_MISMATCH, scalarElement.Error?.Code);
         Assert.Equal(InteractionErrorCode.AMBIGUOUS, ambiguousElement.Error?.Code);
         Assert.True(fieldReference.Value.Node is IObjectNode and IReferenceNode and IFieldNode);
+        Assert.Equal(InteractionErrorCode.TYPE_MISMATCH, keyedList.Error?.Code);
+        Assert.Equal(InteractionErrorCode.TYPE_MISMATCH, indexedDictionary.Error?.Code);
+        Assert.True(runtimeList.IsSuccess);
+        Assert.True(runtimeDictionary.IsSuccess);
     }
 
     [Fact]
@@ -485,12 +493,15 @@ public sealed class RuntimeBehaviorTests
             "BindingReference",
             "ChangeKind",
             "ChangeRecord",
+            "CollectionSelector",
+            "CollectionSelectorKind",
             "CollectionDescriptor",
             "IObjectDescriptorProvider",
             "IObjectDescriptorFactory",
             "IObservationAdapter",
             "IObjectIdentityProvider",
             "IPathSelector",
+            "IndexSelector",
             "IInteractionDispatchPolicy",
             "IInteractionDispatcher",
             "MemberDescriptor",
@@ -504,6 +515,9 @@ public sealed class RuntimeBehaviorTests
             "ResolvedBinding",
             "BindingResolution",
             "PathResolutionState",
+            "KeySelector",
+            "ListSelector",
+            "DictSelector",
             "ValueDescriptor",
         };
 
@@ -514,6 +528,7 @@ public sealed class RuntimeBehaviorTests
                 "ICollectionNode",
                 "IEnumNode",
                 "IFieldNode",
+                "ILogicalPathSegment",
                 "IMemberNode",
                 "IMethodNode",
                 "INavigableNode",
@@ -695,6 +710,14 @@ public sealed class RuntimeBehaviorTests
         [Children]
         public IReadOnlyDictionary<string, _DomainObject> Duplicates { get; } =
             new _DuplicateKeyDictionary();
+
+        [Children]
+        public IEnumerable<_DomainObject> ListView { get; } =
+            new List<_DomainObject> { new("list") };
+
+        [Children]
+        public IEnumerable<KeyValuePair<string, _DomainObject>> DictView { get; } =
+            new Dictionary<string, _DomainObject> { ["item"] = new("dictionary") };
     }
 
     private sealed class _DuplicateKeyDictionary : IReadOnlyDictionary<string, _DomainObject>

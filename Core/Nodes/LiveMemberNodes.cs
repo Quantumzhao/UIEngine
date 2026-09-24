@@ -72,14 +72,64 @@ internal abstract class LiveReflectedMemberNode : BaseNode, IDynamicInterfaceCas
     }
 }
 
-internal sealed class LiveReferenceNode(
+internal sealed class LiveReferenceNode : LiveReflectedMemberNode, IReferenceNode
+{
+    private readonly ReferenceNodeBinding _Binding;
+    private readonly ReflectedMember _Member;
+
+    public LiveReferenceNode(ReferenceNodeBinding binding, ReflectedMember member)
+        : base(binding.Host, binding.Name, member, binding.ReferenceType)
+    {
+        _Binding = binding;
+        _Member = member;
+    }
+
+    public Type ReferenceType => _Binding.ReferenceType;
+
+    public InteractionResult<Guid?> ReadReference() => _Binding.Read();
+
+    internal InteractionResult<LiveResolvedReferenceNode> ResolveTarget()
+    {
+        var read = ReadReference();
+        if (!read.IsSuccess)
+        {
+            return InteractionResult.Failure<LiveResolvedReferenceNode>(read.Error!);
+        }
+
+        if (read.Value is null)
+        {
+            return InteractionResult.Failure<LiveResolvedReferenceNode>(
+                InteractionErrorCode.UNAVAILABLE,
+                $"Reference '{Name}' is empty.");
+        }
+
+        var target = Host.CreateObjectNode(read.Value.Value, Name);
+        return target.IsSuccess
+            ? InteractionResult.Success(new LiveResolvedReferenceNode(
+                _Binding,
+                _Member,
+                target.Value))
+            : InteractionResult.Failure<LiveResolvedReferenceNode>(target.Error!);
+    }
+}
+
+internal sealed class LiveResolvedReferenceNode(
     ReferenceNodeBinding binding,
-    ReflectedMember member)
-    : LiveReflectedMemberNode(binding.Host, binding.Name, member, binding.ReferenceType), IReferenceNode
+    ReflectedMember member,
+    LiveObjectNode target)
+    : LiveReflectedMemberNode(binding.Host, binding.Name, member, target.ValueType),
+        IReferenceNode,
+        IObjectNode
 {
     public Type ReferenceType => binding.ReferenceType;
 
     public InteractionResult<Guid?> ReadReference() => binding.Read();
+
+    public Guid Handle => target.Handle;
+
+    public string? Summary => target.Summary;
+
+    public IReadOnlyList<BaseNode> Members => target.Members;
 }
 
 internal sealed class LiveCollectionNode(
@@ -95,7 +145,10 @@ internal sealed class LiveCollectionNode(
         binding.Read(offset, limit);
 
     internal InteractionResult<IReadOnlyList<Guid>> Select(
-        CollectionSelector selector) => binding.Select(selector);
+        ListLogicalPathSegment segment) => binding.Select(segment);
+
+    internal InteractionResult<IReadOnlyList<Guid>> Select(
+        DictLogicalPathSegment segment) => binding.Select(segment);
 }
 
 [DynamicInterfaceCastableImplementation]

@@ -109,6 +109,31 @@ public sealed class NodeAndNavigationContractTests
         Assert.Equal(expectedParent, parsed.Value.Parent?.ToString());
     }
 
+    [Fact]
+    public void LogicalPathSegmentsRepresentMemberListAndDictionarySemantics()
+    {
+        var memberPath = LogicalPath.Parse("/world/Nations").Value;
+        var listPath = LogicalPath.Parse("/world/Nations[index=2]").Value;
+        var dictionaryPath = LogicalPath.Parse("/catalog/Items[key=SKU%2F42]").Value;
+
+        Assert.Equal("Nations", Assert.IsType<MemberLogicalPathSegment>(
+            memberPath.Segments[^1]).Name);
+        var list = Assert.IsType<ListLogicalPathSegment>(listPath.Segments[^1]);
+        Assert.Equal("Nations", list.Name);
+        Assert.Equal(2, list.Index);
+        var dictionary = Assert.IsType<DictLogicalPathSegment>(dictionaryPath.Segments[^1]);
+        Assert.Equal("Items", dictionary.Name);
+        Assert.Equal("SKU/42", dictionary.Key);
+        Assert.Equal("/catalog/Items[key=SKU%2F42]", dictionaryPath.ToString());
+
+        var constructed = LogicalPath.Root
+            .Append("world")
+            .Append(new ListLogicalPathSegment("Nations", 2));
+        Assert.Equal(listPath, constructed);
+        Assert.Throws<ArgumentException>(() => LogicalPath.Root.Append(
+            new ListLogicalPathSegment("Nations", 0)));
+    }
+
     private sealed class _EnumPropertyNode(UIEngineHost host)
         : BaseNode(host, "State", typeof(_State)),
             IPropertyNode,
