@@ -25,14 +25,14 @@
 
 ## Workspaces and Navigators
 
-- [ ] Add `UIEngineWorkspace` over a caller-owned `UIEngineHost`.
-- [ ] Add and remove independent navigators.
-- [ ] Initialize a navigator from a registered root or specific resolved node.
-- [ ] Navigate deeper by pushing a fresh node entry.
-- [ ] Navigate back by permanently removing the current entry.
-- [ ] Duplicate a navigator at the same path with independent node instances.
-- [ ] Keep broken paths as visible entries that can navigate back.
-- [ ] Prove that one navigator cannot interfere with another navigator's presentation state.
+- [x] Add `UIEngineWorkspace` over a caller-owned `UIEngineHost`.
+- [x] Add and remove independent navigators.
+- [x] Initialize a navigator from a registered root or specific resolved node.
+- [x] Navigate deeper by pushing a fresh node entry.
+- [x] Navigate back by permanently removing the current entry.
+- [x] Duplicate a navigator at the same path with independent node instances.
+- [x] Keep broken paths as visible entries that can navigate back.
+- [x] Prove that one navigator cannot interfere with another navigator's presentation state.
 
 ## Layout Persistence
 

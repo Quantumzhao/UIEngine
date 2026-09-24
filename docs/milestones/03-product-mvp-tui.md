@@ -215,34 +215,34 @@ Verification:
 
 Add the frontend-neutral navigation session only after node and path behavior is stable.
 
-1. Add a caller-disposable `UIEngineWorkspace` over one caller-owned host and an ordered,
+1. [x] Add a caller-disposable `UIEngineWorkspace` over one caller-owned host and an ordered,
    read-only public view of its navigators.
-2. Create a navigator from:
+2. [x] Create a navigator from:
    - a selected registered root;
    - an absolute logical path; and
    - a supplied resolved-node occurrence through the location hand-off defined in Step 1.
-3. Give each navigator a stable name, an ordered entry stack, and one current entry.
-4. Navigate deeper by resolving and pushing a fresh node. Reject navigation from terminal nodes
+3. [x] Give each navigator a stable name, an ordered entry stack, and one current entry.
+4. [x] Navigate deeper by resolving and pushing a fresh node. Reject navigation from terminal nodes
    without changing the stack.
-5. Go back by permanently removing the current entry. Expose no forward history, and define the
+5. [x] Go back by permanently removing the current entry. Expose no forward history, and define the
    root-entry behavior as a structured no-op/failure rather than silently removing the navigator.
-6. Duplicate the current navigator by resolving its current path into a new navigator with fresh
+6. [x] Duplicate the current navigator by resolving its current path into a new navigator with fresh
    entries and node instances.
-7. Remove and reorder navigators without affecting their domain objects, already-started domain
+7. [x] Remove and reorder navigators without affecting their domain objects, already-started domain
    tasks, or any other navigator.
-8. Retain an attempted target as a broken current entry when resolution fails. Back must remove the
+8. [x] Retain an attempted target as a broken current entry when resolution fails. Back must remove the
    broken entry and reveal the previous entry.
-9. Dispose all entries and publish deterministic removal notifications when a navigator or
+9. [x] Dispose all entries and publish deterministic removal notifications when a navigator or
    workspace is disposed. Do not make a node own frontend work.
 
 Verification:
 
-- Test push, destructive back, terminal rejection, duplicate, reorder, remove, disposal, and no
+- [x] Test push, destructive back, terminal rejection, duplicate, reorder, remove, disposal, and no
   forward history.
-- Prove two navigators at one path have distinct nodes and navigation stacks while writes remain
+- [x] Prove two navigators at one path have distinct nodes and navigation stacks while writes remain
   visible through their shared domain object.
-- Prove removal of one navigator cannot invalidate another navigator's operation.
-- Prove workspace disposal leaves its host and already-started invocation alive.
+- [x] Prove removal of one navigator cannot invalidate another navigator's operation.
+- [x] Prove workspace disposal leaves its host and already-started invocation alive.
 
 ### 5. Add versioned layout snapshots and restore
 

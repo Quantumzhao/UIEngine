@@ -72,8 +72,8 @@ collections, validation, and synchronous or asynchronous domain invocation. The 
 those capabilities. The TUI has a reusable hosting boundary and independent frontend operation
 scopes.
 
-The node model and semantic path resolution are complete. The next architecture work is
-`UIEngineWorkspace` and `Navigator`, followed by the multi-navigator TUI.
+The node model, semantic path resolution, `UIEngineWorkspace`, and `Navigator` are complete. The
+next architecture work is versioned layout snapshots, followed by the multi-navigator TUI.
 
 ## Repository Structure
 
