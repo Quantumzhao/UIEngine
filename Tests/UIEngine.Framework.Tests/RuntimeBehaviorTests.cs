@@ -576,6 +576,7 @@ public sealed class RuntimeBehaviorTests
                 "INullableValueNode",
                 "INumberNode",
                 "IObjectNode",
+                "IPathSegmentSnapshot",
                 "IProgrammaticValueNode",
                 "IPropertyNode",
                 "IReadableValueNode",

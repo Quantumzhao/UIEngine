@@ -32,8 +32,8 @@ thread-marshaling mechanism.
 
 ### `UIEngineWorkspace`
 
-A workspace is a frontend-neutral navigation and layout session over one host. It owns an ordered
-collection of `Navigator`s and produces a serializable layout snapshot. A host can support more
+A workspace is a frontend-neutral navigation session over one host. It owns an ordered collection
+of `Navigator`s and produces a serializable workspace snapshot. A host can support more
 than one workspace without sharing navigation state between them.
 
 ### Frontends
@@ -166,23 +166,25 @@ If a path cannot resolve, the current entry remains present with its structured 
 navigation remains available. A restored broken path therefore stays visible and can be unwound
 until a valid node is reached.
 
-## Layout Persistence
+## Workspace Snapshots and Layout Persistence
 
-A workspace serializes a versioned layout containing:
+A workspace creates an unversioned snapshot containing:
 
 - navigator order and names;
-- each navigator's current logical path; and
-- stable presentation configuration such as placement or size.
+- each navigator's current structured logical path; and
+- the selected navigator name.
 
-Each navigator produces its own serializable path and stable configuration. The workspace
-aggregates those records into the layout snapshot.
+Each supported `ILogicalPathSegment` has a corresponding serializable snapshot type. Restore is
+optimistic: malformed navigator records are reported and skipped without discarding usable records,
+and unknown serialized fields do not require a schema-version gate.
 
 The snapshot does not contain domain values, runtime handles, node instances, control instances,
 edit drafts, invocation state, or running work.
 
 Deserialization reconstructs navigation entries from each saved path and its semantic parent
 locations. Resolution failures create broken current entries rather than dropping saved
-navigators. Serialization produces data; file storage remains the caller's responsibility.
+navigators. Frontends own any outer layout contract and stable presentation configuration such as
+placement or size. Serialization produces data; file storage remains the caller's responsibility.
 
 ## Operations and Lifetime
 

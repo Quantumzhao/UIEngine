@@ -68,9 +68,9 @@ continues independently.
 
 ## Layout Persistence
 
-The TUI contributes stable placement, size, and selection configuration to the workspace layout
-snapshot. It does not persist drafts, focus, loaded values, controls, or running
-invocations.
+The TUI owns a layout snapshot that combines the Core workspace snapshot with stable placement and
+size configuration. Core knows nothing about those presentation fields. The TUI does not persist
+drafts, focus, loaded values, controls, or running invocations.
 
 Loading a layout creates all saved navigators. A path that no longer resolves is shown as a broken
 entry and can navigate back or be removed.

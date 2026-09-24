@@ -47,13 +47,14 @@ facets, and frontends choose controls from those semantics.
 - Keep unresolved paths as broken entries with structured errors.
 - Permit back navigation from a broken entry to a valid ancestor.
 
-### Workspaces and Layouts
+### Workspaces and Snapshots
 
 - Own an ordered collection of independent navigators.
 - Add, duplicate, remove, and reorder navigators.
-- Serialize current paths and stable presentation configuration.
+- Serialize navigator names, order, current structured paths, and selection.
 - Restore missing or incompatible paths as visible broken entries.
 - Never persist domain state, runtime handles, node instances, drafts, or running operations.
+- Keep stable presentation configuration in frontend-owned layout data.
 
 ### Lifetime
 
@@ -89,10 +90,10 @@ facets, and frontends choose controls from those semantics.
 - Implement destructive back navigation, duplication, removal, and isolation.
 - Represent broken current entries without inventing a non-language node type.
 
-### 4. Add layout snapshots
+### 4. Add workspace snapshots
 
-- Define a small versioned layout format.
-- Serialize navigator paths, order, names, and stable presentation configuration.
+- Define a small unversioned workspace snapshot.
+- Serialize navigator paths, order, names, and selection.
 - Restore each navigator independently and retain broken entries.
 - Keep file I/O outside Core.
 
@@ -119,7 +120,8 @@ The architecture is complete when:
 - all node kinds can be current and terminal nodes cannot navigate further;
 - back navigation destroys the departed entry and has no forward path;
 - removing one navigator does not affect another or stop domain work;
-- layout round trips preserve navigator paths and stable presentation configuration;
+- workspace snapshot round trips preserve navigator paths and selection;
+- frontend layout round trips preserve stable presentation configuration;
 - broken restored paths remain visible and can navigate back;
 - cyclic and shared-reference graphs do not recursively expand;
 - all collection work and asynchronous streams remain bounded;

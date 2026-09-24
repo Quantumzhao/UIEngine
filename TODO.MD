@@ -34,13 +34,13 @@
 - [x] Keep broken paths as visible entries that can navigate back.
 - [x] Prove that one navigator cannot interfere with another navigator's presentation state.
 
-## Layout Persistence
+## Snapshot Persistence
 
-- [ ] Define a versioned workspace layout snapshot.
-- [ ] Persist navigator names, order, paths, and stable presentation configuration.
-- [ ] Restore each navigator independently.
-- [ ] Preserve broken paths during restore.
-- [ ] Verify that live state, handles, nodes, controls, drafts, and running work are never persisted.
+- [x] Define an unversioned workspace navigation snapshot.
+- [x] Persist navigator names, order, structured paths, and selection.
+- [x] Restore each navigator independently and report malformed records.
+- [x] Preserve broken paths during restore.
+- [x] Verify that live state, handles, nodes, controls, drafts, and running work are never persisted.
 
 ## Product MVP — TUI
 

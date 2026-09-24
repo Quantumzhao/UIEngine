@@ -104,8 +104,8 @@ do not defer Core or lifetime coverage to the final TUI acceptance pass.
   nullability, and mutability.
 - Path plus resolution state belongs to a navigation entry or another Core-owned resolution envelope.
 - A TUI-created Core workspace may be owned by `TuiWorkspace`; a caller-supplied Core workspace is caller-owned.
-- Core produces versioned layout data but does not choose a file, perform file I/O, or persist live
-  state. The TUI owns its stable presentation fields and maps them into that data contract.
+- Core produces unversioned workspace snapshots but does not choose a file, perform file I/O, or
+  persist live state. The TUI owns the outer layout contract and its stable presentation fields.
 - The existing conversion, validation, runtime-handle, domain-thread affinity, bounded-collection,
   and method-occurrence invocation behavior are behavior to preserve.
 
@@ -244,35 +244,35 @@ Verification:
 - [x] Prove removal of one navigator cannot invalidate another navigator's operation.
 - [x] Prove workspace disposal leaves its host and already-started invocation alive.
 
-### 5. Add versioned layout snapshots and restore
+### 5. Add workspace snapshots and restore
 
 Implement address persistence before building TUI save/restore commands.
 
-1. Define a small versioned layout DTO containing navigator names, order, current paths, the
-   selected navigator name, and stable per-navigator presentation configuration.
-2. Choose one bounded, serializable representation for TUI presentation configuration. Keep it
-   opaque to Core and restrict the initial schema to placement and size fields required by this
-   milestone.
-3. Snapshot only stable data. Add explicit tests preventing domain values, runtime handles, node or
+1. [x] Define a small unversioned workspace snapshot containing navigator names, order, current
+   paths, and the selected navigator name. Restore snapshots optimistically without a schema-version
+   gate.
+2. [x] Represent each structured path segment with a serializable snapshot type corresponding to
+   its `ILogicalPathSegment`. Keep diagnostic path strings out of the persistence contract.
+3. [x] Snapshot only stable data. Add explicit tests preventing domain values, runtime handles, node or
    control instances, drafts, invocation state, and invocations from entering the contract.
-4. Restore each navigator independently. One invalid record must not discard the remaining valid
+4. [x] Restore each navigator independently. One invalid record must not discard the remaining valid
    navigators.
-5. Reconstruct each navigation stack from the saved current path and its semantic parents. Include
+5. [x] Reconstruct each navigation stack from the saved current path and its semantic parents. Include
    the collection path before a selected element path.
-6. If any restored prefix cannot resolve, retain that prefix and each requested descendant as
+6. [x] If any restored prefix cannot resolve, retain that prefix and each requested descendant as
    structured broken entries so repeated back navigation eventually reaches the deepest valid
    ancestor.
-7. Define deterministic handling for an unknown layout version, duplicate navigator names,
-   an invalid selected name, empty layouts, and invalid presentation fields.
-8. Keep JSON or other file storage in the caller/example layer; Core only creates and consumes the
+7. [x] Define deterministic handling for duplicate navigator names, malformed path records, an
+   invalid selected name, empty snapshots, and unknown serialized fields.
+8. [x] Keep JSON or other file storage in the caller/example layer; Core only creates and consumes the
    serializable snapshot.
 
 Verification:
 
-- Round-trip multi-navigator order, names, paths, selection, placement, and size.
-- Restore mixed valid and broken navigators and navigate backward from a broken selected element to
+- [x] Round-trip multi-navigator order, names, structured paths, and selection.
+- [x] Restore mixed valid and broken navigators and navigate backward from a broken selected element to
   its valid collection.
-- Inspect serialized test data to prove excluded live state is absent.
+- [x] Inspect serialized test data to prove excluded live state is absent.
 
 ### 7. Rebase the TUI hosting boundary on the Core workspace
 
@@ -285,16 +285,20 @@ Preserve the completed XenoAtom hosting boundary while changing its model source
    workspace when applicable. It never owns a caller-supplied host or workspace.
 3. Replace `InitialPath` with startup configuration that can create the initial navigator or load a
    supplied layout. Define the empty-workspace behavior without treating `/` as an object node.
-4. Maintain a TUI presentation record keyed by navigator name. Each record owns the current
+4. Define the frontend-owned TUI layout snapshot and bounded
+   `NavigatorPresentationConfiguration` for placement and size. Combine them with the Core workspace
+   snapshot without putting presentation types in Core.
+5. Maintain a TUI presentation record keyed by navigator name. Each record owns the current
    control.
-5. React to Core navigation notifications by creating one replacement control for a pushed/revealed
+6. React to Core navigation notifications by creating one replacement control for a pushed/revealed
    entry and removing the departed control exactly once.
-6. Marshal visual state changes with the XenoAtom dispatcher. Domain access remains synchronous on
+7. Marshal visual state changes with the XenoAtom dispatcher. Domain access remains synchronous on
    the domain model's thread, with any cross-thread request boundary owned outside Core.
 
 Verification:
 
 - Extend boundary tests for both ownership paths, empty startup, restored startup, and disposal.
+- Round-trip frontend-owned navigator placement and size with the Core workspace snapshot.
 - Retain the existing caller-owned host tests against the Core workspace-backed implementation.
 
 ### 8. Build multi-navigator workspace chrome
@@ -390,8 +394,8 @@ Verification:
 
 ### 12. Connect layout commands and complete acceptance
 
-1. Map the TUI's selected navigator, placement, and size to the Core layout snapshot without adding
-   draft, focus, loaded-value, or running-work state.
+1. Combine the Core workspace snapshot with the TUI's selected navigator, placement, and size in the
+   frontend-owned layout snapshot without adding draft, focus, loaded-value, or running-work state.
 2. Expose save/load through caller-supplied callbacks or another explicit composition boundary so
    the reusable TUI library does not choose a filesystem location.
 3. Reconcile controls when a layout is loaded: retire removed presentations, retain navigator

@@ -42,8 +42,9 @@ toolkit types in Core.
   captures that node's location and resolves a navigator-owned instance.
 - An unresolved persisted path remains as a broken navigator entry. The user can navigate back
   until a valid node is reached.
-- Layout persistence stores logical paths and stable presentation configuration only. It never
-  stores domain values, runtime handles, node instances, edit drafts, or running operations.
+- Core workspace snapshots store navigator names, order, structured logical paths, and selection.
+  Frontend-owned layouts may add stable presentation configuration. Neither stores domain values,
+  runtime handles, node instances, edit drafts, or running operations.
 - Runtime handles and logical paths remain distinct concepts.
 - Collections are read in bounded windows.
 - Expected failures use structured results. Unexpected faults remain available only for trusted
@@ -63,7 +64,8 @@ toolkit types in Core.
 6. Core contains no frontend or toolkit types.
 7. Frontends branch on structured failures rather than parsing messages.
 8. Every public collection read is bounded.
-9. Persisted layouts contain addresses and stable presentation configuration, not live state.
+9. Persisted workspace snapshots contain addresses and selection, not live state; frontend layouts
+   may separately add stable presentation configuration.
 
 ## Current Delivery State
 
@@ -71,8 +73,8 @@ The host already provides synchronous live graph access, canonical paths, runtim
 collections, validation, and synchronous or asynchronous domain invocation. The TUI has a reusable hosting boundary and independent frontend operation
 scopes.
 
-The node model, semantic path resolution, `UIEngineWorkspace`, and `Navigator` are complete. The
-next architecture work is versioned layout snapshots, followed by the multi-navigator TUI.
+The node model, semantic path resolution, `UIEngineWorkspace`, `Navigator`, and optimistic workspace
+snapshots are complete. The next architecture work is rebasing the TUI on the Core workspace.
 
 ## Repository Structure
 
