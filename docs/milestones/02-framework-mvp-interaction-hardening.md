@@ -22,7 +22,7 @@ collections, and structured failures.
 - Synchronous and asynchronous method invocation with lifecycle status.
 - Synchronous, reentrant live operations owned by the domain model's thread.
 - Deterministic invocation completion and structured outcomes.
-- Black-box framework and CLI coverage of the complete cyclic-world workflow.
+- Black-box framework and ~~CLI coverage~~ of the complete cyclic-world workflow.
 
 ## Acceptance
 
@@ -30,4 +30,4 @@ collections, and structured failures.
 - Ordinary browsing never performs an unbounded collection read.
 - Expected failures return structured codes and validation issues.
 - Invocation completion remains deterministic.
-- Core and CLI tests pass with a zero-warning build.
+- Core and ~~CLI~~ tests pass with a zero-warning build.

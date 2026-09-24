@@ -9,7 +9,7 @@
 - [x] Synchronous and asynchronous invocation with method-occurrence-local status and result.
 - [x] Explicit domain dispatch.
 - [x] Structured interaction failures.
-- [x] CLI coverage of the live graph workflow.
+- [x] ~~CLI coverage of the live graph workflow.~~
 
 ## Object Nodes
 
@@ -59,7 +59,7 @@
 
 ## Product Release
 
-- [ ] Pass Core, CLI, and TUI acceptance from a clean checkout.
+- [ ] Pass Core and TUI acceptance from a clean checkout.
 - [ ] Define licensing, versioning, package metadata, and release policy.
 - [ ] Define supported platforms and compatibility policy.
 - [ ] Enable package generation after those policies are settled.

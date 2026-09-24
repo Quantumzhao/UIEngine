@@ -9,7 +9,7 @@ using UIEngine.Core.Attributes;
 
 namespace UIEngine.Examples.CyclicDomain;
 
-/// <summary>Creates the deterministic cyclic graph used by the CLI and integration tests.</summary>
+/// <summary>Creates the deterministic cyclic graph</summary>
 public static class CyclicWorldFactory
 {
     /// <summary>Creates the immutable exposure for the unannotated sample type.</summary>

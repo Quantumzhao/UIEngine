@@ -9,8 +9,7 @@ Its target architecture has three frontend-neutral layers:
 - `BaseNode` represents an exposed .NET language feature.
 - `UIEngineWorkspace` owns independent `Navigator`s and serializable layout state.
 
-Frontends map node semantics to controls. The CLI is the proving frontend, and the reusable TUI is
-in progress.
+Frontends map node semantics to controls. The reusable TUI is in progress.
 
 ## Build, Test, and Run
 
@@ -18,7 +17,6 @@ in progress.
 dotnet restore UIEngine.sln
 dotnet build UIEngine.sln
 dotnet test UIEngine.sln --no-build
-dotnet run --project Frontend/Cli/Cli.csproj
 dotnet run --project Examples/CyclicWorld.Tui/CyclicWorld.Tui.csproj
 ```
 
@@ -56,7 +54,6 @@ runtime or a method invocation that has already started.
 - [Architecture and delivery plan](REBOOT_PLAN.md) — implementation sequence and acceptance.
 - [TUI frontend architecture](docs/tui-frontend-architecture.md) — TUI control and lifetime model.
 - [Progress tracker](TODO.MD) — completed foundation and remaining work.
-- [CLI command reference](docs/cli-command-reference.md) — current CLI commands and paths.
 - [Milestone records](docs/milestones/README.md) — delivery plans and acceptance records.
 
 Package publication remains disabled until compatibility, licensing, release, and support policy

@@ -68,8 +68,7 @@ toolkit types in Core.
 ## Current Delivery State
 
 The host already provides synchronous live graph access, canonical paths, runtime handles, bounded
-collections, validation, and synchronous or asynchronous domain invocation. The CLI exercises
-those capabilities. The TUI has a reusable hosting boundary and independent frontend operation
+collections, validation, and synchronous or asynchronous domain invocation. The TUI has a reusable hosting boundary and independent frontend operation
 scopes.
 
 The node model, semantic path resolution, `UIEngineWorkspace`, and `Navigator` are complete. The
@@ -78,11 +77,10 @@ next architecture work is versioned layout snapshots, followed by the multi-navi
 ## Repository Structure
 
 - `Core/` — host, exposure, handles, paths, nodes, workspaces, and navigation.
-- `Frontend/Cli/` — command-line frontend.
 - `Frontend/Tui/` — reusable XenoAtom-based TUI frontend.
 - `Examples/CyclicDomain/` — cyclic and shared-reference acceptance model.
 - `Examples/CyclicWorld.Tui/` — thin TUI composition executable.
-- `Tests/` — black-box Core, CLI, and TUI behavior tests.
+- `Tests/` — black-box Core and TUI behavior tests.
 - `docs/architecture.md` — authoritative architecture.
 - `REBOOT_PLAN.md` — implementation sequence and acceptance criteria.
 - `TODO.MD` — progress tracker.
@@ -99,6 +97,7 @@ The build must complete with zero warnings.
 ## Coding Style
 
 - Don't add null checks when the method's parameters are known to be not-null
+- No need to check if an object is disposed. 
 - Never over-design, and be cautious when applying design patterns. 
 - `Task`s do not accept cancellation tokens; stopping a task is beyond our scope.
 - In general, files should be within 500 lines. If you think it qualifies being longer than that, discuss it with me. Long files are usually the symbol of bad design. Test files and configurations are exceptions to this. 

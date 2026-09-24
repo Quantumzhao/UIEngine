@@ -274,29 +274,6 @@ Verification:
   its valid collection.
 - Inspect serialized test data to prove excluded live state is absent.
 
-### 6. Migrate the CLI to one navigator
-
-Use the CLI as the first complete consumer of the new Core architecture before adding substantial
-TUI behavior.
-
-1. Replace `CliSession`'s private location bindings with one `UIEngineWorkspace` and one
-   `Navigator`.
-2. Derive the prompt, current path, parent/back behavior, member completion, reads, writes,
-   collection windows, and method invocation from the current node and its facets.
-3. Preserve existing command grammar and output where the architecture does not require a change.
-   Extend navigation/inspection so scalar, collection, and method nodes can be current and terminal.
-4. Use navigator back semantics for `cd ..`; do not reintroduce a CLI-only history model.
-5. Preserve the CLI executable's existing ownership of its host while making workspace disposal
-   explicit.
-6. Delete the legacy CLI adapters after the CLI tests pass on nodes.
-
-Verification:
-
-- Keep the existing redirected cyclic-world, validation, bounded collection,
-  replacement and completion tests.
-- Add CLI cases for terminal current nodes, collection-selector parent traversal, destructive back,
-  and a structured broken path where the command workflow can create one.
-
 ### 7. Rebase the TUI hosting boundary on the Core workspace
 
 Preserve the completed XenoAtom hosting boundary while changing its model source.
@@ -424,14 +401,14 @@ Verification:
    model-specific control or Core behavior to the executable.
 5. Automate the full acceptance workflow above with deterministic toolkit input where practical,
    then perform a real-terminal smoke test for rendering and focus behavior.
-6. Update the README, architecture documents, CLI command reference, milestone index, and
+6. Update the README, architecture documents, milestone index, and
    `TODO.MD` only after the corresponding behavior is implemented.
 
 Verification:
 
-- Run the focused Core, CLI, TUI, and toolkit-spike tests while implementing each increment.
+- Run the focused Core, TUI, and toolkit-spike tests while implementing each increment.
 - Run `dotnet build UIEngine.sln` and require zero warnings.
-- Run `dotnet test UIEngine.sln --no-build` and require all Core, CLI, TUI, dependency, lifetime,
+- Run `dotnet test UIEngine.sln --no-build` and require all Core, TUI, dependency, lifetime,
   keyboard, resize, and acceptance tests to pass.
 - Record any terminal platform not exercised rather than implying support.
 

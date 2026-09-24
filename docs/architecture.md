@@ -10,7 +10,7 @@ flowchart LR
     Host --> Workspace[UIEngineWorkspace]
     Workspace --> Navigators[Navigator collection]
     Navigators --> Nodes
-    Nodes --> Frontends[CLI, TUI, or another frontend]
+    Nodes --> Frontends[TUI, or another frontend]
 ```
 
 ## Boundaries
@@ -217,7 +217,6 @@ to the same path.
 
 ```text
 Domain application ----------> Core
-Frontend/Cli ----------------> Core
 Frontend/Tui ----------------> Core + XenoAtom.Terminal.UI
 Examples --------------------> domain + selected frontend
 Tests -----------------------> implementation projects

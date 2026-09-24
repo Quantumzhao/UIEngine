@@ -96,7 +96,7 @@ facets, and frontends choose controls from those semantics.
 - Restore each navigator independently and retain broken entries.
 - Keep file I/O outside Core.
 
-### 5. Adapt the CLI
+~~### 5. Adapt the CLI~~
 
 - Use one navigator for the normal command session.
 - Keep commands and output stable where the architecture does not require a change.
@@ -123,7 +123,7 @@ The architecture is complete when:
 - broken restored paths remain visible and can navigate back;
 - cyclic and shared-reference graphs do not recursively expand;
 - all collection work and asynchronous streams remain bounded;
-- Core, CLI, and TUI tests pass; and
+- Core and TUI tests pass; and
 - `dotnet build UIEngine.sln` completes with zero warnings.
 
 ## Verification
