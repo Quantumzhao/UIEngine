@@ -9,12 +9,14 @@ namespace UIEngine.Core;
 /// </summary>
 public sealed class UIEngineWorkspace : IDisposable
 {
-    public List<Navigator> Navigators { get; } = [];
+    private readonly List<Navigator> _Navigators = [];
 
     public UIEngineWorkspace(UIEngineHost host)
     {
         Host = host;
     }
+
+    public IReadOnlyList<Navigator> Navigators => _Navigators;
 
     public event EventHandler<WorkspaceChangedEventArgs>? Changed;
 
@@ -38,7 +40,7 @@ public sealed class UIEngineWorkspace : IDisposable
         var entries = _ResolveInitialEntries(path);
         var navigator = new Navigator(this, Guid.NewGuid(), name, entries);
         var index = Navigators.Count;
-        Navigators.Add(navigator);
+        _Navigators.Add(navigator);
 
         var change = new NavigatorAddedChange(
             navigator.Id,
@@ -74,8 +76,8 @@ public sealed class UIEngineWorkspace : IDisposable
 
         var entries = _ResolveInitialEntries(source.CurrentPath);
         var navigator = new Navigator(this, Guid.NewGuid(), name, entries);
-        var index = Navigators.IndexOf(source) + 1;
-        Navigators.Insert(index, navigator);
+        var index = _Navigators.IndexOf(source) + 1;
+        _Navigators.Insert(index, navigator);
 
         var change = new NavigatorDuplicatedChange(
             source.Id,
@@ -105,7 +107,7 @@ public sealed class UIEngineWorkspace : IDisposable
             return _NavigatorNotFound<NavigatorReorderedChange>(navigatorId);
         }
 
-        var previousIndex = Navigators.IndexOf(navigator);
+        var previousIndex = _Navigators.IndexOf(navigator);
         if (previousIndex == index)
         {
             return Left(new InteractionError(
@@ -113,8 +115,8 @@ public sealed class UIEngineWorkspace : IDisposable
                 "The navigator is already at the requested index."));
         }
 
-        Navigators.RemoveAt(previousIndex);
-        Navigators.Insert(index, navigator);
+        _Navigators.RemoveAt(previousIndex);
+        _Navigators.Insert(index, navigator);
         var change = new NavigatorReorderedChange(navigator.Id, previousIndex, index);
         Publish(change);
         return Right(change);
@@ -255,7 +257,7 @@ public sealed class UIEngineWorkspace : IDisposable
             navigator.Name,
             snapshot.SelectedNavigatorName))
             ? snapshot.SelectedNavigatorName
-            : Navigators.FirstOrDefault()?.Name;
+            : Navigators.Count > 0 ? Navigators[0].Name : null;
         if (!StringComparer.Ordinal.Equals(selectedNavigatorName, snapshot.SelectedNavigatorName))
         {
             issues.Add(_RestoreIssue(
@@ -422,12 +424,12 @@ public sealed class UIEngineWorkspace : IDisposable
             new InteractionError(InteractionErrorCode.INVALID_INPUT, message));
 
     private Navigator? _FindNavigator(Guid navigatorId) =>
-        Navigators.FirstOrDefault(navigator => navigator.Id == navigatorId);
+        _Navigators.Find(navigator => navigator.Id == navigatorId);
 
     private NavigatorRemovedChange _RemoveNavigator(Navigator navigator)
     {
-        var previousIndex = Navigators.IndexOf(navigator);
-        Navigators.RemoveAt(previousIndex);
+        var previousIndex = _Navigators.IndexOf(navigator);
+        _Navigators.RemoveAt(previousIndex);
         var removed = navigator.Remove();
         var change = new NavigatorRemovedChange(
             navigator.Id,

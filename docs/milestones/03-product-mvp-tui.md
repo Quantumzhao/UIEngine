@@ -103,7 +103,7 @@ do not defer Core or lifetime coverage to the final TUI acceptance pass.
   separate concrete class for every possible combination of property, field, value kind,
   nullability, and mutability.
 - Path plus resolution state belongs to a navigation entry or another Core-owned resolution envelope.
-- A TUI-created Core workspace may be owned by `TuiWorkspace`; a caller-supplied Core workspace is caller-owned.
+- Every Core workspace is owned by the frontend implementation that creates it. 
 - Core produces unversioned workspace snapshots but does not choose a file, perform file I/O, or
   persist live state. The TUI owns the outer layout contract and its stable presentation fields.
 - The existing conversion, validation, runtime-handle, domain-thread affinity, bounded-collection,
@@ -278,28 +278,27 @@ Verification:
 
 Preserve the completed XenoAtom hosting boundary while changing its model source.
 
-1. Let `TuiFrontend` either:
-   - create and own a `UIEngineWorkspace` from a caller-owned host; or
-   - present a caller-supplied `UIEngineWorkspace` without taking ownership.
-2. Update `TuiWorkspace` to own only its visual tree, TUI state, and an internally created Core
-   workspace when applicable. It never owns a caller-supplied host or workspace.
-3. Replace `InitialPath` with startup configuration that can create the initial navigator or load a
+1. [x] Let `TuiFrontend` create and own a `UIEngineWorkspace` from a caller-owned host.
+2. [x] Update `TuiWorkspace` to own its Core workspace, visual tree, and TUI state. It never owns
+   the caller-supplied host.
+3. [x] Replace `InitialPath` with startup configuration that can create the initial navigator or load a
    supplied layout. Define the empty-workspace behavior without treating `/` as an object node.
-4. Define the frontend-owned TUI layout snapshot and bounded
+4. [x] Define the frontend-owned TUI layout snapshot and bounded
    `NavigatorPresentationConfiguration` for placement and size. Combine them with the Core workspace
    snapshot without putting presentation types in Core.
-5. Maintain a TUI presentation record keyed by navigator name. Each record owns the current
+5. [x] Maintain a TUI presentation record keyed by navigator name. Each record owns the current
    control.
-6. React to Core navigation notifications by creating one replacement control for a pushed/revealed
+6. [x] React to Core navigation notifications by creating one replacement control for a pushed/revealed
    entry and removing the departed control exactly once.
-7. Marshal visual state changes with the XenoAtom dispatcher. Domain access remains synchronous on
+7. [x] Marshal visual state changes with the XenoAtom dispatcher. Domain access remains synchronous on
    the domain model's thread, with any cross-thread request boundary owned outside Core.
 
 Verification:
 
-- Extend boundary tests for both ownership paths, empty startup, restored startup, and disposal.
-- Round-trip frontend-owned navigator placement and size with the Core workspace snapshot.
-- Retain the existing caller-owned host tests against the Core workspace-backed implementation.
+- [x] Extend boundary tests for frontend workspace ownership, empty startup, restored startup, and
+  disposal.
+- [x] Round-trip frontend-owned navigator placement and size with the Core workspace snapshot.
+- [x] Retain the existing caller-owned host tests against the Core workspace-backed implementation.
 
 ### 8. Build multi-navigator workspace chrome
 

@@ -70,11 +70,13 @@ toolkit types in Core.
 ## Current Delivery State
 
 The host already provides synchronous live graph access, canonical paths, runtime handles, bounded
-collections, validation, and synchronous or asynchronous domain invocation. The TUI has a reusable hosting boundary and independent frontend operation
-scopes.
+collections, validation, and synchronous or asynchronous domain invocation. The node model,
+semantic path resolution, `UIEngineWorkspace`, `Navigator`, and optimistic workspace snapshots are
+complete.
 
-The node model, semantic path resolution, `UIEngineWorkspace`, `Navigator`, and optimistic workspace
-snapshots are complete. The next architecture work is rebasing the TUI on the Core workspace.
+The reusable TUI boundary creates and owns its `UIEngineWorkspace` over a caller-owned host. It
+supports explicit startup configuration, frontend layout snapshots, notification-driven navigator
+presentation lifetimes, and XenoAtom dispatcher handoff.
 
 ## Repository Structure
 

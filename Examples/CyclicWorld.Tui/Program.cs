@@ -11,5 +11,5 @@ host.SetRoot("world", CyclicWorldFactory.Create());
 await TuiFrontend.RunAsync(host, new TuiFrontendOptions
 {
     ApplicationTitle = "UIEngine Cyclic World",
-    InitialPath = LogicalPath.Root.Append("world"),
+    Startup = new AddNavigator("world", LogicalPath.Root.Append("world")),
 });

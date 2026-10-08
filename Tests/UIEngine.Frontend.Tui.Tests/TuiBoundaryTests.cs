@@ -9,35 +9,48 @@ namespace UIEngine.Frontend.Tui.Tests;
 public sealed class TuiBoundaryTests
 {
     [Fact]
-    public void WorkspaceUsesCopiedOptionsAndLeavesCallerOwnedHostAlive()
+    public void FrontendOwnsWorkspaceButNotHostAndCopiesOptions()
     {
-        using var host = new UIEngineHost();
-        host.SetRoot("world", new object());
+        using var host = TuiTestModel.CreateHost();
         var options = new TuiFrontendOptions
         {
             ApplicationTitle = "Test application",
-            InitialPath = LogicalPath.Root.Append("world"),
+            Startup = new AddNavigator("main", TuiTestModel.Path("model")),
             CollectionWindowSize = 12,
         };
+        var tui = TuiFrontend.CreateWorkspace(host, options);
+        var coreWorkspace = tui.Workspace;
 
-        using var workspace = new TuiWorkspace(host, options);
+        Assert.NotSame(options, tui.Options);
+        Assert.Equal(options, tui.Options);
+        Assert.Equal("main", Assert.Single(coreWorkspace.Navigators).Name);
 
-        Assert.Equal(options, workspace.Options);
-        Assert.True(host.ResolveRootNode("world").IsRight);
+        tui.Dispose();
+        tui.Dispose();
 
-        workspace.Dispose();
-
-        Assert.True(host.ResolveRootNode("world").IsRight);
+        Assert.Empty(coreWorkspace.Navigators);
+        Assert.True(host.ResolveRootNode("model").IsRight);
     }
 
     [Fact]
-    public void FullscreenRunnerExposesOnlyHostAndOptions()
+    public void PublicEntryPointsAcceptOnlyHostAndOptions()
     {
-        var run = Assert.Single(typeof(TuiFrontend).GetMethods(), static method =>
-            method.Name == nameof(TuiFrontend.RunAsync));
+        var creates = typeof(TuiFrontend).GetMethods()
+            .Where(static method => method.Name == nameof(TuiFrontend.CreateWorkspace))
+            .ToArray();
+        var runs = typeof(TuiFrontend).GetMethods()
+            .Where(static method => method.Name == nameof(TuiFrontend.RunAsync))
+            .ToArray();
 
-        Assert.Equal([typeof(UIEngineHost), typeof(TuiFrontendOptions)],
+        var create = Assert.Single(creates);
+        var run = Assert.Single(runs);
+        Assert.Equal(
+            [typeof(UIEngineHost), typeof(TuiFrontendOptions)],
+            create.GetParameters().Select(static parameter => parameter.ParameterType));
+        Assert.Equal(
+            [typeof(UIEngineHost), typeof(TuiFrontendOptions)],
             run.GetParameters().Select(static parameter => parameter.ParameterType));
+        Assert.Null(typeof(TuiFrontendOptions).GetProperty("InitialPath"));
     }
 
     [Fact]
@@ -67,11 +80,7 @@ public sealed class TuiBoundaryTests
         Assert.DoesNotContain(tuiReferences, static reference => reference.Name == "CyclicDomain");
 
         var repositoryRoot = _FindRepositoryRoot();
-        var tuiProject = XDocument.Load(Path.Combine(
-            repositoryRoot,
-            "Frontend",
-            "Tui",
-            "Tui.csproj"));
+        var tuiProject = XDocument.Load(Path.Combine(repositoryRoot, "Frontend", "Tui", "Tui.csproj"));
         var tuiPackages = tuiProject.Descendants("PackageReference")
             .Select(static element => (
                 Name: element.Attribute("Include")?.Value ??

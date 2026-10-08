@@ -38,9 +38,9 @@ than one workspace without sharing navigation state between them.
 
 ### Frontends
 
-A frontend maps node semantics to controls and owns all toolkit state. It may create a workspace,
-or present a caller-supplied workspace. Core never references controls, focus, colors, geometry,
-key bindings, or a UI dispatcher.
+A frontend maps node semantics to controls, creates and owns its workspace, and owns all toolkit
+state. The caller owns the host supplied to the frontend. Core never references controls, focus,
+colors, geometry, key bindings, or a UI dispatcher.
 
 ## Object Nodes
 

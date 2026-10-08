@@ -78,8 +78,8 @@ entry and can navigate back or be removed.
 ## Toolkit and Ownership
 
 - XenoAtom.Terminal.UI remains pinned to an accepted version.
-- `TuiWorkspace` owns its visual tree and TUI presentation state.
-- The caller owns `UIEngineHost` and, when supplied separately, `UIEngineWorkspace`.
+- `TuiWorkspace` owns its core workspace, visual tree, and TUI presentation state.
+- The caller owns `UIEngineHost`.
 - UI changes run through the toolkit dispatcher; domain access runs through the host dispatcher.
 - Keyboard operation is complete without requiring mouse input.
 - Core has no XenoAtom dependency.

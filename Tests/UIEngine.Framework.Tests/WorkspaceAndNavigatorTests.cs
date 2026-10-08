@@ -8,6 +8,43 @@ namespace UIEngine.Framework.Tests;
 public sealed class WorkspaceAndNavigatorTests
 {
     [Fact]
+    public void NavigatorViewIsReadOnlyAndEveryMutationPublishesOneChange()
+    {
+        using var host = _CreateHost(new _Model());
+        var workspace = new UIEngineWorkspace(host);
+        var mutableView = Assert.IsAssignableFrom<ICollection<Navigator>>(workspace.Navigators);
+        var changes = new List<WorkspaceChange>();
+        workspace.Changed += (_, eventArgs) => changes.Add(eventArgs.Change);
+
+        var added = workspace.AddNavigator("one", "model").RightValue();
+        Assert.Throws<NotSupportedException>(() => mutableView.Add(workspace.Navigators[0]));
+        var duplicated = workspace.DuplicateNavigator(added.NavigatorId, "two").RightValue();
+        var reordered = workspace.ReorderNavigator(duplicated.NavigatorId, 0).RightValue();
+        var restored = workspace.RestoreSnapshot(new WorkspaceSnapshot(
+            [new NavigatorSnapshot("restored", [new MemberPathSegmentSnapshot("model")])],
+            "restored"));
+        var restoredId = Assert.Single(workspace.Navigators).Id;
+        var removed = workspace.RemoveNavigator(restoredId).RightValue();
+        workspace.AddNavigator("disposed", "model");
+        var disposedId = Assert.Single(workspace.Navigators).Id;
+
+        workspace.Dispose();
+
+        Assert.Empty(restored.Issues);
+        Assert.Same(added, changes[0]);
+        Assert.Same(duplicated, changes[1]);
+        Assert.Same(reordered, changes[2]);
+        Assert.Collection(
+            changes.Skip(3),
+            change => Assert.IsType<NavigatorRemovedChange>(change),
+            change => Assert.IsType<NavigatorRemovedChange>(change),
+            change => Assert.IsType<NavigatorAddedChange>(change),
+            change => Assert.Same(removed, change),
+            change => Assert.IsType<NavigatorAddedChange>(change),
+            change => Assert.Equal(disposedId, Assert.IsType<NavigatorRemovedChange>(change).NavigatorId));
+    }
+
+    [Fact]
     public void NavigatorCanStartFromRootPathAndResolvedOccurrenceWithFreshStacks()
     {
         var model = new _Model();

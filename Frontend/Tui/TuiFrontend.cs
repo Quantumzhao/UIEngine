@@ -1,35 +1,47 @@
 using UIEngine.Core;
 using XenoAtom.Terminal;
 using XenoAtom.Terminal.UI;
-using XenoAtom.Terminal.UI.Controls;
 using XenoAtom.Terminal.UI.Hosting;
 
 namespace UIEngine.Frontend.Tui;
 
-/// <summary>Creates embeddable or fullscreen TUI workspaces over a caller-owned Core host.</summary>
+/// <summary>Creates embeddable or fullscreen TUI presentations over a Core workspace.</summary>
 public static class TuiFrontend
 {
-    /// <summary>Runs a workspace in a fullscreen terminal application until exit.</summary>
-    /// <remarks>
-    /// This convenience host creates and disposes the workspace and terminal application. It does
-    /// not dispose <paramref name="host"/>. The same workspace and visual created by
-    /// </remarks>
-    public static async Task RunAsync(
+    /// <summary>Creates a TUI presentation with an internally owned Core workspace.</summary>
+    public static TuiWorkspace CreateWorkspace(
         UIEngineHost host,
         TuiFrontendOptions? options = null)
     {
-        var workspace = new TuiWorkspace(host, options);
-        await using var app = new TerminalApp(
-            workspace.Visual,
-            Terminal.Instance,
-            new TerminalAppOptions { HostKind = TerminalHostKind.Fullscreen });
+        ArgumentNullException.ThrowIfNull(host);
+        var workspace = new UIEngineWorkspace(host);
         try
         {
-            await app.RunAsync(default);
+            var copiedOptions = (options ?? new TuiFrontendOptions()).ValidateAndCopy();
+            return new TuiWorkspace(workspace, copiedOptions);
         }
-        finally
+        catch
         {
             workspace.Dispose();
+            throw;
+        }
+    }
+
+    /// <summary>Runs an internally owned workspace in a fullscreen terminal application.</summary>
+    public static Task RunAsync(
+        UIEngineHost host,
+        TuiFrontendOptions? options = null) =>
+        _RunAsync(CreateWorkspace(host, options));
+
+    private static async Task _RunAsync(TuiWorkspace workspace)
+    {
+        using (workspace)
+        await using (var app = new TerminalApp(
+            workspace.Visual,
+            Terminal.Instance,
+            new TerminalAppOptions { HostKind = TerminalHostKind.Fullscreen }))
+        {
+            await app.RunAsync(default);
         }
     }
 }
@@ -40,8 +52,8 @@ public sealed record TuiFrontendOptions
     /// <summary>Gets the title shown by the workspace.</summary>
     public string ApplicationTitle { get; init; } = "UIEngine";
 
-    /// <summary>Gets the logical path selected when the session starts.</summary>
-    public LogicalPath InitialPath { get; init; } = LogicalPath.Root;
+    /// <summary>Gets the action applied before the initial visual tree is returned.</summary>
+    public TuiStartupConfiguration Startup { get; init; } = new PresentWorkspace();
 
     /// <summary>Gets the maximum number of collection entries requested for one visible window.</summary>
     public int CollectionWindowSize { get; init; } = 50;
@@ -50,11 +62,13 @@ public sealed record TuiFrontendOptions
     {
         if (string.IsNullOrWhiteSpace(ApplicationTitle))
         {
-            throw new ArgumentException("The application title cannot be empty or whitespace.", nameof(ApplicationTitle));
+            throw new ArgumentException(
+                "The application title cannot be empty or whitespace.");
         }
 
-        ArgumentNullException.ThrowIfNull(InitialPath);
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(CollectionWindowSize);
-        return this with { };
+        ArgumentNullException.ThrowIfNull(Startup);
+
+        return this with { Startup = Startup.Copy() };
     }
 }
