@@ -17,6 +17,7 @@ public sealed class UIEngineHost : IDisposable
     private readonly ConditionalWeakTable<object, _HandleHolder> _Handles = new();
     private readonly Dictionary<Guid, WeakReference<object>> _Objects = [];
     private readonly Dictionary<string, _RootEntry> _Roots = new(StringComparer.Ordinal);
+    private readonly NodeRefreshRouter _RefreshRouter = new();
     private readonly HostSettings _Settings;
     private readonly ILogger _Logger;
 
@@ -91,6 +92,7 @@ public sealed class UIEngineHost : IDisposable
 
     public void Dispose()
     {
+        _RefreshRouter.Dispose();
         _Roots.Clear();
         _Objects.Clear();
         _Handles.Clear();
@@ -190,23 +192,40 @@ public sealed class UIEngineHost : IDisposable
                         ReflectionMetadata.CanWrite(member.Member)
                             ? (target, value) => ReflectionMetadata.Write(member.Member, target, value)
                             : null);
-                    members.Add(new LiveValueNode(valueBinding, member));
+                    var valueNode = new LiveValueNode(valueBinding, member);
+                    members.Add(valueNode);
+                    _RefreshRouter.RegisterReflectedMember(
+                        handle, instance, valueNode, member.Member.Name);
                     break;
                 case ReflectedMemberKind.REFERENCE:
-                    members.Add(new LiveReferenceNode(new ReferenceNodeBinding(
+                    var referenceNode = new LiveReferenceNode(new ReferenceNodeBinding(
                         this,
                         handle,
                         member.Name,
                         member.ValueType,
-                        target => ReflectionMetadata.Read(member.Member, target)), member));
+                        target => ReflectionMetadata.Read(member.Member, target)), member);
+                    members.Add(referenceNode);
+                    _RefreshRouter.RegisterReflectedMember(
+                        handle, instance, referenceNode, member.Member.Name);
                     break;
                 case ReflectedMemberKind.COLLECTION:
-                    members.Add(new LiveCollectionNode(new CollectionNodeBinding(
+                    var collectionRead = (object target) =>
+                        ReflectionMetadata.Read(member.Member, target);
+                    var collectionNode = new LiveCollectionNode(new CollectionNodeBinding(
                         this,
                         handle,
                         member.Name,
                         member.ValueType,
-                        target => ReflectionMetadata.Read(member.Member, target)), member));
+                        collectionRead), member);
+                    members.Add(collectionNode);
+                    _RefreshRouter.RegisterReflectedMember(
+                        handle, instance, collectionNode, member.Member.Name);
+                    _RefreshRouter.RegisterCollection(
+                        handle,
+                        instance,
+                        collectionNode,
+                        member.Member.Name,
+                        collectionRead);
                     break;
                 case ReflectedMemberKind.ACTION:
                     var methodNode = LiveMethodNode.Create(this, handle, member);
@@ -224,8 +243,9 @@ public sealed class UIEngineHost : IDisposable
 
         if (exposure is not null)
         {
-            members.AddRange(exposure.Values.Select(value => (BaseNode)new LiveValueNode(
-                new ValueNodeBinding(
+            foreach (var value in exposure.Values)
+            {
+                var valueNode = new LiveValueNode(new ValueNodeBinding(
                     this,
                     handle,
                     value.Name,
@@ -237,7 +257,10 @@ public sealed class UIEngineHost : IDisposable
                     value.Range,
                     [],
                     value.Read,
-                    value.CanWrite ? value.Write : null))));
+                    value.CanWrite ? value.Write : null));
+                members.Add(valueNode);
+                _RefreshRouter.RegisterProgrammatic(instance, valueNode, value);
+            }
         }
 
         string? summary = null;

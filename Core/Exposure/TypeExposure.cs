@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using System.ComponentModel;
 
 namespace UIEngine.Core;
 
@@ -63,7 +64,8 @@ public abstract class ValueExposure
         Type valueType,
         bool canWrite,
         bool isNullable,
-        IValueRange? range)
+        IValueRange? range,
+        string? refreshPropertyName)
     {
         if (string.IsNullOrWhiteSpace(name))
         {
@@ -76,6 +78,7 @@ public abstract class ValueExposure
         CanWrite = canWrite;
         IsNullable = isNullable;
         Range = range;
+        RefreshPropertyName = refreshPropertyName;
     }
 
     public string Name { get; }
@@ -90,9 +93,13 @@ public abstract class ValueExposure
 
     internal Type ObjectType { get; }
 
+    internal string? RefreshPropertyName { get; }
+
     internal abstract object? Read(object instance);
 
     internal abstract void Write(object instance, object? value);
+
+    internal abstract INotifyPropertyChanged? GetRefreshSource(object instance);
 }
 
 public sealed class ValueExposure<T, TValue> : ValueExposure
@@ -100,21 +107,40 @@ public sealed class ValueExposure<T, TValue> : ValueExposure
 {
     private readonly Func<T, TValue> _Getter;
     private readonly Action<T, TValue>? _Setter;
+    private readonly Func<T, INotifyPropertyChanged?>? _GetRefreshSource;
 
     public ValueExposure(
         string name,
         Func<T, TValue> getter,
         Action<T, TValue>? setter = null,
         ValueRange<TValue>? range = null,
-        bool? isNullable = null)
+        bool? isNullable = null,
+        Func<T, INotifyPropertyChanged?>? refreshSource = null,
+        string? refreshPropertyName = null)
         : base(
             typeof(T),
             name,
             typeof(TValue),
             setter is not null,
             isNullable ?? _InferNullability(),
-            range)
+            range,
+            refreshPropertyName)
     {
+        if (refreshPropertyName is not null &&
+            string.IsNullOrWhiteSpace(refreshPropertyName))
+        {
+            throw new ArgumentException(
+                "A refresh property name cannot be empty or whitespace.",
+                nameof(refreshPropertyName));
+        }
+
+        if (refreshPropertyName is not null && refreshSource is null)
+        {
+            throw new ArgumentException(
+                "A refresh property name requires a refresh source.",
+                nameof(refreshPropertyName));
+        }
+
         if (range is not null && !_IsOrdered(range))
         {
             throw new ArgumentException(
@@ -124,6 +150,7 @@ public sealed class ValueExposure<T, TValue> : ValueExposure
 
         _Getter = getter;
         _Setter = setter;
+        _GetRefreshSource = refreshSource;
         Range = range;
     }
 
@@ -133,6 +160,9 @@ public sealed class ValueExposure<T, TValue> : ValueExposure
 
     internal override void Write(object instance, object? value) =>
         _Setter!((T)instance, (TValue)value!);
+
+    internal override INotifyPropertyChanged? GetRefreshSource(object instance) =>
+        _GetRefreshSource?.Invoke((T)instance);
 
     private static bool _InferNullability() =>
         !typeof(TValue).IsValueType || Nullable.GetUnderlyingType(typeof(TValue)) is not null;

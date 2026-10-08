@@ -24,7 +24,15 @@ public abstract class BaseNode
     /// <summary>Whether this node has no language-semantic navigation edge.</summary>
     public bool IsTerminal => this is not INavigableNode;
 
+    /// <summary>
+    /// Raised when this occurrence should re-read its live state after a domain notification.
+    /// </summary>
+    public event EventHandler<NodeRefreshRequestedEventArgs>? RefreshRequested;
+
     internal UIEngineHost Host { get; }
+
+    internal void RequestRefresh(NodeRefreshKind kind) =>
+        RefreshRequested?.Invoke(this, new NodeRefreshRequestedEventArgs(this, kind));
 }
 
 /// <summary>Marks a node that exposes one or more language-semantic navigation edges.</summary>
