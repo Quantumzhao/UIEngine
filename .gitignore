@@ -343,3 +343,5 @@ healthchecksdb
 
 .github/
 .vscode/
+
+*.editorconfig
