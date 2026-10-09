@@ -51,6 +51,9 @@ toolkit types in Core.
   diagnostics.
 - Core live operations are synchronous and are called on the domain model's owning thread.
 - Frontends own any cross-thread handoff; Core never marshals domain access to a UI thread.
+- The TUI and its owned `UIEngineWorkspace` are confined to the XenoAtom UI thread. TUI commands
+  call Core synchronously on that thread; do not add workspace dispatching or cross-thread
+  synchronization unless this ownership model changes.
 
 ## Architectural Invariants
 
@@ -76,7 +79,7 @@ complete.
 
 The reusable TUI boundary creates and owns its `UIEngineWorkspace` over a caller-owned host. It
 supports explicit startup configuration, frontend layout snapshots, notification-driven navigator
-presentation lifetimes, and XenoAtom dispatcher handoff.
+presentation lifetimes, and synchronous UI-thread workspace updates.
 
 ## Repository Structure
 

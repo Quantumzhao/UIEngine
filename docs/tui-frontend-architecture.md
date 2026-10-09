@@ -80,7 +80,8 @@ entry and can navigate back or be removed.
 - XenoAtom.Terminal.UI remains pinned to an accepted version.
 - `TuiWorkspace` owns its core workspace, visual tree, and TUI presentation state.
 - The caller owns `UIEngineHost`.
-- UI changes run through the toolkit dispatcher; domain access runs through the host dispatcher.
+- `TuiWorkspace` and its owned Core workspace are UI-thread-confined. TUI commands call Core
+  synchronously on that thread; only independent background results require later UI dispatch.
 - Keyboard operation is complete without requiring mouse input.
 - Core has no XenoAtom dependency.
 

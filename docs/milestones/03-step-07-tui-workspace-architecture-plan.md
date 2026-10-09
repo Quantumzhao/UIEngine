@@ -4,7 +4,7 @@
 
 Replace the current host-only placeholder with a reusable TUI boundary backed by
 `UIEngineWorkspace`. The completed step must establish ownership, startup, layout persistence,
-navigator presentation lifetime, and UI-thread dispatching so Step 8 can add workspace chrome
+navigator presentation lifetime, and UI-thread confinement so Step 8 can add workspace chrome
 without changing those foundations.
 
 The node-refresh routing added in commit `6e87620` is treated as completed prerequisite work. This
@@ -155,17 +155,16 @@ processing runtime notifications. Assert internally that the two indexes remain 
 Unknown navigator IDs or duplicate add notifications are programming errors, not recoverable UI
 states.
 
-### 6. Enforce the UI-thread boundary
+### 6. Enforce UI-thread confinement
 
-- Capture XenoAtom's `Dispatcher.Current` when `TuiWorkspace` is created.
-- If a workspace notification arrives with dispatcher access, apply the visual mutation
-  immediately; otherwise post it with `Dispatcher.Post`.
-- Do not move Core resolution, navigation, reads, or writes onto the UI dispatcher. Those calls
-  remain synchronous on the caller/domain-owning thread.
-- Every posted callback checks the workspace and target presentation lifetime before touching a
-  visual. Disposal invalidates queued callbacks.
-- Keep the concrete XenoAtom dispatcher boundary; do not introduce a parallel public dispatcher or
-  queue abstraction.
+- Create, mutate, restore, and dispose `TuiWorkspace` and its owned `UIEngineWorkspace` on the
+  XenoAtom UI thread.
+- Let synchronous Core workspace notifications update presentation state immediately on that same
+  thread.
+- Do not add a workspace dispatcher, queue, volatile state, or cross-thread lifetime path while
+  this ownership rule holds.
+- Treat independent background results from later node controls as a separate concern; those
+  controls must marshal only their result application to the UI thread.
 
 ### 7. Update documentation and milestone state
 
@@ -202,7 +201,6 @@ states.
 - Reorder retains the same presentation and placeholder instances.
 - Remove and workspace disposal retire each affected presentation once.
 - Removal of one navigator does not affect another presentation.
-- A queued visual update becomes a no-op after its workspace or presentation is disposed.
 
 ### Layout persistence
 
@@ -215,19 +213,18 @@ states.
 - Serialized layout text contains no domain values, runtime handles, nodes, controls, drafts,
   invocation state, or running operations.
 
-### Dispatcher
+### UI-thread confinement
 
-- A workspace change raised on the UI thread mutates the presentation immediately.
-- A change raised off the UI thread posts the visual mutation to XenoAtom's dispatcher.
-- Core navigation remains on the invoking thread.
-- No posted mutation reaches a retired control.
+- Every workspace change mutates its presentation immediately on the UI thread.
+- Core navigation remains synchronous on that same thread.
+- The TUI creates no workspace dispatch queue or cross-thread synchronization state.
 
 ## Completion Gate
 
 Step 7 is complete, and Step 8 may begin, only when:
 
-1. Frontend workspace ownership, all three startup modes, layout round-trip, notification-driven control
-   replacement, and dispatcher behavior are implemented and covered by tests.
+1. Frontend workspace ownership, all three startup modes, layout round-trip, notification-driven
+   control replacement, and UI-thread confinement are implemented and covered by tests.
 2. The example uses the new startup contract and contains composition only.
 3. The old `InitialPath` API and caller-supplied workspace overloads are removed.
 4. These commands pass with zero build warnings:

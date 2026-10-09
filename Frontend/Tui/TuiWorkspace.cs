@@ -2,20 +2,15 @@ using LanguageExt;
 using UIEngine.Core;
 using XenoAtom.Terminal.UI;
 using XenoAtom.Terminal.UI.Controls;
-using XenoAtom.Terminal.UI.Threading;
 
 namespace UIEngine.Frontend.Tui;
 
 /// <summary>A disposable TUI presentation that can be embedded in a XenoAtom visual tree.</summary>
 public sealed class TuiWorkspace : IDisposable
 {
-    private readonly Dispatcher _Dispatcher;
     private readonly VStack _NavigatorVisuals;
     private readonly Dictionary<string, NavigatorPresentation> _PresentationsByName = [];
     private readonly OrderedDictionary<Guid, NavigatorPresentation> _PresentationsById = [];
-    private readonly System.Collections.Generic.HashSet<Guid> _RetiredNavigatorIds = [];
-    private int _Disposed;
-    private int _PostedChangeCount;
 
     internal TuiWorkspace(
         UIEngineWorkspace workspace,
@@ -23,7 +18,6 @@ public sealed class TuiWorkspace : IDisposable
     {
         Workspace = workspace;
         Options = options;
-        _Dispatcher = Dispatcher.Current;
         _NavigatorVisuals = new VStack();
         Visual = new VStack(
             new TextBlock(options.ApplicationTitle),
@@ -68,10 +62,6 @@ public sealed class TuiWorkspace : IDisposable
     internal IReadOnlyCollection<NavigatorPresentation> Presentations =>
         _PresentationsById.Values;
 
-    internal int PostedChangeCount => Volatile.Read(ref _PostedChangeCount);
-
-    internal bool IsDisposed => Volatile.Read(ref _Disposed) != 0;
-
     /// <summary>Creates a serializable snapshot of Core and presentation state.</summary>
     public Either<InteractionError, TuiLayoutSnapshot> CreateLayoutSnapshot()
     {
@@ -101,59 +91,25 @@ public sealed class TuiWorkspace : IDisposable
         ArgumentNullException.ThrowIfNull(layout);
         var copiedLayout = layout.Copy();
         var result = Workspace.RestoreSnapshot(copiedLayout.Workspace);
-        _Dispatch(() =>
+        for (var index = 0; index < _PresentationsById.Count; index++)
         {
-            for (var index = 0; index < _PresentationsById.Count; index++)
-            {
-                var presentation = _PresentationsById.GetAt(index).Value;
-                var configuration = _GetConfiguration(
-                    copiedLayout.Navigators,
-                    presentation.Navigator.Name,
-                    index);
-                presentation.ApplyConfiguration(configuration);
-            }
+            var presentation = _PresentationsById.GetAt(index).Value;
+            var configuration = _GetConfiguration(
+                copiedLayout.Navigators,
+                presentation.Navigator.Name,
+                index);
+            presentation.ApplyConfiguration(configuration);
+        }
 
-            _SetSelectedNavigator(result.SelectedNavigatorName);
-        });
+        _SetSelectedNavigator(result.SelectedNavigatorName);
         return result;
     }
 
     /// <summary>Disposes frontend resources and the Core workspace.</summary>
     public void Dispose()
     {
-        if (Interlocked.Exchange(ref _Disposed, 1) != 0)
-        {
-            return;
-        }
-
         Workspace.Changed -= _OnWorkspaceChanged;
-        if (_Dispatcher.CheckAccess())
-        {
-            _DisposePresentations();
-        }
-        else
-        {
-            var retiredPresentations = _PresentationsById.Values.ToArray();
-            foreach (var presentation in retiredPresentations)
-            {
-                _RetiredNavigatorIds.Add(presentation.Navigator.Id);
-                presentation.Retire();
-            }
-
-            _PresentationsById.Clear();
-            _PresentationsByName.Clear();
-            SelectedNavigatorName = null;
-            _Dispatcher.Post(() =>
-            {
-                foreach (var presentation in retiredPresentations)
-                {
-                    presentation.Dispose();
-                }
-
-                _NavigatorVisuals.Children.Clear();
-            });
-        }
-
+        _DisposePresentations();
         Workspace.Dispose();
     }
 
@@ -205,30 +161,7 @@ public sealed class TuiWorkspace : IDisposable
             ? Workspace.Navigators.FirstOrDefault(navigator =>
                 navigator.Id == eventArgs.Change.NavigatorId)
             : null;
-        _Dispatch(() => _ApplyWorkspaceChange(eventArgs.Change, addedNavigator));
-    }
-
-    private void _Dispatch(Action action)
-    {
-        if (IsDisposed)
-        {
-            return;
-        }
-
-        if (_Dispatcher.CheckAccess())
-        {
-            action();
-            return;
-        }
-
-        Interlocked.Increment(ref _PostedChangeCount);
-        _Dispatcher.Post(() =>
-        {
-            if (!IsDisposed)
-            {
-                action();
-            }
-        });
+        _ApplyWorkspaceChange(eventArgs.Change, addedNavigator);
     }
 
     private void _ApplyWorkspaceChange(WorkspaceChange change, Navigator? addedNavigator)
@@ -252,10 +185,10 @@ public sealed class TuiWorkspace : IDisposable
                     duplicated.InitialEntry);
                 break;
             case NavigationPushedChange pushed:
-                _GetActivePresentation(pushed.NavigatorId)?.ReplaceControl(pushed.Entry);
+                _GetActivePresentation(pushed.NavigatorId).ReplaceControl(pushed.Entry);
                 break;
             case NavigationPoppedChange popped:
-                _GetActivePresentation(popped.NavigatorId)?.ReplaceControl(popped.CurrentEntry);
+                _GetActivePresentation(popped.NavigatorId).ReplaceControl(popped.CurrentEntry);
                 break;
             case NavigatorReorderedChange reordered:
                 _ReorderPresentation(reordered);
@@ -297,16 +230,11 @@ public sealed class TuiWorkspace : IDisposable
         }
     }
 
-    private NavigatorPresentation? _GetActivePresentation(Guid navigatorId)
+    private NavigatorPresentation _GetActivePresentation(Guid navigatorId)
     {
         if (_PresentationsById.TryGetValue(navigatorId, out var presentation))
         {
             return presentation;
-        }
-
-        if (_RetiredNavigatorIds.Contains(navigatorId))
-        {
-            return null;
         }
 
         throw new InvalidOperationException(
@@ -316,11 +244,6 @@ public sealed class TuiWorkspace : IDisposable
     private void _ReorderPresentation(NavigatorReorderedChange change)
     {
         var presentation = _GetActivePresentation(change.NavigatorId);
-        if (presentation is null)
-        {
-            return;
-        }
-
         if (!ReferenceEquals(
             _PresentationsById.GetAt(change.PreviousIndex).Value,
             presentation))
@@ -337,11 +260,6 @@ public sealed class TuiWorkspace : IDisposable
     private void _RemovePresentation(Guid navigatorId, int previousIndex)
     {
         var presentation = _GetActivePresentation(navigatorId);
-        if (presentation is null)
-        {
-            return;
-        }
-
         if (!ReferenceEquals(_PresentationsById.GetAt(previousIndex).Value, presentation))
         {
             throw new InvalidOperationException("The presentation order does not match Core.");
@@ -349,7 +267,6 @@ public sealed class TuiWorkspace : IDisposable
 
         _PresentationsById.RemoveAt(previousIndex);
         _PresentationsByName.Remove(presentation.Navigator.Name);
-        _RetiredNavigatorIds.Add(navigatorId);
         _NavigatorVisuals.Children.RemoveAt(previousIndex);
         presentation.Dispose();
         if (StringComparer.Ordinal.Equals(
@@ -378,7 +295,6 @@ public sealed class TuiWorkspace : IDisposable
     {
         foreach (var presentation in _PresentationsById.Values)
         {
-            _RetiredNavigatorIds.Add(presentation.Navigator.Id);
             presentation.Dispose();
         }
 

@@ -6,9 +6,6 @@ namespace UIEngine.Frontend.Tui;
 
 internal sealed class NavigatorPresentation : IDisposable
 {
-    private int _Disposed;
-    private int _VisualsDetached;
-
     public NavigatorPresentation(
         Navigator navigator,
         NavigatorPresentationConfiguration configuration,
@@ -36,49 +33,21 @@ internal sealed class NavigatorPresentation : IDisposable
         set => Container.IsVisible = value;
     }
 
-    public bool IsDisposed => Volatile.Read(ref _Disposed) != 0;
-
     public void ApplyConfiguration(NavigatorPresentationConfiguration configuration) =>
         Configuration = configuration;
 
     public void ReplaceControl(Either<InteractionError, Option<BaseNode>> entry)
     {
-        if (IsDisposed)
-        {
-            return;
-        }
-
-        var previous = CurrentControl;
         var replacement = new PlaceholderNodeControl(entry);
         Container.Children[0] = replacement.Visual;
         CurrentControl = replacement;
-        previous.Dispose();
     }
 
-    public void Dispose()
-    {
-        Retire();
-        if (Interlocked.Exchange(ref _VisualsDetached, 1) != 0)
-        {
-            return;
-        }
-
-        Container.Children.Clear();
-    }
-
-    public void Retire()
-    {
-        if (Interlocked.Exchange(ref _Disposed, 1) == 0)
-        {
-            CurrentControl.Dispose();
-        }
-    }
+    public void Dispose() => Container.Children.Clear();
 }
 
-internal sealed class PlaceholderNodeControl : IDisposable
+internal sealed class PlaceholderNodeControl
 {
-    private int _Disposed;
-
     public PlaceholderNodeControl(Either<InteractionError, Option<BaseNode>> entry)
     {
         if (!entry.IsRight)
@@ -104,10 +73,6 @@ internal sealed class PlaceholderNodeControl : IDisposable
     public PlaceholderNodeState State { get; }
 
     public TextBlock Visual { get; }
-
-    public bool IsDisposed => Volatile.Read(ref _Disposed) != 0;
-
-    public void Dispose() => Interlocked.Exchange(ref _Disposed, 1);
 }
 
 internal enum PlaceholderNodeState

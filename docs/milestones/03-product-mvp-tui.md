@@ -290,8 +290,8 @@ Preserve the completed XenoAtom hosting boundary while changing its model source
    control.
 6. [x] React to Core navigation notifications by creating one replacement control for a pushed/revealed
    entry and removing the departed control exactly once.
-7. [x] Marshal visual state changes with the XenoAtom dispatcher. Domain access remains synchronous on
-   the domain model's thread, with any cross-thread request boundary owned outside Core.
+7. [x] Keep `TuiWorkspace` and its owned Core workspace confined to the XenoAtom UI thread. Apply
+   synchronous workspace notifications immediately without a redundant dispatch layer.
 
 Verification:
 
