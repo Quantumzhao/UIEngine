@@ -5,11 +5,11 @@ namespace UIEngine.Core;
 /// <summary>One serializable snapshot containing only stable workspace navigation state.</summary>
 public sealed record WorkspaceSnapshot(
     IReadOnlyList<NavigatorSnapshot> Navigators,
-    string? SelectedNavigatorName);
+    Guid? SelectedNavigatorId);
 
-/// <summary>One navigator's stable name and current semantic path.</summary>
+/// <summary>One navigator's stable identity and current semantic path.</summary>
 public sealed record NavigatorSnapshot(
-    string Name,
+    Guid Id,
     IReadOnlyList<IPathSegmentSnapshot> CurrentPath);
 
 /// <summary>One serializable semantic step in a logical path.</summary>
@@ -33,7 +33,7 @@ public enum SnapshotRestoreIssueCode
 {
     INVALID_NAVIGATOR_COLLECTION,
     INVALID_NAVIGATOR_RECORD,
-    DUPLICATE_NAVIGATOR_NAME,
+    DUPLICATE_NAVIGATOR_ID,
     INVALID_NAVIGATOR_PATH,
     SELECTION_ADJUSTED,
 }
@@ -42,10 +42,10 @@ public enum SnapshotRestoreIssueCode
 public sealed record SnapshotRestoreIssue(
     SnapshotRestoreIssueCode Code,
     int? NavigatorIndex,
-    string? NavigatorName,
+    Guid? NavigatorId,
     InteractionError Error);
 
 /// <summary>The usable state and non-fatal issues produced by optimistic snapshot restore.</summary>
 public sealed record WorkspaceRestoreResult(
-    string? SelectedNavigatorName,
+    Guid? SelectedNavigatorId,
     IReadOnlyList<SnapshotRestoreIssue> Issues);

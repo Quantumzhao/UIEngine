@@ -21,25 +21,15 @@ public sealed record PresentWorkspace : TuiStartupConfiguration
 /// <summary>Adds one navigator before exposing the initial visual tree.</summary>
 public sealed record AddNavigator : TuiStartupConfiguration
 {
-    public AddNavigator(string name, LogicalPath path)
+    public AddNavigator(LogicalPath path)
     {
-        if (string.IsNullOrWhiteSpace(name))
-        {
-            throw new ArgumentException(
-                "A navigator name cannot be empty or whitespace.",
-                nameof(name));
-        }
-
         ArgumentNullException.ThrowIfNull(path);
-        Name = name;
         Path = path;
     }
 
-    public string Name { get; }
-
     public LogicalPath Path { get; }
 
-    internal override TuiStartupConfiguration Copy() => new AddNavigator(Name, Path);
+    internal override TuiStartupConfiguration Copy() => new AddNavigator(Path);
 }
 
 /// <summary>Replaces the Core workspace from a TUI layout before presentation.</summary>
@@ -60,7 +50,7 @@ public sealed record RestoreLayout : TuiStartupConfiguration
 /// <summary>Serializable Core navigation and frontend-owned presentation state.</summary>
 public sealed record TuiLayoutSnapshot(
     WorkspaceSnapshot Workspace,
-    IReadOnlyDictionary<string, NavigatorPresentationConfiguration> Navigators)
+    IReadOnlyDictionary<Guid, NavigatorPresentationConfiguration> Navigators)
 {
     internal TuiLayoutSnapshot Copy()
     {
@@ -69,9 +59,7 @@ public sealed record TuiLayoutSnapshot(
             _CopyWorkspace(Workspace),
             Navigators is null
                 ? null!
-                : new Dictionary<string, NavigatorPresentationConfiguration>(
-                    Navigators,
-                    StringComparer.Ordinal));
+                : new Dictionary<Guid, NavigatorPresentationConfiguration>(Navigators));
     }
 
     private static WorkspaceSnapshot _CopyWorkspace(WorkspaceSnapshot snapshot) => new(
@@ -80,12 +68,12 @@ public sealed record TuiLayoutSnapshot(
             : snapshot.Navigators.Select(static navigator => navigator is null
                 ? null!
                 : new NavigatorSnapshot(
-                    navigator.Name,
+                    navigator.Id,
                     navigator.CurrentPath is null
                         ? null!
                         : navigator.CurrentPath.ToArray()))
                 .ToArray(),
-        snapshot.SelectedNavigatorName);
+        snapshot.SelectedNavigatorId);
 }
 
 /// <summary>Stable logical placement and preferred size for one navigator.</summary>

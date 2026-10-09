@@ -12,21 +12,17 @@ public sealed class Navigator
     internal Navigator(
         UIEngineWorkspace workspace,
         Guid id,
-        string name,
         IReadOnlyList<(
             LogicalPath Path,
             Either<InteractionError, Option<BaseNode>> Entry)> entries)
     {
         _Workspace = workspace;
         Id = id;
-        Name = name;
         Paths = entries.Select(static item => item.Path).ToList();
         Entries = entries.Select(static item => item.Entry).ToList();
     }
 
     public Guid Id { get; }
-
-    public string Name { get; }
 
     public IReadOnlyList<LogicalPath> Paths { get; }
 

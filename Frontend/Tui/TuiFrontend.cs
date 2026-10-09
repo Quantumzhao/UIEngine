@@ -41,6 +41,7 @@ public static class TuiFrontend
             Terminal.Instance,
             new TerminalAppOptions { HostKind = TerminalHostKind.Fullscreen }))
         {
+            workspace.CloseRequested += (_, _) => app.Stop();
             await app.RunAsync(default);
         }
     }
