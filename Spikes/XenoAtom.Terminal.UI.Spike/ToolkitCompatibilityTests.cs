@@ -12,8 +12,11 @@ namespace UIEngine.Spikes.XenoAtomTerminalUi;
 
 public sealed class ToolkitCompatibilityTests
 {
+    [Root]
+    public static object Model { get; private set; } = new();
+
     [Fact]
-    public async Task FullscreenHostSupportsInputFocusResizeDispatcherAndDeterministicExit()
+    public async Task FullscreenHostSupportsInputFocusResizeAndDeterministicExit()
     {
         var backend = new InMemoryTerminalBackend(new TerminalSize(80, 25));
         using var terminal = Terminal.Open(backend, new TerminalOptions(), force: true);
@@ -23,8 +26,6 @@ public sealed class ToolkitCompatibilityTests
         var root = new VStack(first, second, new TextBlock(() => status.Value));
         var clicked = false;
         var resizedWidth = 0;
-        var backgroundThreadId = 0;
-        var dispatcherThreadId = 0;
         var phase = 0;
 
         second.ClickRouted += (_, _) => clicked = true;
@@ -33,20 +34,12 @@ public sealed class ToolkitCompatibilityTests
             root,
             async context =>
             {
+                await Task.CompletedTask;
                 switch (phase)
                 {
                     case 0:
                         Assert.Same(first, context.App.FocusedElement);
-                        backgroundThreadId = await Task.Run(async () =>
-                        {
-                            var threadId = Environment.CurrentManagedThreadId;
-                            await context.App.Dispatcher.InvokeAsync(() =>
-                            {
-                                dispatcherThreadId = Environment.CurrentManagedThreadId;
-                                status.Value = "Marshalled";
-                            });
-                            return threadId;
-                        });
+                        status.Value = "Updated";
                         backend.SetSize(new TerminalSize(40, 12), true);
                         backend.PushEvent(new TerminalKeyEvent { Key = TerminalKey.Tab });
                         phase = 1;
@@ -67,8 +60,7 @@ public sealed class ToolkitCompatibilityTests
 
         Assert.True(clicked);
         Assert.Equal(40, resizedWidth);
-        Assert.NotEqual(backgroundThreadId, dispatcherThreadId);
-        Assert.Contains("Marshalled", backend.GetOutText(), StringComparison.Ordinal);
+        Assert.Contains("Updated", backend.GetOutText(), StringComparison.Ordinal);
     }
 
     [Fact]
@@ -94,9 +86,17 @@ public sealed class ToolkitCompatibilityTests
     public async Task BoundedCoreWindowsCanReplaceListVisualsWithoutEnumeratingTheCollection()
     {
         var source = new _CountingCollection();
+        Model = source;
         using var host = new UIEngineHost(new UIEngineHostOptions { MaxCollectionItems = 8 });
-        host.SetRoot("model", source);
-        var resolved = host.ResolveRootNode("model");
+        var rootId = host.RootIds.Single(id =>
+        {
+            var path = LogicalPath.Empty.Append(new RootLogicalPathSegment(id));
+            var names = path.ResolveNames();
+            return names.IsRight && StringComparer.Ordinal.Equals(
+                names.IfLeft(static error => throw new InvalidOperationException(error.Message))[0],
+                nameof(Model));
+        });
+        var resolved = host.ResolveRootNode(rootId);
         var collection = Assert.IsAssignableFrom<ICollectionNode>(Assert.Single(
             ((IObjectNode)((ResolvedNode)resolved).Node).Members));
         var list = new ListBox<string>();

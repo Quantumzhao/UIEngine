@@ -10,18 +10,16 @@ internal sealed class LiveMethodNode : LiveReflectedMemberNode, IMethodNode
     private readonly Guid _Owner;
     private readonly MethodInfo _Method;
     private readonly List<IReadOnlyList<ValidationAttribute>> _ValidationAttributes;
-    private readonly Lock _InvocationGate = new();
     private Task<Either<InteractionError, Option<object>>>? _ResultTask;
 
     public static Either<InteractionError, LiveMethodNode> Create(
-        UIEngineHost host,
         Guid owner,
         ReflectedMember member)
     {
         var method = (MethodInfo)member.Member;
-        if (method.IsStatic || method.ContainsGenericParameters)
+        if (method.ContainsGenericParameters)
         {
-            return _Unsupported(method, "actions must be non-generic instance methods");
+            return _Unsupported(method, "generic actions are not supported");
         }
 
         var parameters = method.GetParameters();
@@ -56,7 +54,7 @@ internal sealed class LiveMethodNode : LiveReflectedMemberNode, IMethodNode
         }
 
         return Right(new LiveMethodNode(
-            host, owner, member, method, parameters, resultType));
+            owner, member, method, parameters, resultType));
     }
 
     private static Either<InteractionError, LiveMethodNode> _Unsupported(MethodInfo method, string reason) =>
@@ -65,13 +63,12 @@ internal sealed class LiveMethodNode : LiveReflectedMemberNode, IMethodNode
             $"Action '{method.Name}' is unsupported because {reason}."));
 
     private LiveMethodNode(
-        UIEngineHost host,
         Guid owner,
         ReflectedMember member,
         MethodInfo method,
         ParameterInfo[] methodParameters,
         Type? resultType)
-        : base(host, member.Name, member, method.ReturnType)
+        : base(member.Name, member, method.ReturnType)
     {
         _Owner = owner;
         _Method = method;
@@ -119,31 +116,19 @@ internal sealed class LiveMethodNode : LiveReflectedMemberNode, IMethodNode
         }
     }
 
-    public Task<Either<InteractionError, Option<object>>>? ResultTask
-    {
-        get
-        {
-            lock (_InvocationGate)
-            {
-                return _ResultTask;
-            }
-        }
-    }
+    public Task<Either<InteractionError, Option<object>>>? ResultTask => _ResultTask;
 
     public Either<InteractionError, InvocationStatus> Invoke(
-        IReadOnlyDictionary<string, object?> arguments) => Host.Execute(
+        IReadOnlyDictionary<string, object?> arguments) => UIEngineHost.Instance.Execute(
         $"invoke action {Name}",
         () =>
         {
-            lock (_InvocationGate)
+            if (_ResultTask is { IsCompleted: false })
             {
-                if (_ResultTask is { IsCompleted: false })
-                {
-                    return _AlreadyRunning();
-                }
+                return _AlreadyRunning();
             }
 
-            var target = Host.ResolveTarget(_Owner);
+            var target = UIEngineHost.Instance.ResolveTarget(_Owner);
             if (!target.IsRight)
             {
                 return Left((InteractionError)target);
@@ -208,18 +193,8 @@ internal sealed class LiveMethodNode : LiveReflectedMemberNode, IMethodNode
                 bound[index] = convertedValue;
             }
 
-            TaskCompletionSource<Either<InteractionError, Option<object>>> completion;
-            lock (_InvocationGate)
-            {
-                if (_ResultTask is { IsCompleted: false })
-                {
-                    return _AlreadyRunning();
-                }
-
-                completion = new TaskCompletionSource<Either<InteractionError, Option<object>>>(
-                    TaskCreationOptions.RunContinuationsAsynchronously);
-                _ResultTask = completion.Task;
-            }
+            var completion = new TaskCompletionSource<Either<InteractionError, Option<object>>>();
+            _ResultTask = completion.Task;
 
             try
             {
@@ -272,7 +247,7 @@ internal sealed class LiveMethodNode : LiveReflectedMemberNode, IMethodNode
     {
         try
         {
-            await task.ConfigureAwait(false);
+            await task;
             var result = ResultType is null
                 ? null
                 : task.GetType().GetProperty(nameof(Task<object>.Result))?.GetValue(task);
@@ -289,7 +264,7 @@ internal sealed class LiveMethodNode : LiveReflectedMemberNode, IMethodNode
             InteractionErrorCode.UNAVAILABLE,
             $"Action '{Name}' is already running on this method node."));
 
-    private void _CompleteFailure(
+    private static void _CompleteFailure(
         TaskCompletionSource<Either<InteractionError, Option<object>>> completion,
         Exception exception)
     {
@@ -298,6 +273,9 @@ internal sealed class LiveMethodNode : LiveReflectedMemberNode, IMethodNode
                 ? InteractionErrorCode.PERMISSION_DENIED
                 : InteractionErrorCode.FAULT,
             exception.Message)));
-        Host.ReportInvocationFault(exception);
+        if (UIEngineHost.TryGetInstance(out var host))
+        {
+            host.ReportInvocationFault(exception);
+        }
     }
 }

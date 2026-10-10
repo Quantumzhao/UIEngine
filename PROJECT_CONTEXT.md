@@ -6,14 +6,11 @@ UIEngine exposes a running .NET application's live objects as a navigable, edita
 invocable graph. Domain objects remain authoritative; UIEngine provides frontend-neutral nodes,
 navigation, paths, validation, and invocation observation.
 
-The framework targets simulations, engines, services, research systems, internal tools, and
-prototypes that need generated user interfaces over live state.
-
 ## Architecture
 
-`UIEngineHost` owns registered roots and access to the live domain graph. A
-`UIEngineWorkspace` holds the single authoritative reference to its caller-owned host and owns an
-ordered collection of independent `Navigator`s. Each navigator tracks one stack of logical paths
+`UIEngineHost` discovers roots and owns access to the live domain graph. Exactly one host is active
+at a time. A `UIEngineWorkspace` uses that active host and owns an ordered collection of independent
+`Navigator`s. Each navigator tracks one stack of logical paths
 alongside `Either<InteractionError, Option<BaseNode>>` resolution results.
 
 `BaseNode` is frontend-neutral. Its concrete types and semantic interfaces describe .NET
@@ -27,6 +24,14 @@ toolkit types in Core.
 ## Settled Decisions
 
 - Every exposed root or member resolves to an `BaseNode`.
+- The active host discovers public static `[Root]` members from assemblies loaded at construction.
+  Root methods also require `[Action]`; invalid markers are skipped and logged.
+- Root registrations have host-lifetime GUIDs and no separate names. The root `BaseNode` retains
+  the reflected member's ordinary name.
+- Exactly one host is active at a time. Nodes, bindings, workspaces, and frontends use that host
+  without retaining explicit host references. Host disposal retires its registered workspaces.
+- `/` is path decoration. An absolute path begins with a root-GUID segment, followed by ordinary
+  member or collection-selection segments.
 - Every node can be the current node of a navigator. Scalar and method nodes are terminal.
 - Nodes are live operation endpoints, not copied domain state.
 - Nodes do not own logical paths or UI controls.
@@ -44,8 +49,8 @@ toolkit types in Core.
   presentation instances while sharing the same domain object.
 - A navigator can start from a registered root or a specific resolved `BaseNode`. The workspace
   captures that node's location and resolves a navigator-owned instance.
-- An unresolved persisted path remains as a broken navigator entry. The user can navigate back
-  until a valid node is reached.
+- An unresolved persisted path leaves its navigator invalid and displays no node content. The user
+  can navigate back until a valid node is reached.
 - Navigators have stable GUID identities and no names. Core workspace snapshots store navigator
   GUIDs, order, structured logical paths, and selected GUID.
   Frontend-owned layouts may add stable presentation configuration. Neither stores domain values,
@@ -55,38 +60,20 @@ toolkit types in Core.
 - Expected failures use structured results. Unexpected faults remain available only for trusted
   diagnostics.
 - Core live operations are synchronous and are called on the domain model's owning thread.
-- Frontends own any cross-thread handoff; Core never marshals domain access to a UI thread.
 - The TUI and its owned `UIEngineWorkspace` are confined to the XenoAtom UI thread. TUI commands
-  call Core synchronously on that thread; do not add workspace dispatching or cross-thread
-  synchronization unless this ownership model changes.
+  call Core synchronously on that thread; do not add dispatching or cross-thread synchronization.
 
 ## Architectural Invariants
 
-1. Live domain objects remain authoritative.
-2. Cycles, shared references, replacement, nulls, and unavailable targets are normal graph states.
-3. Node semantics describe the exposed language feature, not a widget or interaction archetype.
-4. A node instance belongs to one resolved navigator occurrence and is never shared between
+1. Cycles, shared references, replacement, nulls, and unavailable targets are normal graph states.
+2. Node semantics describe the exposed language feature, not a widget or interaction archetype.
+3. A node instance belongs to one resolved navigator occurrence and is never shared between
    navigators.
-5. Navigation state belongs to `Navigator`; domain access belongs to `UIEngineHost`; invocation
+4. Navigation state belongs to `Navigator`; domain access belongs to `UIEngineHost`; invocation
    observation belongs to the originating method-node occurrence.
-6. Core contains no frontend or toolkit types.
-7. Frontends branch on structured failures rather than parsing messages.
-8. Every public collection read is bounded.
-9. Persisted workspace snapshots contain addresses and selection, not live state; frontend layouts
+5. Core contains no frontend or toolkit types.
+6. Persisted workspace snapshots contain addresses and selection, not live state; frontend layouts
    may separately add stable presentation configuration.
-
-## Current Delivery State
-
-The host already provides synchronous live graph access, canonical paths, runtime handles, bounded
-collections, validation, and synchronous or asynchronous domain invocation. The node model,
-semantic path resolution, `UIEngineWorkspace`, `Navigator`, and optimistic workspace snapshots are
-complete.
-
-The reusable TUI boundary creates and owns its `UIEngineWorkspace` over a caller-owned host. It
-supports explicit startup configuration, frontend layout snapshots, notification-driven navigator
-presentation lifetimes, GUID-keyed scrollable grid placement, shared address/status chrome, and
-synchronous UI-thread workspace updates. Closing a pane hides its exact live presentation in a
-TUI-only one-item cache; Core continues to treat that navigator as an ordinary live navigator.
 
 ## Repository Structure
 
@@ -116,3 +103,4 @@ The build must complete with zero warnings.
 - `Task`s do not accept cancellation tokens; stopping a task is beyond our scope.
 - In general, files should be within 500 lines. If you think it qualifies being longer than that, discuss it with me. Long files are usually the symbol of bad design. Test files and configurations are exceptions to this. 
 - If classes/structs are wrappers/converters of other ones, think twice if that's necessary. Be extremely cautious of applying factory design pattern. Ask me if you really need to.
+- UIEngine runs on the same thread as domain model (single thread), and TUI uses only 1 UI thread. You must not implement multi-thread machinary to avoid over-design.

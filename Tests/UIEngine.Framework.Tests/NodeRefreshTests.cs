@@ -13,7 +13,7 @@ public sealed class NodeRefreshTests
     {
         var model = new _NotifyingModel();
         using var host = new UIEngineHost();
-        host.SetRoot("model", model);
+        TestRoots.Set("model", model);
         var first = _ResolveMembers(host);
         var second = _ResolveMembers(host);
         var firstCount = first[nameof(_NotifyingModel.Count)];
@@ -53,7 +53,7 @@ public sealed class NodeRefreshTests
         var model = new _NotifyingModel();
         var original = model.Items;
         var host = new UIEngineHost();
-        host.SetRoot("model", model);
+        TestRoots.Set("model", model);
         var first = _ResolveMembers(host)[nameof(_NotifyingModel.Items)];
         var second = _ResolveMembers(host)[nameof(_NotifyingModel.Items)];
         var firstKinds = new List<NodeRefreshKind>();
@@ -95,7 +95,7 @@ public sealed class NodeRefreshTests
         {
             Exposures = [new TypeExposure<_ProgrammaticModel>([exposure])],
         });
-        host.SetRoot("model", model);
+        TestRoots.Set("model", model);
         var first = Assert.Single(_ResolveMembers(host).Values);
         var second = Assert.Single(_ResolveMembers(host).Values);
         var firstEvents = new List<NodeRefreshRequestedEventArgs>();
@@ -133,7 +133,7 @@ public sealed class NodeRefreshTests
     }
 
     private static Dictionary<string, BaseNode> _ResolveMembers(UIEngineHost host) =>
-        ((IObjectNode)host.ResolveRootNode("model").RightValue().Node).Members.ToDictionary(
+        ((IObjectNode)host.ResolveRootNode(TestRoots.Id("model")).RightValue().Node).Members.ToDictionary(
             static node => node.Name,
             StringComparer.Ordinal);
 

@@ -12,13 +12,13 @@ visual in an existing terminal application.
 
 The TUI presents several independent navigators. Each navigator has:
 
-- a header containing only the current node name or the textual `Broken`/`Empty` state;
+- a header containing only the current node name or the textual `Invalid`/`Empty` state;
 - one control for its current node;
 - concise loading, result, and failure state; and
 - independent presentation state.
 
 Shared workspace chrome contains root creation, Up, duplication, close/suspend, restore-closed, and
-a read-only canonical path and textual state for the selected navigator. Healthy, broken, and empty
+a read-only canonical path and textual state for the selected navigator. Healthy, invalid, and empty
 states use green, red, and yellow respectively; selection uses a separate cyan pane border. State is
 never communicated by color alone.
 
@@ -45,7 +45,7 @@ Controls are selected from language semantics exposed by the current `BaseNode`:
 | Enum | Enum editor using declared members |
 | Collection | Bounded window with entry navigation |
 | Method | Generated parameter form, result, and completion state |
-| Broken navigator entry | Structured failure and back/remove commands |
+| Invalid navigator entry | No node content; shared status and back/remove commands remain |
 
 An enum property remains an enum property; Core does not describe it as a choice control. Toolkit
 selection and styling stay in the TUI.
@@ -53,7 +53,7 @@ selection and styling stay in the TUI.
 ## Operations
 
 Controls call node operations directly. Core remains responsible for conversion, validation,
-dispatch, bounded reads, and invocation.
+bounded reads, and invocation.
 
 - Read a value before presenting or editing it.
 - Keep uncommitted drafts frontend-local.
@@ -84,17 +84,16 @@ placement and size configuration. Core knows nothing about those presentation fi
 pane is temporarily hidden. The TUI filters its hidden navigator from its layout snapshot and does
 not persist the cache, drafts, focus, loaded values, controls, or running invocations.
 
-Loading a layout creates all saved navigators. A path that no longer resolves is shown as a broken
-entry and can navigate back or be removed.
+Loading a layout creates all saved navigators. A path that no longer resolves is invalid, displays
+no node content, and can navigate back or be removed.
 
 ## Toolkit and Ownership
 
 - XenoAtom.Terminal.UI remains pinned to an accepted version.
 - `TuiWorkspace` owns its core workspace, visual tree, and TUI presentation state.
-- The caller owns `UIEngineHost`; `UIEngineWorkspace.Host` is the one authoritative host reference
-  used by the TUI.
+- The TUI uses the active `UIEngineHost` singleton and does not retain an explicit host reference.
 - `TuiWorkspace` and its owned Core workspace are UI-thread-confined. TUI commands call Core
-  synchronously on that thread; only independent background results require later UI dispatch.
+  synchronously on that thread. The TUI contains no cross-thread dispatch machinery.
 - Keyboard operation is complete without requiring mouse input.
 - Core has no XenoAtom dependency.
 
@@ -106,7 +105,7 @@ Tests cover:
 - duplication with independent node and control instances;
 - destructive back navigation and navigator removal;
 - terminal nodes;
-- broken restored paths and recovery by going back;
+- invalid restored paths and recovery by going back;
 - scalar editing, validation, and dirty drafts;
 - bounded collection windows;
 - method invocation and continued execution after control disposal;

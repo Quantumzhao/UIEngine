@@ -6,14 +6,11 @@ using static LanguageExt.Prelude;
 namespace UIEngine.Core;
 
 internal sealed class CollectionNodeBinding(
-    UIEngineHost host,
     Guid owner,
     string name,
     Type collectionType,
     Func<object, object?> read)
 {
-    public UIEngineHost Host { get; } = host;
-
     public string Name { get; } = name;
 
     public Type CollectionType { get; } = collectionType;
@@ -31,14 +28,14 @@ internal sealed class CollectionNodeBinding(
                 "Collection offset must be non-negative and limit must be positive."));
         }
 
-        if (limit > Host.MaxCollectionItems)
+        if (limit > UIEngineHost.Instance.MaxCollectionItems)
         {
             return Left(new InteractionError(
                 InteractionErrorCode.INVALID_INPUT,
-                $"Collection limit {limit} exceeds the host maximum {Host.MaxCollectionItems}."));
+                $"Collection limit {limit} exceeds the host maximum {UIEngineHost.Instance.MaxCollectionItems}."));
         }
 
-        return Host.Execute(
+        return UIEngineHost.Instance.Execute(
             $"read collection {Name}",
             () =>
             {
@@ -55,7 +52,7 @@ internal sealed class CollectionNodeBinding(
 
     public Either<InteractionError, IReadOnlyList<Guid>> Select(ListLogicalPathSegment segment)
     {
-        return Host.Execute(
+        return UIEngineHost.Instance.Execute(
             $"select from list {Name}",
             () =>
             {
@@ -88,7 +85,7 @@ internal sealed class CollectionNodeBinding(
 
     public Either<InteractionError, IReadOnlyList<Guid>> Select(DictLogicalPathSegment segment)
     {
-        return Host.Execute<IReadOnlyList<Guid>>(
+        return UIEngineHost.Instance.Execute<IReadOnlyList<Guid>>(
             $"select from dictionary {Name}",
             () =>
             {
@@ -107,7 +104,7 @@ internal sealed class CollectionNodeBinding(
                         $"Collection '{Name}' does not provide dictionary semantics."));
                 }
 
-                var snapshot = _ReadSlice(enumerable, 0, Host.MaxCollectionItems);
+                var snapshot = _ReadSlice(enumerable, 0, UIEngineHost.Instance.MaxCollectionItems);
                 if (!snapshot.IsRight)
                 {
                     return Left((InteractionError)snapshot);
@@ -134,7 +131,7 @@ internal sealed class CollectionNodeBinding(
 
     private Either<InteractionError, IEnumerable> _ReadSource()
     {
-        var target = Host.ResolveTarget(owner);
+        var target = UIEngineHost.Instance.ResolveTarget(owner);
         if (!target.IsRight)
         {
             return Left((InteractionError)target);
@@ -148,7 +145,7 @@ internal sealed class CollectionNodeBinding(
                 $"Collection '{Name}' is null or unavailable."));
     }
 
-    private Either<InteractionError, CollectionSlice> _ReadSlice(
+    private static Either<InteractionError, CollectionSlice> _ReadSlice(
         IEnumerable source,
         long offset,
         int limit)
@@ -170,7 +167,7 @@ internal sealed class CollectionNodeBinding(
         }
         else
         {
-            if (offset + limit > Host.MaxCollectionItems)
+            if (offset + limit > UIEngineHost.Instance.MaxCollectionItems)
             {
                 return Left(new InteractionError(
                     InteractionErrorCode.UNSUPPORTED,
@@ -207,7 +204,7 @@ internal sealed class CollectionNodeBinding(
             new CollectionSlice(offset, entries, total, hasMore));
     }
 
-    private CollectionEntry _CreateEntry(long position, object? key, object? value)
+    private static CollectionEntry _CreateEntry(long position, object? key, object? value)
     {
         if (value is null)
         {
@@ -219,7 +216,10 @@ internal sealed class CollectionNodeBinding(
             return new ScalarCollectionEntry(position, value, key);
         }
 
-        return new ReferenceCollectionEntry(position, Host.GetOrCreateHandle(value), key);
+        return new ReferenceCollectionEntry(
+            position,
+            UIEngineHost.Instance.GetOrCreateHandle(value),
+            key);
     }
 
     private static Either<InteractionError, IReadOnlyList<Guid>> _ReferenceHandles(

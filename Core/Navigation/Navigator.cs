@@ -33,7 +33,7 @@ public sealed class Navigator
 
     /// <summary>Resolves one child location and makes it the current entry.</summary>
     /// <remarks>
-    /// A resolution failure is committed as a broken entry so that <see cref="GoBack"/> can
+    /// A resolution failure is committed as an invalid entry so that <see cref="GoBack"/> can
     /// return to the previous location.
     /// </remarks>
     public Either<InteractionError, NavigationPushedChange> Navigate(
@@ -44,7 +44,7 @@ public sealed class Navigator
         {
             return Left(new InteractionError(
                 InteractionErrorCode.INVALID_INPUT,
-                "A broken navigation entry has no child locations."));
+                "An invalid navigation entry has no child locations."));
         }
 
         var currentNode = ((Option<BaseNode>)current)

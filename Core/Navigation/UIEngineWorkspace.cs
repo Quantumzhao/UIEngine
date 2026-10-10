@@ -5,27 +5,26 @@ using static LanguageExt.Prelude;
 namespace UIEngine.Core;
 
 /// <summary>
-/// Owns an ordered set of independent navigators over one caller-owned host.
+/// Owns an ordered set of independent navigators over the active host.
 /// </summary>
 public sealed class UIEngineWorkspace : IDisposable
 {
     private readonly List<Navigator> _Navigators = [];
+    private readonly ReadOnlyCollection<Navigator> _NavigatorView;
 
-    public UIEngineWorkspace(UIEngineHost host)
+    public UIEngineWorkspace()
     {
-        Host = host;
+        _NavigatorView = _Navigators.AsReadOnly();
+        UIEngineHost.Instance.RegisterWorkspace(this);
     }
 
-    public IReadOnlyList<Navigator> Navigators => _Navigators;
+    public IReadOnlyList<Navigator> Navigators => _NavigatorView;
 
     public event EventHandler<WorkspaceChangedEventArgs>? Changed;
 
-    /// <summary>Gets the caller-owned host whose roots and policies this workspace navigates.</summary>
-    public UIEngineHost Host { get; }
-
     /// <summary>Adds a navigator whose initial location is a registered root.</summary>
-    public Either<InteractionError, NavigatorAddedChange> AddNavigator(string rootName) =>
-        AddNavigator(LogicalPath.Root.Append(rootName));
+    public Either<InteractionError, NavigatorAddedChange> AddNavigator(Guid rootId) =>
+        AddNavigator(LogicalPath.Empty.Append(new RootLogicalPathSegment(rootId)));
 
     /// <summary>Adds a navigator whose stack is reconstructed from an absolute path.</summary>
     public Either<InteractionError, NavigatorAddedChange> AddNavigator(LogicalPath path) =>
@@ -148,7 +147,7 @@ public sealed class UIEngineWorkspace : IDisposable
         var snapshots = new List<NavigatorSnapshot>(Navigators.Count);
         foreach (var navigator in Navigators)
         {
-            if (navigator.CurrentPath.IsRoot)
+            if (navigator.CurrentPath.IsEmpty)
             {
                 return Left(new InteractionError(
                     InteractionErrorCode.INVALID_INPUT,
@@ -268,6 +267,11 @@ public sealed class UIEngineWorkspace : IDisposable
         {
             _RemoveNavigator(Navigators[^1]);
         }
+
+        if (UIEngineHost.TryGetInstance(out var host))
+        {
+            host.UnregisterWorkspace(this);
+        }
     }
 
     private void _OnNavigatorChanged(object? sender, WorkspaceChangedEventArgs eventArgs) =>
@@ -275,7 +279,7 @@ public sealed class UIEngineWorkspace : IDisposable
 
     private Either<InteractionError, ResolvedPath> _ResolveNavigatorPath(
         Navigator navigator,
-        LogicalPath path) => PathResolution.Resolve(Host, path);
+        LogicalPath path) => PathResolution.Resolve(path);
 
     private void _Subscribe(Navigator navigator)
     {
@@ -292,12 +296,12 @@ public sealed class UIEngineWorkspace : IDisposable
     private void Publish(WorkspaceChange change) =>
         Changed?.Invoke(this, new WorkspaceChangedEventArgs(change));
 
-    private (
+    private static (
         LogicalPath Path,
         Either<InteractionError, Option<BaseNode>> Entry)[] _ResolveInitialEntries(
             LogicalPath path)
     {
-        var resolved = PathResolution.Resolve(Host, path);
+        var resolved = PathResolution.Resolve(path);
         if (resolved.IsRight)
         {
             return ((ResolvedPath)resolved).ResolutionChain
@@ -306,19 +310,19 @@ public sealed class UIEngineWorkspace : IDisposable
                 .ToArray();
         }
 
-        if (path.IsRoot)
+        if (path.IsEmpty)
         {
-            return [(path, _BrokenEntry((InteractionError)resolved))];
+            return [(path, _InvalidEntry((InteractionError)resolved))];
         }
 
         var entries = new List<(
             LogicalPath Path,
             Either<InteractionError, Option<BaseNode>> Entry)>();
-        var prefix = LogicalPath.Root;
+        var prefix = LogicalPath.Empty;
         foreach (var segment in path.Segments)
         {
             prefix = prefix.Append(segment);
-            var prefixResolution = PathResolution.Resolve(Host, prefix);
+            var prefixResolution = PathResolution.Resolve(prefix);
             if (prefixResolution.IsRight)
             {
                 var resolvedPrefix = (ResolvedPath)prefixResolution;
@@ -328,7 +332,7 @@ public sealed class UIEngineWorkspace : IDisposable
             }
             else
             {
-                entries.Add((prefix, _BrokenEntry((InteractionError)prefixResolution)));
+                entries.Add((prefix, _InvalidEntry((InteractionError)prefixResolution)));
             }
         }
 
@@ -338,13 +342,14 @@ public sealed class UIEngineWorkspace : IDisposable
     private static Either<InteractionError, Option<BaseNode>> _ResolvedEntry(BaseNode node) =>
         Right(Some(node));
 
-    private static Either<InteractionError, Option<BaseNode>> _BrokenEntry(
+    private static Either<InteractionError, Option<BaseNode>> _InvalidEntry(
         InteractionError error) =>
         Left(error);
 
     private static IPathSegmentSnapshot? _CreateSegmentSnapshot(
         ILogicalPathSegment segment) => segment switch
         {
+            RootLogicalPathSegment root => new RootPathSegmentSnapshot(root.RootId),
             MemberLogicalPathSegment member => new MemberPathSegmentSnapshot(member.Name),
             ListLogicalPathSegment list => new ListPathSegmentSnapshot(list.Index),
             DictLogicalPathSegment dictionary =>
@@ -362,7 +367,7 @@ public sealed class UIEngineWorkspace : IDisposable
                 "A navigator path must identify a registered root."));
         }
 
-        var path = LogicalPath.Root;
+        var path = LogicalPath.Empty;
         for (var index = 0; index < segments.Count; index++)
         {
             var segment = segments[index];
@@ -376,6 +381,8 @@ public sealed class UIEngineWorkspace : IDisposable
             {
                 restored = segment switch
                 {
+                    RootPathSegmentSnapshot root =>
+                        new RootLogicalPathSegment(root.RootId),
                     MemberPathSegmentSnapshot member =>
                         new MemberLogicalPathSegment(member.Name),
                     ListPathSegmentSnapshot list =>

@@ -422,12 +422,15 @@ public sealed partial class TuiWorkspace : IDisposable
         var selected = SelectedNavigatorId is Guid id && _Presentations.TryGetValue(id, out var value)
             ? value
             : null;
-        _Address.Text = selected?.Navigator.CurrentPath.ToString() ?? "No navigator";
+        var displayPath = selected?.Navigator.CurrentPath.ToDisplayString();
+        _Address.Text = displayPath is null
+            ? "No navigator"
+            : displayPath.Value.IsRight ? (string)displayPath.Value : string.Empty;
         _State.Text = selected?.CurrentControl.State.ToString() ?? "Empty";
         _State.SetStyle(new TextBlockStyle { Foreground = selected?.CurrentControl.State switch
         {
             PlaceholderNodeState.Healthy => Colors.Green,
-            PlaceholderNodeState.Broken => Colors.Red,
+            PlaceholderNodeState.Invalid => Colors.Red,
             _ => Colors.Yellow,
         }});
         _UpButton.IsEnabled = selected is not null && selected.Navigator.Paths.Count > 1;

@@ -11,14 +11,16 @@ public sealed class LiveObjectNodeTests
     {
         var model = new _Model();
         using var host = new UIEngineHost(new UIEngineHostOptions { MaxCollectionItems = 2 });
-        var handle = host.SetRoot("model", model).RightValue();
+        TestRoots.Set("model", model);
+        var rootId = TestRoots.Id("model");
+        var handle = host.GetOrCreateHandle(model);
 
-        var first = host.ResolveRootNode("model");
-        var second = host.ResolveRootNode("model");
+        var first = host.ResolveRootNode(rootId);
+        var second = host.ResolveRootNode(rootId);
 
         Assert.True(first.IsRight);
         Assert.True(second.IsRight);
-        Assert.Equal("/model", first.RightValue().CanonicalPath.ToString());
+        Assert.Equal("/model", first.RightValue().CanonicalPath.ToDisplayString().RightValue());
         Assert.NotSame(first.RightValue().Node, second.RightValue().Node);
         var firstObject = Assert.IsAssignableFrom<IObjectNode>(first.RightValue().Node);
         var secondObject = Assert.IsAssignableFrom<IObjectNode>(second.RightValue().Node);
@@ -79,7 +81,7 @@ public sealed class LiveObjectNodeTests
     {
         using var host = new UIEngineHost();
 
-        var missing = host.ResolveRootNode("missing");
+        var missing = host.ResolveRootNode(Guid.NewGuid());
 
         Assert.Equal(InteractionErrorCode.NOT_FOUND, missing.LeftValue().Code);
     }

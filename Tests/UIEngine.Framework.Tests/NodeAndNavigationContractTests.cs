@@ -9,7 +9,7 @@ public sealed class NodeAndNavigationContractTests
     public void ReflectedEnumPropertyCombinesOverlappingFacets()
     {
         using var host = new UIEngineHost();
-        var node = new _EnumPropertyNode(host);
+        var node = new _EnumPropertyNode();
 
         Assert.IsAssignableFrom<IPropertyNode>(node);
         Assert.IsAssignableFrom<IReadableValueNode>(node);
@@ -25,7 +25,7 @@ public sealed class NodeAndNavigationContractTests
     public void ProgrammaticScalarDoesNotClaimReflectedMembership()
     {
         using var host = new UIEngineHost();
-        var node = new _ProgrammaticStringNode(host);
+        var node = new _ProgrammaticStringNode();
 
         Assert.IsAssignableFrom<IProgrammaticValueNode>(node);
         Assert.IsAssignableFrom<IStringNode>(node);
@@ -39,10 +39,10 @@ public sealed class NodeAndNavigationContractTests
     {
         using var host = new UIEngineHost();
 
-        Assert.True(new _ProgrammaticStringNode(host).IsTerminal);
-        Assert.True(new _MethodNode(host).IsTerminal);
-        Assert.False(new _ObjectNode(host).IsTerminal);
-        Assert.False(new _CollectionNode(host).IsTerminal);
+        Assert.True(new _ProgrammaticStringNode().IsTerminal);
+        Assert.True(new _MethodNode().IsTerminal);
+        Assert.False(new _ObjectNode().IsTerminal);
+        Assert.False(new _CollectionNode().IsTerminal);
     }
 
     [Fact]
@@ -50,12 +50,12 @@ public sealed class NodeAndNavigationContractTests
     {
         using var host = new UIEngineHost();
         var path = _Path(_Member("model"), _Member("State"));
-        var first = new ResolvedNode(path, new _EnumPropertyNode(host));
-        var second = new ResolvedNode(path, new _EnumPropertyNode(host));
+        var first = new ResolvedNode(path, new _EnumPropertyNode());
+        var second = new ResolvedNode(path, new _EnumPropertyNode());
 
         Assert.Equal(first.CanonicalPath, second.CanonicalPath);
         Assert.NotSame(first.Node, second.Node);
-        Assert.Same(host, first.Host);
+        Assert.Null(typeof(ResolvedNode).GetProperty("Host"));
         Assert.DoesNotContain(
             typeof(BaseNode).GetProperties(),
             static property => property.PropertyType == typeof(LogicalPath));
@@ -77,12 +77,12 @@ public sealed class NodeAndNavigationContractTests
     {
         using var host = new UIEngineHost();
         var navigatorId = Guid.NewGuid();
-        var oldNode = new _ProgrammaticStringNode(host);
+        var oldNode = new _ProgrammaticStringNode();
         var oldPath = _Path(_Member("model"), _Member("Name"));
         Either<InteractionError, Option<BaseNode>> oldEntry = Right(Some<BaseNode>(oldNode));
         var currentPath = _Path(_Member("model"));
         Either<InteractionError, Option<BaseNode>> currentEntry =
-            Right(Some<BaseNode>(new _ObjectNode(host)));
+            Right(Some<BaseNode>(new _ObjectNode()));
         var change = new NavigationPoppedChange(
             navigatorId,
             oldPath,
@@ -100,6 +100,7 @@ public sealed class NodeAndNavigationContractTests
     [Fact]
     public void LogicalPathsExposeLinkedSemanticParents()
     {
+        using var host = new UIEngineHost();
         var world = _Path(_Member("world"));
         var name = world.Append("Name");
         var nations = world.Append("Nations");
@@ -116,6 +117,7 @@ public sealed class NodeAndNavigationContractTests
     [Fact]
     public void LogicalPathSegmentsRepresentMemberListAndDictionarySemantics()
     {
+        using var host = new UIEngineHost();
         var memberPath = _Path(_Member("world"), _Member("Nations"));
         var listPath = memberPath.Append(new ListLogicalPathSegment(2));
         var dictionaryPath = _Path(
@@ -129,22 +131,27 @@ public sealed class NodeAndNavigationContractTests
         Assert.Equal(2, list.Index);
         var dictionary = Assert.IsType<DictLogicalPathSegment>(dictionaryPath.Segments[^1]);
         Assert.Equal("SKU/42", dictionary.Key);
-        Assert.Equal("/catalog/Items[key=SKU/42]", dictionaryPath.ToString());
+        Assert.Equal(
+            "/catalog/Items[key=SKU/42]",
+            dictionaryPath.ToDisplayString().RightValue());
 
-        var constructed = LogicalPath.Root
-            .Append("world")
+        var constructed = LogicalPath.Empty
+            .Append(TestRoots.Segment("world"))
             .Append("Nations")
             .Append(new ListLogicalPathSegment(2));
         Assert.Equal(listPath, constructed);
-        Assert.Throws<ArgumentException>(() => LogicalPath.Root.Append(
+        Assert.Throws<ArgumentException>(() => LogicalPath.Empty.Append(
             new ListLogicalPathSegment(0)));
     }
 
     private static LogicalPath _Path(params ILogicalPathSegment[] segments)
     {
-        var path = LogicalPath.Root;
-        foreach (var segment in segments)
+        var path = LogicalPath.Empty;
+        for (var index = 0; index < segments.Length; index++)
         {
+            var segment = index == 0 && segments[index] is MemberLogicalPathSegment root
+                ? TestRoots.Segment(root.Name)
+                : segments[index];
             path = path.Append(segment);
         }
 
@@ -153,8 +160,8 @@ public sealed class NodeAndNavigationContractTests
 
     private static MemberLogicalPathSegment _Member(string name) => new(name);
 
-    private sealed class _EnumPropertyNode(UIEngineHost host)
-        : BaseNode(host, "State", typeof(_State)),
+    private sealed class _EnumPropertyNode()
+        : BaseNode("State", typeof(_State)),
             IPropertyNode,
             IReadableValueNode,
             IWritableValueNode,
@@ -175,8 +182,8 @@ public sealed class NodeAndNavigationContractTests
             Right(Optional(value));
     }
 
-    private sealed class _ProgrammaticStringNode(UIEngineHost host)
-        : BaseNode(host, "Name", typeof(string)),
+    private sealed class _ProgrammaticStringNode()
+        : BaseNode("Name", typeof(string)),
             IProgrammaticValueNode,
             IStringNode,
             IReadableValueNode
@@ -185,8 +192,8 @@ public sealed class NodeAndNavigationContractTests
             Right(Some<object>("name"));
     }
 
-    private sealed class _ObjectNode(UIEngineHost host)
-        : BaseNode(host, "model", typeof(_Model)), IObjectNode
+    private sealed class _ObjectNode()
+        : BaseNode("model", typeof(_Model)), IObjectNode
     {
         public Guid Handle { get; } = Guid.NewGuid();
 
@@ -195,8 +202,8 @@ public sealed class NodeAndNavigationContractTests
         public IReadOnlyList<BaseNode> Members => [];
     }
 
-    private sealed class _CollectionNode(UIEngineHost host)
-        : BaseNode(host, "Items", typeof(IReadOnlyList<string>)), ICollectionNode
+    private sealed class _CollectionNode()
+        : BaseNode("Items", typeof(IReadOnlyList<string>)), ICollectionNode
     {
         public Type ElementType => typeof(string);
 
@@ -207,8 +214,8 @@ public sealed class NodeAndNavigationContractTests
             int limit) => Right(new CollectionSlice(offset, [], 0, false));
     }
 
-    private sealed class _MethodNode(UIEngineHost host)
-        : BaseNode(host, "Run", typeof(void)), IMethodNode
+    private sealed class _MethodNode()
+        : BaseNode("Run", typeof(void)), IMethodNode
     {
         public Type DeclaringType => typeof(_Model);
 

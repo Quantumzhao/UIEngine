@@ -11,7 +11,7 @@ public sealed class WorkspaceSnapshotTests
     public void SnapshotRoundTripsOrderedStructuredPathsAndSelectionThroughJson()
     {
         using var host = _CreateHost(new _SnapshotModel());
-        using var workspace = new UIEngineWorkspace(host);
+        using var workspace = new UIEngineWorkspace();
         workspace.AddNavigator(_Path(_Member("model"), _Member("Child"), _Member("Name")));
         workspace.AddNavigator(_Path(
             _Member("model"),
@@ -42,7 +42,8 @@ public sealed class WorkspaceSnapshotTests
                 "/model/ByKey[key=key/one]/Name",
                 "/model/Child/Name",
             ],
-            workspace.Navigators.Select(static navigator => navigator.CurrentPath.ToString()));
+            workspace.Navigators.Select(static navigator =>
+                navigator.CurrentPath.ToDisplayString().RightValue()));
         Assert.DoesNotContain("Version", json, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("Presentation", json, StringComparison.OrdinalIgnoreCase);
         Assert.Null(typeof(WorkspaceSnapshot).GetProperty("Version"));
@@ -53,7 +54,7 @@ public sealed class WorkspaceSnapshotTests
     {
         var model = new _SnapshotModel();
         using var host = _CreateHost(model);
-        using var workspace = new UIEngineWorkspace(host);
+        using var workspace = new UIEngineWorkspace();
         workspace.AddNavigator(_Path(
             _Member("model"),
             _Member("Items"),
@@ -77,14 +78,14 @@ public sealed class WorkspaceSnapshotTests
         Assert.False(navigator.CurrentEntry.IsRight);
         Assert.True(navigator.GoBack().IsRight);
         Assert.True(navigator.CurrentEntry.IsRight);
-        Assert.Equal("/model/Items", navigator.CurrentPath.ToString());
+        Assert.Equal("/model/Items", navigator.CurrentPath.ToDisplayString().RightValue());
     }
 
     [Fact]
     public void RestoreSalvagesRecordsAndUsesFirstOccurrenceOfEachId()
     {
         using var host = _CreateHost(new _SnapshotModel());
-        using var workspace = new UIEngineWorkspace(host);
+        using var workspace = new UIEngineWorkspace();
         var firstId = Guid.NewGuid();
         var brokenId = Guid.NewGuid();
         var snapshot = new WorkspaceSnapshot(
@@ -127,7 +128,7 @@ public sealed class WorkspaceSnapshotTests
     public void RestoreSkipsEveryMalformedConcretePathShapeIndependently()
     {
         using var host = _CreateHost(new _SnapshotModel());
-        using var workspace = new UIEngineWorkspace(host);
+        using var workspace = new UIEngineWorkspace();
         var validId = Guid.NewGuid();
         var snapshot = new WorkspaceSnapshot(
             [
@@ -161,7 +162,7 @@ public sealed class WorkspaceSnapshotTests
     public void FirstMalformedDuplicateStillClaimsItsId()
     {
         using var host = _CreateHost(new _SnapshotModel());
-        using var workspace = new UIEngineWorkspace(host);
+        using var workspace = new UIEngineWorkspace();
         var claimedId = Guid.NewGuid();
         var fallbackId = Guid.NewGuid();
         var snapshot = new WorkspaceSnapshot(
@@ -189,8 +190,8 @@ public sealed class WorkspaceSnapshotTests
     public void MissingNavigatorCollectionOptimisticallyReplacesWorkspaceWithEmptySnapshot()
     {
         using var host = _CreateHost(new _SnapshotModel());
-        using var workspace = new UIEngineWorkspace(host);
-        workspace.AddNavigator("model");
+        using var workspace = new UIEngineWorkspace();
+        workspace.AddNavigator(TestRoots.Id("model"));
         var existingId = workspace.Navigators[0].Id;
         var changes = new List<WorkspaceChange>();
         workspace.Changed += (_, eventArgs) => changes.Add(eventArgs.Change);
@@ -214,9 +215,9 @@ public sealed class WorkspaceSnapshotTests
     public void RestorePublishesReverseRemovalsThenOrderedAdditions()
     {
         using var host = _CreateHost(new _SnapshotModel());
-        using var workspace = new UIEngineWorkspace(host);
-        workspace.AddNavigator("model");
-        workspace.AddNavigator("model");
+        using var workspace = new UIEngineWorkspace();
+        workspace.AddNavigator(TestRoots.Id("model"));
+        workspace.AddNavigator(TestRoots.Id("model"));
         var oldIds = workspace.Navigators.Select(static navigator => navigator.Id).ToArray();
         var changes = new List<WorkspaceChange>();
         workspace.Changed += (_, eventArgs) => changes.Add(eventArgs.Change);
@@ -251,8 +252,8 @@ public sealed class WorkspaceSnapshotTests
     public void EmptySnapshotAndInvalidSelectionUseDeterministicSelection()
     {
         using var host = _CreateHost(new _SnapshotModel());
-        using var workspace = new UIEngineWorkspace(host);
-        workspace.AddNavigator("model");
+        using var workspace = new UIEngineWorkspace();
+        workspace.AddNavigator(TestRoots.Id("model"));
 
         var empty = workspace.RestoreSnapshot(new WorkspaceSnapshot([], null));
         var invalidEmptySelection = workspace.CreateSnapshot(Guid.NewGuid());
@@ -272,13 +273,15 @@ public sealed class WorkspaceSnapshotTests
     public void JsonWithUnknownFieldsRestoresWithoutSchemaGate()
     {
         var id = Guid.NewGuid();
+        using var host = _CreateHost(new _SnapshotModel());
+        var rootId = TestRoots.Id("model");
         var json = $$"""
             {
               "Navigators": [
                 {
                   "Id": "{{id}}",
                   "CurrentPath": [
-                    { "segment": "member", "Name": "model", "FutureSegmentData": true }
+                    { "segment": "root", "RootId": "{{rootId}}", "FutureSegmentData": true }
                   ],
                   "FutureNavigatorData": "ignored"
                 }
@@ -287,15 +290,16 @@ public sealed class WorkspaceSnapshotTests
               "FutureWorkspaceData": { "revision": 12 }
             }
             """;
-        using var host = _CreateHost(new _SnapshotModel());
-        using var workspace = new UIEngineWorkspace(host);
+        using var workspace = new UIEngineWorkspace();
         var snapshot = JsonSerializer.Deserialize<WorkspaceSnapshot>(json)!;
 
         var restored = workspace.RestoreSnapshot(snapshot);
 
         Assert.Empty(restored.Issues);
         Assert.Equal(id, restored.SelectedNavigatorId);
-        Assert.Equal("/model", Assert.Single(workspace.Navigators).CurrentPath.ToString());
+        Assert.Equal(
+            "/model",
+            Assert.Single(workspace.Navigators).CurrentPath.ToDisplayString().RightValue());
     }
 
     [Fact]
@@ -303,7 +307,7 @@ public sealed class WorkspaceSnapshotTests
     {
         var model = new _SnapshotModel { Secret = "domain-secret-9217" };
         using var host = _CreateHost(model);
-        using var workspace = new UIEngineWorkspace(host);
+        using var workspace = new UIEngineWorkspace();
         workspace.AddNavigator(_Path(_Member("model"), _Member("WorkAsync")));
         var method = Assert.IsAssignableFrom<IMethodNode>(
             workspace.Navigators[0].CurrentEntry.RightValue().SomeValue());
@@ -328,10 +332,10 @@ public sealed class WorkspaceSnapshotTests
     public void SamePathNavigatorsHaveDistinctPersistentIds()
     {
         using var host = _CreateHost(new _SnapshotModel());
-        using var workspace = new UIEngineWorkspace(host);
+        using var workspace = new UIEngineWorkspace();
 
-        var first = workspace.AddNavigator("model");
-        var second = workspace.AddNavigator("model");
+        var first = workspace.AddNavigator(TestRoots.Id("model"));
+        var second = workspace.AddNavigator(TestRoots.Id("model"));
 
         Assert.True(first.IsRight);
         Assert.True(second.IsRight);
@@ -342,7 +346,7 @@ public sealed class WorkspaceSnapshotTests
     public void SnapshotRejectsAnUnsupportedPathSegmentAsAStructuredError()
     {
         using var host = _CreateHost(new _SnapshotModel());
-        using var workspace = new UIEngineWorkspace(host);
+        using var workspace = new UIEngineWorkspace();
         var path = _Path(_Member("model"), new _UnknownPathSegment());
         workspace.AddNavigator(path);
 
@@ -355,15 +359,18 @@ public sealed class WorkspaceSnapshotTests
     private static UIEngineHost _CreateHost(_SnapshotModel model)
     {
         var host = new UIEngineHost();
-        host.SetRoot("model", model);
+        TestRoots.Set("model", model);
         return host;
     }
 
     private static LogicalPath _Path(params ILogicalPathSegment[] segments)
     {
-        var path = LogicalPath.Root;
-        foreach (var segment in segments)
+        var path = LogicalPath.Empty;
+        for (var index = 0; index < segments.Length; index++)
         {
+            var segment = index == 0 && segments[index] is MemberLogicalPathSegment root
+                ? TestRoots.Segment(root.Name)
+                : segments[index];
             path = path.Append(segment);
         }
 
@@ -372,12 +379,12 @@ public sealed class WorkspaceSnapshotTests
 
     private static MemberLogicalPathSegment _Member(string name) => new(name);
 
-    private static MemberPathSegmentSnapshot _SavedMember(string name) => new(name);
+    private static IPathSegmentSnapshot _SavedMember(string name) =>
+        name == "model" ? TestRoots.Snapshot(name) : new MemberPathSegmentSnapshot(name);
 
     private sealed class _SnapshotModel
     {
-        private readonly TaskCompletionSource<int> _Work =
-            new(TaskCreationOptions.RunContinuationsAsynchronously);
+        private readonly TaskCompletionSource<int> _Work = new();
 
         [Expose]
         public string Secret { get; set; } = "secret";

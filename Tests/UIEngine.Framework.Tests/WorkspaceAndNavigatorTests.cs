@@ -12,22 +12,22 @@ public sealed class WorkspaceAndNavigatorTests
     public void NavigatorViewIsReadOnlyAndEveryMutationPublishesOneChange()
     {
         using var host = _CreateHost(new _Model());
-        var workspace = new UIEngineWorkspace(host);
+        var workspace = new UIEngineWorkspace();
         var mutableView = Assert.IsAssignableFrom<ICollection<Navigator>>(workspace.Navigators);
         var changes = new List<WorkspaceChange>();
         workspace.Changed += (_, eventArgs) => changes.Add(eventArgs.Change);
 
-        var added = workspace.AddNavigator("model").RightValue();
+        var added = workspace.AddNavigator(TestRoots.Id("model")).RightValue();
         Assert.Throws<NotSupportedException>(() => mutableView.Add(workspace.Navigators[0]));
         var duplicated = workspace.DuplicateNavigator(added.NavigatorId).RightValue();
         var reordered = workspace.ReorderNavigator(duplicated.NavigatorId, 0).RightValue();
         var restoredSnapshotId = Guid.NewGuid();
         var restored = workspace.RestoreSnapshot(new WorkspaceSnapshot(
-            [new NavigatorSnapshot(restoredSnapshotId, [new MemberPathSegmentSnapshot("model")])],
+            [new NavigatorSnapshot(restoredSnapshotId, [TestRoots.Snapshot("model")])],
             restoredSnapshotId));
         var restoredId = Assert.Single(workspace.Navigators).Id;
         var removed = workspace.RemoveNavigator(restoredId).RightValue();
-        workspace.AddNavigator("model");
+        workspace.AddNavigator(TestRoots.Id("model"));
         var disposedId = Assert.Single(workspace.Navigators).Id;
 
         workspace.Dispose();
@@ -54,8 +54,8 @@ public sealed class WorkspaceAndNavigatorTests
         Assert.DoesNotContain(fields, static field => field.FieldType == typeof(UIEngineHost));
 
         using var host = _CreateHost(new _Model());
-        using var workspace = new UIEngineWorkspace(host);
-        workspace.AddNavigator("model");
+        using var workspace = new UIEngineWorkspace();
+        workspace.AddNavigator(TestRoots.Id("model"));
         var navigator = Assert.Single(workspace.Navigators);
         var changes = new List<WorkspaceChange>();
         workspace.Changed += (_, eventArgs) => changes.Add(eventArgs.Change);
@@ -71,13 +71,13 @@ public sealed class WorkspaceAndNavigatorTests
     {
         var model = new _Model();
         using var host = _CreateHost(model);
-        using var workspace = new UIEngineWorkspace(host);
+        using var workspace = new UIEngineWorkspace();
         var path = _Path(_Member("model"), _Member("Child"), _Member("Value"));
-        var supplied = PathResolution.Resolve(host, path).RightValue().ResolutionChain[^1];
+        var supplied = PathResolution.Resolve(path).RightValue().ResolutionChain[^1];
         var changes = new List<WorkspaceChange>();
         workspace.Changed += (_, eventArgs) => changes.Add(eventArgs.Change);
 
-        var rootAdded = workspace.AddNavigator("model");
+        var rootAdded = workspace.AddNavigator(TestRoots.Id("model"));
         var pathAdded = workspace.AddNavigator(path);
         var occurrenceAdded = workspace.AddNavigator(supplied);
 
@@ -94,7 +94,7 @@ public sealed class WorkspaceAndNavigatorTests
         Assert.Equal(pathNavigator.Paths.Count, pathNavigator.Entries.Count);
         Assert.Equal(
             ["/model", "/model/Child", "/model/Child/Value"],
-            pathNavigator.Paths.Select(static path => path.ToString()));
+            pathNavigator.Paths.Select(static path => path.ToDisplayString().RightValue()));
         Assert.NotSame(
             supplied.Node,
             occurrenceNavigator.CurrentEntry.RightValue().SomeValue());
@@ -110,8 +110,8 @@ public sealed class WorkspaceAndNavigatorTests
     public void NavigatorPushesBrokenEntriesAndBackIsDestructive()
     {
         using var host = _CreateHost(new _Model());
-        using var workspace = new UIEngineWorkspace(host);
-        workspace.AddNavigator("model");
+        using var workspace = new UIEngineWorkspace();
+        workspace.AddNavigator(TestRoots.Id("model"));
         var navigator = Assert.Single(workspace.Navigators);
         var changes = new List<WorkspaceChange>();
         workspace.Changed += (_, eventArgs) => changes.Add(eventArgs.Change);
@@ -124,7 +124,7 @@ public sealed class WorkspaceAndNavigatorTests
         Assert.Equal(
             InteractionErrorCode.NOT_FOUND,
             navigator.CurrentEntry.LeftValue().Code);
-        Assert.Equal("/model/Missing", navigator.CurrentPath.ToString());
+        Assert.Equal("/model/Missing", navigator.CurrentPath.ToDisplayString().RightValue());
 
         var fromBroken = navigator.Navigate(_Member("Anything"));
         Assert.False(fromBroken.IsRight);
@@ -162,8 +162,8 @@ public sealed class WorkspaceAndNavigatorTests
     {
         var model = new _Model();
         using var host = _CreateHost(model);
-        using var workspace = new UIEngineWorkspace(host);
-        workspace.AddNavigator("model");
+        using var workspace = new UIEngineWorkspace();
+        workspace.AddNavigator(TestRoots.Id("model"));
         var first = Assert.Single(workspace.Navigators);
 
         var duplicated = workspace.DuplicateNavigator(first.Id);
@@ -207,10 +207,10 @@ public sealed class WorkspaceAndNavigatorTests
     public void ReorderRemoveAndDisposePublishExactDeterministicChanges()
     {
         using var host = _CreateHost(new _Model());
-        var workspace = new UIEngineWorkspace(host);
-        workspace.AddNavigator("model");
-        workspace.AddNavigator("model");
-        workspace.AddNavigator("model");
+        var workspace = new UIEngineWorkspace();
+        workspace.AddNavigator(TestRoots.Id("model"));
+        workspace.AddNavigator(TestRoots.Id("model"));
+        workspace.AddNavigator(TestRoots.Id("model"));
         var one = workspace.Navigators[0];
         var two = workspace.Navigators[1];
         var three = workspace.Navigators[2];
@@ -242,19 +242,18 @@ public sealed class WorkspaceAndNavigatorTests
         Assert.Empty(one.Paths);
         Assert.Empty(three.Entries);
         Assert.Empty(three.Paths);
-        Assert.True(host.ResolveRootNode("model").IsRight);
+        Assert.True(host.ResolveRootNode(TestRoots.Id("model")).IsRight);
     }
 
     [Fact]
     public void InvalidStartIsVisibleAndSamePathNavigatorsHaveDistinctIds()
     {
         using var host = _CreateHost(new _Model());
-        using var otherHost = _CreateHost(new _Model());
-        using var workspace = new UIEngineWorkspace(host);
+        using var workspace = new UIEngineWorkspace();
 
         var broken = workspace.AddNavigator(
             _Path(_Member("model"), _Member("Missing")));
-        var samePath = workspace.AddNavigator("model");
+        var samePath = workspace.AddNavigator(TestRoots.Id("model"));
 
         Assert.True(broken.IsRight);
         var navigator = workspace.Navigators[0];
@@ -275,7 +274,7 @@ public sealed class WorkspaceAndNavigatorTests
     {
         var model = new _Model();
         using var host = _CreateHost(model);
-        var workspace = new UIEngineWorkspace(host);
+        var workspace = new UIEngineWorkspace();
         workspace.AddNavigator(_Path(_Member("model"), _Member("WorkAsync")));
         var navigator = Assert.Single(workspace.Navigators);
         var method = Assert.IsAssignableFrom<IMethodNode>(
@@ -288,7 +287,7 @@ public sealed class WorkspaceAndNavigatorTests
         Assert.Equal(InvocationStatus.RUNNING, started.RightValue());
         Assert.False(resultTask.IsCompleted);
         Assert.Empty(navigator.Entries);
-        Assert.True(host.ResolveRootNode("model").IsRight);
+        Assert.True(host.ResolveRootNode(TestRoots.Id("model")).IsRight);
 
         model.CompleteWork(42);
         var completed = await resultTask;
@@ -299,15 +298,18 @@ public sealed class WorkspaceAndNavigatorTests
     private static UIEngineHost _CreateHost(_Model model)
     {
         var host = new UIEngineHost();
-        host.SetRoot("model", model);
+        TestRoots.Set("model", model);
         return host;
     }
 
     private static LogicalPath _Path(params ILogicalPathSegment[] segments)
     {
-        var path = LogicalPath.Root;
-        foreach (var segment in segments)
+        var path = LogicalPath.Empty;
+        for (var index = 0; index < segments.Length; index++)
         {
+            var segment = index == 0 && segments[index] is MemberLogicalPathSegment root
+                ? TestRoots.Segment(root.Name)
+                : segments[index];
             path = path.Append(segment);
         }
 
@@ -318,8 +320,7 @@ public sealed class WorkspaceAndNavigatorTests
 
     private sealed class _Model
     {
-        private readonly TaskCompletionSource<int> _Work =
-            new(TaskCreationOptions.RunContinuationsAsynchronously);
+        private readonly TaskCompletionSource<int> _Work = new();
 
         [Expose]
         [Range(0, 10)]

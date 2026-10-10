@@ -11,9 +11,9 @@ public sealed class SynchronousInteractionTests
     {
         using var host = new UIEngineHost();
         var model = new _ReentrantModel();
-        host.SetRoot("model", model);
+        TestRoots.Set("model", model);
         model.Attach(host);
-        var resolved = host.ResolveRootNode("model");
+        var resolved = host.ResolveRootNode(TestRoots.Id("model"));
         var valueNode = Assert.Single(((IObjectNode)resolved.RightValue().Node).Members);
         Assert.True(valueNode is IReadableValueNode);
         var value = (IReadableValueNode)valueNode;
@@ -35,7 +35,7 @@ public sealed class SynchronousInteractionTests
         {
             get
             {
-                ReentrantDescribeSucceeded = _Host!.ResolveRootNode("model").IsRight;
+                ReentrantDescribeSucceeded = _Host!.ResolveRootNode(TestRoots.Id("model")).IsRight;
                 return 17;
             }
         }

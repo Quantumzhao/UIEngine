@@ -5,7 +5,7 @@ invocable graph.
 
 Its target architecture has three frontend-neutral layers:
 
-- `UIEngineHost` owns roots, live domain access, runtime handles, dispatch, and invocation.
+- `UIEngineHost` owns roots, live domain access, runtime handles, and invocation.
 - `BaseNode` represents an exposed .NET language feature.
 - `UIEngineWorkspace` owns independent `Navigator`s and serializable layout state.
 
@@ -24,13 +24,20 @@ dotnet run --project Examples/CyclicWorld.Tui/CyclicWorld.Tui.csproj
 
 ```csharp
 using UIEngine.Core;
+using UIEngine.Core.Attributes;
 
 using var host = new UIEngineHost();
-host.SetRoot("model", model);
+
+static class ApplicationRoots
+{
+    [Root]
+    public static Model Model { get; } = new();
+}
 ```
 
-Domain members opt in with `[Expose]`, `[Children]`, and `[Action]`. `[Summary]` supplies an
-optional summary.
+The host discovers public static `[Root]` fields and properties, plus public static methods marked
+with both `[Root]` and `[Action]`, from the assemblies loaded when it is constructed. Domain members
+opt in with `[Expose]`, `[Children]`, and `[Action]`. `[Summary]` supplies an optional summary.
 
 ## Minimal TUI Host
 
@@ -39,13 +46,12 @@ using UIEngine.Core;
 using UIEngine.Frontend.Tui;
 
 using var host = new UIEngineHost();
-host.SetRoot("model", model);
-
-await TuiFrontend.RunAsync(host);
+await TuiFrontend.RunAsync();
 ```
 
-The caller owns the host. Closing the TUI disposes frontend resources without stopping the domain
-runtime or a method invocation that has already started.
+The active host is process-wide. Closing the TUI disposes frontend resources without stopping the
+host or a method invocation that has already started; disposing the host disposes its registered
+Core workspaces.
 
 ## Documentation
 

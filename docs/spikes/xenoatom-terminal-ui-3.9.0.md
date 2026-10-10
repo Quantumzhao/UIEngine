@@ -18,7 +18,7 @@ support:
 - composition of a UIEngine-owned visual inside a caller-owned visual tree and `TerminalApp`;
 - keyboard-event injection, focus traversal, and activation through `InMemoryTerminalBackend`;
 - resize-event injection followed by layout at the new width;
-- UI-thread marshalling from a worker through the public dispatcher;
+- direct UI-thread state updates;
 - replacement of a `ListBox<T>` window from two bounded Core reads; and
 - a 10,000-item lazy Core source is not fully enumerated (the reads inspect 4 and then 7 items,
   including the look-ahead used to establish `HasMore`).
@@ -64,11 +64,10 @@ Sources: [UI package metadata](https://www.nuget.org/packages/XenoAtom.Terminal.
 ## Known limits and integration rules
 
 - The accepted packages target .NET 10 and use C# 14 APIs.
-- UI visuals, state, and the dispatcher are single-thread-affine. Domain/background results must
-  be marshalled to the UI dispatcher.
+- UIEngine visuals, state, and domain access share the single UI thread.
 - Routed input handlers are synchronous. They may enqueue intent, but must not be `async void`.
-- Only one asynchronous host update callback is in flight. Independent work belongs off the UI
-  thread and publishes results through the dispatcher.
+- Asynchronous domain tasks may overlap, but UIEngine observes and presents their results on its
+  single owning thread.
 - Fullscreen hosting owns the calling thread and alternate screen until exit. Embedders should
   compose the UIEngine visual into their existing tree instead of starting a second loop.
 - Windows Console and Unix terminals on Linux/macOS are supported by the terminal package, but
@@ -96,5 +95,4 @@ toolkit contract.
 6. Only after those checks pass, update the production TUI reference and this qualification record.
 
 An upgrade is rejected or deferred if a mandatory behavior requires internal APIs, weakens
-deterministic input/resize coverage, breaks dispatcher isolation, or makes bounded collection
-presentation impossible.
+deterministic input/resize coverage, or makes bounded collection presentation impossible.

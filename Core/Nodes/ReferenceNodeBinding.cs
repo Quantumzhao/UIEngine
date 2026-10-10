@@ -4,23 +4,20 @@ using static LanguageExt.Prelude;
 namespace UIEngine.Core;
 
 internal sealed class ReferenceNodeBinding(
-    UIEngineHost host,
     Guid owner,
     string name,
     Type referenceType,
     Func<object, object?> read)
 {
-    public UIEngineHost Host { get; } = host;
-
     public string Name { get; } = name;
 
     public Type ReferenceType { get; } = referenceType;
 
-    public Either<InteractionError, Option<Guid>> Read() => Host.Execute<Option<Guid>>(
+    public Either<InteractionError, Option<Guid>> Read() => UIEngineHost.Instance.Execute<Option<Guid>>(
         $"read reference {Name}",
         () =>
         {
-            var target = Host.ResolveTarget(owner);
+            var target = UIEngineHost.Instance.ResolveTarget(owner);
             if (!target.IsRight)
             {
                 return Left((InteractionError)target);
@@ -40,6 +37,6 @@ internal sealed class ReferenceNodeBinding(
                     $"Reference '{Name}' returned a value type."));
             }
 
-            return Right(Some(Host.GetOrCreateHandle(value)));
+            return Right(Some(UIEngineHost.Instance.GetOrCreateHandle(value)));
         });
 }

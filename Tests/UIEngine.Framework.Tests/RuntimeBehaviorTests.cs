@@ -15,9 +15,9 @@ public sealed class RuntimeBehaviorTests
     {
         var model = new _EditingModel();
         using var host = new UIEngineHost();
-        host.SetRoot("model", model);
+        TestRoots.Set("model", model);
 
-        var resolved = host.ResolveRootNode("model");
+        var resolved = host.ResolveRootNode(TestRoots.Id("model"));
 
         Assert.True(resolved.IsRight);
         var members = ((IObjectNode)resolved.RightValue().Node).Members;
@@ -57,9 +57,9 @@ public sealed class RuntimeBehaviorTests
         {
             Exposures = CyclicWorldFactory.CreateExposures(),
         });
-        host.SetRoot("economy", profile);
+        TestRoots.Set("economy", profile);
 
-        var resolved = host.ResolveRootNode("economy");
+        var resolved = host.ResolveRootNode(TestRoots.Id("economy"));
         var objectNode = (IObjectNode)resolved.RightValue().Node;
         var valueNode = Assert.Single(objectNode.Members);
         Assert.True(valueNode is IWritableValueNode);
@@ -97,8 +97,8 @@ public sealed class RuntimeBehaviorTests
     {
         var model = new _CollectionModel();
         using var host = new UIEngineHost(new UIEngineHostOptions { MaxCollectionItems = 3 });
-        host.SetRoot("model", model);
-        var resolved = host.ResolveRootNode("model");
+        TestRoots.Set("model", model);
+        var resolved = host.ResolveRootNode(TestRoots.Id("model"));
         var members = ((IObjectNode)resolved.RightValue().Node).Members
             .Where(static member => member is ICollectionNode)
             .ToDictionary(static member => member.Name, static member => (ICollectionNode)member);
@@ -121,15 +121,15 @@ public sealed class RuntimeBehaviorTests
     public void PathsPreserveCyclesSharedReferencesAndReplacementObjects()
     {
         using var host = _CreateWorldHost();
-        var nation = PathResolution.Resolve(host, _Path(
+        var nation = PathResolution.Resolve(_Path(
             _Member("world"), _Member("Nations"), _Index(0)));
-        var cycled = PathResolution.Resolve(host, _Path(
+        var cycled = PathResolution.Resolve(_Path(
             _Member("world"),
             _Member("Nations"),
             _Index(0),
             _Member("Capital"),
             _Member("OwnerNation")));
-        var legacyAlias = PathResolution.Resolve(host, _Path(
+        var legacyAlias = PathResolution.Resolve(_Path(
             _Member("world"), _Member("Nations"), _Member("0")));
 
         Assert.True(nation.IsRight);
@@ -140,13 +140,13 @@ public sealed class RuntimeBehaviorTests
         Assert.NotSame(nation.RightValue().Node, cycled.RightValue().Node);
         Assert.Equal(
             "/world/Nations[index=0]/Capital/OwnerNation",
-            cycled.RightValue().CanonicalPath.ToString());
+            cycled.RightValue().CanonicalPath.ToDisplayString().RightValue());
         Assert.False(legacyAlias.IsRight);
 
-        var original = PathResolution.Resolve(host, _Path(
+        var original = PathResolution.Resolve(_Path(
             _Member("world"), _Member("Nations"), _Index(0)));
-        host.SetRoot("world", CyclicWorldFactory.Create());
-        var replacement = PathResolution.Resolve(host, _Path(
+        TestRoots.Set("world", CyclicWorldFactory.Create());
+        var replacement = PathResolution.Resolve(_Path(
             _Member("world"), _Member("Nations"), _Index(0)));
 
         Assert.True(original.IsRight);
@@ -163,17 +163,17 @@ public sealed class RuntimeBehaviorTests
         var second = new _DomainObject("second");
         var model = new _SelectorModel(first, second);
         using var host = new UIEngineHost();
-        host.SetRoot("model", model);
+        TestRoots.Set("model", model);
 
-        var initialByKey = PathResolution.Resolve(host, _Path(
+        var initialByKey = PathResolution.Resolve(_Path(
             _Member("model"), _Member("ByKey"), _Key("a")));
-        var initialByIndex = PathResolution.Resolve(host, _Path(
+        var initialByIndex = PathResolution.Resolve(_Path(
             _Member("model"), _Member("Items"), _Index(0)));
         model.ByKey["a"] = second;
         model.Items.Reverse();
-        var remappedByKey = PathResolution.Resolve(host, _Path(
+        var remappedByKey = PathResolution.Resolve(_Path(
             _Member("model"), _Member("ByKey"), _Key("a")));
-        var reorderedByIndex = PathResolution.Resolve(host, _Path(
+        var reorderedByIndex = PathResolution.Resolve(_Path(
             _Member("model"), _Member("Items"), _Index(0)));
 
         Assert.True(initialByKey.IsRight);
@@ -196,10 +196,10 @@ public sealed class RuntimeBehaviorTests
     {
         using var host = _CreateWorldHost();
 
-        var firstName = PathResolution.Resolve(host, _Path(_Member("world"), _Member("Name")));
-        var secondName = PathResolution.Resolve(host, _Path(_Member("world"), _Member("Name")));
-        var nations = PathResolution.Resolve(host, _Path(_Member("world"), _Member("Nations")));
-        var advance = PathResolution.Resolve(host, _Path(
+        var firstName = PathResolution.Resolve(_Path(_Member("world"), _Member("Name")));
+        var secondName = PathResolution.Resolve(_Path(_Member("world"), _Member("Name")));
+        var nations = PathResolution.Resolve(_Path(_Member("world"), _Member("Nations")));
+        var advance = PathResolution.Resolve(_Path(
             _Member("world"),
             _Member("Nations"),
             _Index(0),
@@ -220,14 +220,14 @@ public sealed class RuntimeBehaviorTests
     {
         using var host = _CreateWorldHost();
 
-        var root = PathResolution.Resolve(host, _Path(_Member("world")));
-        var scalar = PathResolution.Resolve(host, _Path(_Member("world"), _Member("Name")));
-        var collection = PathResolution.Resolve(host, _Path(_Member("world"), _Member("Nations")));
-        var selected = PathResolution.Resolve(host, _Path(
+        var root = PathResolution.Resolve(_Path(_Member("world")));
+        var scalar = PathResolution.Resolve(_Path(_Member("world"), _Member("Name")));
+        var collection = PathResolution.Resolve(_Path(_Member("world"), _Member("Nations")));
+        var selected = PathResolution.Resolve(_Path(
             _Member("world"), _Member("Nations"), _Index(0)));
-        var reference = PathResolution.Resolve(host, _Path(
+        var reference = PathResolution.Resolve(_Path(
             _Member("world"), _Member("Nations"), _Index(0), _Member("Capital")));
-        var method = PathResolution.Resolve(host, _Path(
+        var method = PathResolution.Resolve(_Path(
             _Member("world"),
             _Member("Nations"),
             _Index(0),
@@ -257,8 +257,8 @@ public sealed class RuntimeBehaviorTests
             _Index(0),
             _Member("Capital"),
             _Member("Name"));
-        var first = PathResolution.Resolve(host, path);
-        var second = PathResolution.Resolve(host, path);
+        var first = PathResolution.Resolve(path);
+        var second = PathResolution.Resolve(path);
 
         Assert.True(first.IsRight);
         Assert.True(second.IsRight);
@@ -270,7 +270,8 @@ public sealed class RuntimeBehaviorTests
                 "/world/Nations[index=0]/Capital",
                 "/world/Nations[index=0]/Capital/Name",
             ],
-            first.RightValue().ResolutionChain.Select(static node => node.CanonicalPath.ToString()));
+            first.RightValue().ResolutionChain.Select(static node =>
+                node.CanonicalPath.ToDisplayString().RightValue()));
         Assert.Same(first.RightValue().Node, first.RightValue().ResolutionChain[^1].Node);
         Assert.All(
             first.RightValue().ResolutionChain.Zip(second.RightValue().ResolutionChain),
@@ -296,18 +297,18 @@ public sealed class RuntimeBehaviorTests
                 ]),
             ],
         });
-        host.SetRoot("root/name", model);
+        TestRoots.Set("model", model);
 
-        var resolved = PathResolution.Resolve(host, _Path(
-            _Member("root/name"), _Member("value/name")));
-        var wrongRootCase = PathResolution.Resolve(host, _Path(
-            _Member("Root/name"), _Member("value/name")));
-        var wrongMemberCase = PathResolution.Resolve(host, _Path(
-            _Member("root/name"), _Member("Value/name")));
+        var resolved = PathResolution.Resolve(_Path(
+            _Member("model"), _Member("value/name")));
+        var wrongRootCase = PathResolution.Resolve(_Path(
+            new RootLogicalPathSegment(Guid.NewGuid()), _Member("value/name")));
+        var wrongMemberCase = PathResolution.Resolve(_Path(
+            _Member("model"), _Member("Value/name")));
 
         Assert.True(resolved.IsRight);
-        Assert.Equal("root/name", ((MemberLogicalPathSegment)
-            resolved.RightValue().CanonicalPath.Parent!.Segment!).Name);
+        Assert.Equal(TestRoots.Id("model"), ((RootLogicalPathSegment)
+            resolved.RightValue().CanonicalPath.Parent!.Segment!).RootId);
         Assert.Equal("value/name", ((MemberLogicalPathSegment)
             resolved.RightValue().CanonicalPath.Segment!).Name);
         Assert.Equal(InteractionErrorCode.NOT_FOUND, wrongRootCase.LeftValue().Code);
@@ -319,25 +320,25 @@ public sealed class RuntimeBehaviorTests
     {
         var model = new _PathFailureModel();
         using var host = new UIEngineHost();
-        host.SetRoot("model", model);
+        TestRoots.Set("model", model);
 
-        var nullReference = PathResolution.Resolve(host, _Path(_Member("model"), _Member("Child")));
-        var missingMember = PathResolution.Resolve(host, _Path(_Member("model"), _Member("Missing")));
-        var missingElement = PathResolution.Resolve(host, _Path(
+        var nullReference = PathResolution.Resolve(_Path(_Member("model"), _Member("Child")));
+        var missingMember = PathResolution.Resolve(_Path(_Member("model"), _Member("Missing")));
+        var missingElement = PathResolution.Resolve(_Path(
             _Member("model"), _Member("Items"), _Index(2)));
-        var scalarElement = PathResolution.Resolve(host, _Path(
+        var scalarElement = PathResolution.Resolve(_Path(
             _Member("model"), _Member("Items"), _Index(0)));
-        var ambiguousElement = PathResolution.Resolve(host, _Path(
+        var ambiguousElement = PathResolution.Resolve(_Path(
             _Member("model"), _Member("Duplicates"), _Key("duplicate")));
-        var fieldReference = PathResolution.Resolve(host, _Path(
+        var fieldReference = PathResolution.Resolve(_Path(
             _Member("model"), _Member("FieldChild")));
-        var keyedList = PathResolution.Resolve(host, _Path(
+        var keyedList = PathResolution.Resolve(_Path(
             _Member("model"), _Member("Items"), _Key("0")));
-        var indexedDictionary = PathResolution.Resolve(host, _Path(
+        var indexedDictionary = PathResolution.Resolve(_Path(
             _Member("model"), _Member("Duplicates"), _Index(0)));
-        var runtimeList = PathResolution.Resolve(host, _Path(
+        var runtimeList = PathResolution.Resolve(_Path(
             _Member("model"), _Member("ListView"), _Index(0)));
-        var runtimeDictionary = PathResolution.Resolve(host, _Path(
+        var runtimeDictionary = PathResolution.Resolve(_Path(
             _Member("model"), _Member("DictView"), _Key("item")));
 
         Assert.Equal(InteractionErrorCode.UNAVAILABLE, nullReference.LeftValue().Code);
@@ -357,7 +358,7 @@ public sealed class RuntimeBehaviorTests
     {
         var model = new _PathFailureModel();
         using var host = new UIEngineHost();
-        host.SetRoot("model", model);
+        TestRoots.Set("model", model);
         var (childMember, target) = _ResolveTemporaryChild(host, model);
 
         for (var attempt = 0; attempt < 3 && target.IsAlive; attempt++)
@@ -377,8 +378,8 @@ public sealed class RuntimeBehaviorTests
     {
         var model = new _ActionModel();
         using var host = new UIEngineHost();
-        host.SetRoot("model", model);
-        var resolved = host.ResolveRootNode("model");
+        TestRoots.Set("model", model);
+        var resolved = host.ResolveRootNode(TestRoots.Id("model"));
         var actions = ((IObjectNode)resolved.RightValue().Node).Members
             .Where(static member => member is IMethodNode)
             .ToDictionary(static member => member.Name, static member => (IMethodNode)member);
@@ -452,16 +453,16 @@ public sealed class RuntimeBehaviorTests
     }
 
     [Fact]
-    public async Task SeparateMethodNodeOccurrencesCanRunConcurrently()
+    public async Task SeparateMethodNodeOccurrencesCanOverlapAsyncWork()
     {
         var model = new _ActionModel();
         using var host = new UIEngineHost();
-        host.SetRoot("model", model);
+        TestRoots.Set("model", model);
         var first = (IMethodNode)Assert.Single(
-            ((IObjectNode)host.ResolveRootNode("model").RightValue().Node).Members,
+            ((IObjectNode)host.ResolveRootNode(TestRoots.Id("model")).RightValue().Node).Members,
             static member => member.Name == "WorkAsync");
         var second = (IMethodNode)Assert.Single(
-            ((IObjectNode)host.ResolveRootNode("model").RightValue().Node).Members,
+            ((IObjectNode)host.ResolveRootNode(TestRoots.Id("model")).RightValue().Node).Members,
             static member => member.Name == "WorkAsync");
 
         var firstStarted = first.Invoke(new Dictionary<string, object?> { ["steps"] = 1 });
@@ -483,8 +484,8 @@ public sealed class RuntimeBehaviorTests
     {
         var model = new _ActionModel();
         var host = new UIEngineHost();
-        host.SetRoot("model", model);
-        var resolved = host.ResolveRootNode("model");
+        TestRoots.Set("model", model);
+        var resolved = host.ResolveRootNode(TestRoots.Id("model"));
         var work = Assert.Single(
             ((IObjectNode)resolved.RightValue().Node).Members,
             action => action.Name == "WorkAsync");
@@ -509,7 +510,7 @@ public sealed class RuntimeBehaviorTests
     {
         var model = new _ActionModel();
         using var host = new UIEngineHost();
-        host.SetRoot("model", model);
+        TestRoots.Set("model", model);
 
         _StartWorkWithoutRetainingNode(host);
         model.CompleteWork();
@@ -640,15 +641,18 @@ public sealed class RuntimeBehaviorTests
         {
             Exposures = CyclicWorldFactory.CreateExposures(),
         });
-        host.SetRoot("world", CyclicWorldFactory.Create());
+        TestRoots.Set("world", CyclicWorldFactory.Create());
         return host;
     }
 
     private static LogicalPath _Path(params ILogicalPathSegment[] segments)
     {
-        var path = LogicalPath.Root;
-        foreach (var segment in segments)
+        var path = LogicalPath.Empty;
+        for (var index = 0; index < segments.Length; index++)
         {
+            var segment = index == 0 && segments[index] is MemberLogicalPathSegment root
+                ? TestRoots.Segment(root.Name)
+                : segments[index];
             path = path.Append(segment);
         }
 
@@ -664,7 +668,7 @@ public sealed class RuntimeBehaviorTests
     private static void _StartWorkWithoutRetainingNode(UIEngineHost host)
     {
         var work = (IMethodNode)Assert.Single(
-            ((IObjectNode)host.ResolveRootNode("model").RightValue().Node).Members,
+            ((IObjectNode)host.ResolveRootNode(TestRoots.Id("model")).RightValue().Node).Members,
             static member => member.Name == "WorkAsync");
         var started = work.Invoke(new Dictionary<string, object?> { ["steps"] = 1 });
         Assert.Equal(InvocationStatus.RUNNING, started.RightValue());
@@ -678,7 +682,7 @@ public sealed class RuntimeBehaviorTests
         var child = new _DomainObject("temporary");
         var target = new WeakReference(child);
         model.Child = child;
-        var resolved = PathResolution.Resolve(host, _Path(_Member("model"), _Member("Child")));
+        var resolved = PathResolution.Resolve(_Path(_Member("model"), _Member("Child")));
         var member = Assert.Single(
             ((IObjectNode)resolved.RightValue().Node).Members,
             static candidate => candidate.Name == nameof(_DomainObject.Key));
@@ -822,10 +826,8 @@ public sealed class RuntimeBehaviorTests
     private sealed class _ActionModel
     {
         private int _InvocationCount;
-        private readonly TaskCompletionSource _WorkCompletion = new(
-            TaskCreationOptions.RunContinuationsAsynchronously);
-        private readonly TaskCompletionSource _WorkFinished = new(
-            TaskCreationOptions.RunContinuationsAsynchronously);
+        private readonly TaskCompletionSource _WorkCompletion = new();
+        private readonly TaskCompletionSource _WorkFinished = new();
         private int _CompletedWorkCount;
 
         public Func<InvocationStatus?> ReadInvocationStatus { get; set; } = () => null;
@@ -858,7 +860,7 @@ public sealed class RuntimeBehaviorTests
         {
             _InvocationCount++;
             await _WorkCompletion.Task;
-            Interlocked.Increment(ref _CompletedWorkCount);
+            _CompletedWorkCount++;
             _WorkFinished.TrySetResult();
 
             return steps;

@@ -18,7 +18,6 @@ public sealed class ResolvedNode
 
     public BaseNode Node { get; }
 
-    internal UIEngineHost Host => Node.Host;
 }
 
 /// <summary>

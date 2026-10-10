@@ -8,9 +8,8 @@ namespace UIEngine.Core;
 /// </summary>
 public abstract class BaseNode
 {
-    internal BaseNode(UIEngineHost host, string name, Type valueType)
+    internal BaseNode(string name, Type valueType)
     {
-        Host = host;
         Name = name;
         ValueType = valueType;
     }
@@ -28,8 +27,6 @@ public abstract class BaseNode
     /// Raised when this occurrence should re-read its live state after a domain notification.
     /// </summary>
     public event EventHandler<NodeRefreshRequestedEventArgs>? RefreshRequested;
-
-    internal UIEngineHost Host { get; }
 
     internal void RequestRefresh(NodeRefreshKind kind) =>
         RefreshRequested?.Invoke(this, new NodeRefreshRequestedEventArgs(this, kind));

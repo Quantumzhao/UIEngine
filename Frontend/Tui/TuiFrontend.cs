@@ -10,11 +10,9 @@ public static class TuiFrontend
 {
     /// <summary>Creates a TUI presentation with an internally owned Core workspace.</summary>
     public static TuiWorkspace CreateWorkspace(
-        UIEngineHost host,
         TuiFrontendOptions? options = null)
     {
-        ArgumentNullException.ThrowIfNull(host);
-        var workspace = new UIEngineWorkspace(host);
+        var workspace = new UIEngineWorkspace();
         try
         {
             var copiedOptions = (options ?? new TuiFrontendOptions()).ValidateAndCopy();
@@ -29,9 +27,8 @@ public static class TuiFrontend
 
     /// <summary>Runs an internally owned workspace in a fullscreen terminal application.</summary>
     public static Task RunAsync(
-        UIEngineHost host,
         TuiFrontendOptions? options = null) =>
-        _RunAsync(CreateWorkspace(host, options));
+        _RunAsync(CreateWorkspace(options));
 
     private static async Task _RunAsync(TuiWorkspace workspace)
     {

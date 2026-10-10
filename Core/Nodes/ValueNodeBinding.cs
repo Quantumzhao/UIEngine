@@ -9,7 +9,6 @@ namespace UIEngine.Core;
 /// Owns the live host-mediated operations for one scalar node occurrence.
 /// </summary>
 internal sealed class ValueNodeBinding(
-    UIEngineHost host,
     Guid owner,
     string name,
     Type valueType,
@@ -22,13 +21,10 @@ internal sealed class ValueNodeBinding(
     Func<object, object?> read,
     Action<object, object?>? write)
 {
-    private readonly UIEngineHost _Host = host;
     private readonly Guid _Owner = owner;
     private readonly Func<object, object?> _Read = read;
     private readonly Action<object, object?>? _Write = write;
     private readonly IReadOnlyList<ValidationAttribute> _ValidationAttributes = validationAttributes;
-
-    internal UIEngineHost Host { get; } = host;
 
     public string Name { get; } = name;
 
@@ -44,7 +40,7 @@ internal sealed class ValueNodeBinding(
 
     public IValueRange? Range { get; } = range;
 
-    public Either<InteractionError, Option<object>> Read() => _Host.Execute<Option<object>>(
+    public Either<InteractionError, Option<object>> Read() => UIEngineHost.Instance.Execute<Option<object>>(
         $"read value {Name}",
         () =>
         {
@@ -55,7 +51,7 @@ internal sealed class ValueNodeBinding(
                     $"Value '{Name}' is not readable."));
             }
 
-            var target = _Host.ResolveTarget(_Owner);
+            var target = UIEngineHost.Instance.ResolveTarget(_Owner);
             if (!target.IsRight)
             {
                 return Left((InteractionError)target);
@@ -66,7 +62,7 @@ internal sealed class ValueNodeBinding(
         });
 
     public Either<InteractionError, Option<object>> Write(object? value) =>
-        _Host.Execute<Option<object>>(
+        UIEngineHost.Instance.Execute<Option<object>>(
         $"write value {Name}",
         () =>
         {
@@ -79,7 +75,7 @@ internal sealed class ValueNodeBinding(
                     [new ValidationIssue(ValidationIssueCode.READ_ONLY, Name, message)]));
             }
 
-            var target = _Host.ResolveTarget(_Owner);
+            var target = UIEngineHost.Instance.ResolveTarget(_Owner);
             if (!target.IsRight)
             {
                 return Left((InteractionError)target);

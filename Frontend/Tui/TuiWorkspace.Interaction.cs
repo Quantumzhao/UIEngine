@@ -16,8 +16,19 @@ public sealed partial class TuiWorkspace
             return;
         }
 
-        var roots = Workspace.Host.Roots.Select(static root => root.Name).ToArray();
-        var selection = new Select<string>(roots, roots.Length > 0 ? 0 : -1);
+        var roots = UIEngineHost.Instance.RootIds
+            .Select(static id =>
+            {
+                var path = LogicalPath.Empty.Append(new RootLogicalPathSegment(id));
+                var names = path.ResolveNames();
+                return names.IsRight
+                    ? (Id: id, Name: names.IfLeft(
+                        static error => throw new InvalidOperationException(error.Message))[0])
+                    : (Id: id, Name: id.ToString("D"));
+            })
+            .ToArray();
+        var rootNames = roots.Select(static root => root.Name).ToArray();
+        var selection = new Select<string>(rootNames, roots.Length > 0 ? 0 : -1);
         var create = new Button("Create") { IsEnabled = roots.Length > 0 };
         var cancel = new Button("Cancel");
         var content = new VStack(
@@ -46,7 +57,7 @@ public sealed partial class TuiWorkspace
                 return;
             }
 
-            var added = Workspace.AddNavigator(roots[selection.SelectedIndex]);
+            var added = Workspace.AddNavigator(roots[selection.SelectedIndex].Id);
             if (added.IsRight)
             {
                 dialog.Close();

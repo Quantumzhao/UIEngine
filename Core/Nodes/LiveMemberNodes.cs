@@ -11,11 +11,10 @@ internal abstract class LiveReflectedMemberNode : BaseNode, IDynamicInterfaceCas
     private readonly MemberNodeSource _Source;
 
     private protected LiveReflectedMemberNode(
-        UIEngineHost host,
         string name,
         ReflectedMember member,
         Type valueType)
-        : base(host, name, valueType)
+        : base(name, valueType)
     {
         DeclaringType = member.Member.DeclaringType!;
         _Source = member.Member switch
@@ -81,7 +80,7 @@ internal sealed class LiveReferenceNode : LiveReflectedMemberNode, IReferenceNod
     private readonly ReflectedMember _Member;
 
     public LiveReferenceNode(ReferenceNodeBinding binding, ReflectedMember member)
-        : base(binding.Host, binding.Name, member, binding.ReferenceType)
+        : base(binding.Name, member, binding.ReferenceType)
     {
         _Binding = binding;
         _Member = member;
@@ -107,7 +106,7 @@ internal sealed class LiveReferenceNode : LiveReflectedMemberNode, IReferenceNod
                 $"Reference '{Name}' is empty."));
         }
 
-        var target = Host.CreateObjectNode(handle.IfNone(Guid.Empty), Name);
+        var target = UIEngineHost.Instance.CreateObjectNode(handle.IfNone(Guid.Empty), Name);
         return target.IsRight
             ? Right(new LiveResolvedReferenceNode(
                 _Binding,
@@ -121,7 +120,7 @@ internal sealed class LiveResolvedReferenceNode(
     ReferenceNodeBinding binding,
     ReflectedMember member,
     LiveObjectNode target)
-    : LiveReflectedMemberNode(binding.Host, binding.Name, member, target.ValueType),
+    : LiveReflectedMemberNode(binding.Name, member, target.ValueType),
         IReferenceNode,
         IObjectNode
 {
@@ -139,7 +138,7 @@ internal sealed class LiveResolvedReferenceNode(
 internal sealed class LiveCollectionNode(
     CollectionNodeBinding binding,
     ReflectedMember member)
-    : LiveReflectedMemberNode(binding.Host, binding.Name, member, binding.CollectionType), ICollectionNode
+    : LiveReflectedMemberNode(binding.Name, member, binding.CollectionType), ICollectionNode
 {
     public Type ElementType => binding.ElementType;
 

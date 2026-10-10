@@ -6,7 +6,6 @@ namespace UIEngine.Core;
 internal static class PathResolution
 {
     public static Either<InteractionError, ResolvedPath> Resolve(
-        UIEngineHost host,
         LogicalPath path)
     {
         var segments = path.Segments;
@@ -17,30 +16,22 @@ internal static class PathResolution
                 "The root list is not a navigable object."));
         }
 
-        if (segments[0] is not MemberLogicalPathSegment rootSegment)
+        if (segments[0] is not RootLogicalPathSegment rootSegment)
         {
             return Left(new InteractionError(
                 InteractionErrorCode.INVALID_INPUT,
-                "The first path segment must identify a registered root."));
+                "The first path segment must identify a root by GUID."));
         }
 
-        var root = host.Roots.FirstOrDefault(candidate =>
-            StringComparer.Ordinal.Equals(candidate.Name, rootSegment.Name));
-        if (root is null)
+        var root = UIEngineHost.Instance.ResolveRootNode(rootSegment.RootId);
+        if (!root.IsRight)
         {
-            return Left(new InteractionError(
-                InteractionErrorCode.NOT_FOUND,
-                $"Root '{rootSegment.Name}' was not found."));
+            return Left((InteractionError)root);
         }
 
-        var canonical = LogicalPath.Root.Append(root.Name);
-        var rootNode = host.CreateObjectNode(root.Handle, root.Name);
-        if (!rootNode.IsRight)
-        {
-            return Left((InteractionError)rootNode);
-        }
-
-        BaseNode current = (LiveObjectNode)rootNode;
+        var resolvedRoot = (ResolvedNode)root;
+        var canonical = resolvedRoot.CanonicalPath;
+        BaseNode current = resolvedRoot.Node;
         var resolutionChain = new List<ResolvedNode>
         {
             new(canonical, current),
@@ -52,9 +43,12 @@ internal static class PathResolution
             Either<InteractionError, BaseNode> resolved = segment switch
             {
                 MemberLogicalPathSegment member => _ResolveMember(current, member),
-                ListLogicalPathSegment list => _ResolveListElement(host, current, list),
+                ListLogicalPathSegment list => _ResolveListElement(current, list),
                 DictLogicalPathSegment dictionary =>
-                    _ResolveDictionaryValue(host, current, dictionary),
+                    _ResolveDictionaryValue(current, dictionary),
+                RootLogicalPathSegment => Left(new InteractionError(
+                    InteractionErrorCode.INVALID_INPUT,
+                    "A root path segment can only appear first.")),
                 _ => Left(new InteractionError(
                     InteractionErrorCode.UNSUPPORTED,
                     "The logical path contains an unsupported segment.")),
@@ -110,7 +104,6 @@ internal static class PathResolution
     }
 
     private static Either<InteractionError, BaseNode> _ResolveListElement(
-        UIEngineHost host,
         BaseNode current,
         ListLogicalPathSegment segment)
     {
@@ -119,11 +112,10 @@ internal static class PathResolution
             return _InvalidTraversal($"index {segment.Index}");
         }
 
-        return _ResolveSelectedObject(host, collection, collection.Select(segment));
+        return _ResolveSelectedObject(collection, collection.Select(segment));
     }
 
     private static Either<InteractionError, BaseNode> _ResolveDictionaryValue(
-        UIEngineHost host,
         BaseNode current,
         DictLogicalPathSegment segment)
     {
@@ -132,11 +124,10 @@ internal static class PathResolution
             return _InvalidTraversal($"key '{segment.Key}'");
         }
 
-        return _ResolveSelectedObject(host, collection, collection.Select(segment));
+        return _ResolveSelectedObject(collection, collection.Select(segment));
     }
 
     private static Either<InteractionError, BaseNode> _ResolveSelectedObject(
-        UIEngineHost host,
         LiveCollectionNode collection,
         Either<InteractionError, IReadOnlyList<Guid>> selected)
     {
@@ -160,7 +151,7 @@ internal static class PathResolution
                 $"Selection on collection '{collection.Name}' matched multiple objects."));
         }
 
-        var resolved = host.CreateObjectNode(handles[0], collection.Name);
+        var resolved = UIEngineHost.Instance.CreateObjectNode(handles[0], collection.Name);
         return resolved.IsRight
             ? Right((BaseNode)(LiveObjectNode)resolved)
             : Left((InteractionError)resolved);

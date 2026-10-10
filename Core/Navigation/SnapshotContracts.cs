@@ -14,12 +14,16 @@ public sealed record NavigatorSnapshot(
 
 /// <summary>One serializable semantic step in a logical path.</summary>
 [JsonPolymorphic(TypeDiscriminatorPropertyName = "segment")]
+[JsonDerivedType(typeof(RootPathSegmentSnapshot), "root")]
 [JsonDerivedType(typeof(MemberPathSegmentSnapshot), "member")]
 [JsonDerivedType(typeof(ListPathSegmentSnapshot), "list")]
 [JsonDerivedType(typeof(DictionaryPathSegmentSnapshot), "dictionary")]
 public interface IPathSegmentSnapshot;
 
-/// <summary>Selects a named root or exposed member.</summary>
+/// <summary>Selects one root by its host-lifetime identity.</summary>
+public sealed record RootPathSegmentSnapshot(Guid RootId) : IPathSegmentSnapshot;
+
+/// <summary>Selects a named exposed member.</summary>
 public sealed record MemberPathSegmentSnapshot(string Name) : IPathSegmentSnapshot;
 
 /// <summary>Selects one element from the list at the parent path.</summary>

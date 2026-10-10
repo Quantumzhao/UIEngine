@@ -12,7 +12,7 @@ public sealed class LiveValueNodeTests
     {
         var model = new _ReflectedModel();
         using var host = new UIEngineHost();
-        host.SetRoot("model", model);
+        TestRoots.Set("model", model);
 
         var first = _ResolveMembers(host, "model");
         var second = _ResolveMembers(host, "model");
@@ -83,7 +83,7 @@ public sealed class LiveValueNodeTests
         {
             Exposures = [new TypeExposure<_ProgrammaticModel>([exposure])],
         });
-        host.SetRoot("model", model);
+        TestRoots.Set("model", model);
 
         var first = Assert.Single(_ResolveMembers(host, "model").Values);
         var second = Assert.Single(_ResolveMembers(host, "model").Values);
@@ -109,7 +109,7 @@ public sealed class LiveValueNodeTests
         UIEngineHost host,
         string rootName)
     {
-        var resolved = host.ResolveRootNode(rootName);
+        var resolved = host.ResolveRootNode(TestRoots.Id(rootName));
         Assert.True(resolved.IsRight);
         return ((IObjectNode)resolved.RightValue().Node).Members.ToDictionary(
             static node => node.Name,

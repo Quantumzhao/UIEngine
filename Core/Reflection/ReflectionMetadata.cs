@@ -1,5 +1,4 @@
 using System.Collections;
-using System.Collections.Concurrent;
 using System.ComponentModel.DataAnnotations;
 using System.Reflection;
 using System.Runtime.CompilerServices;
@@ -31,10 +30,20 @@ internal sealed record ReflectedType(
 
 internal static class ReflectionMetadata
 {
-    private static readonly ConcurrentDictionary<Type, ReflectedType> _CACHE = new();
+    private static readonly Dictionary<Type, ReflectedType> _CACHE = [];
     private static readonly NullabilityInfoContext _NULLABILITY = new();
 
-    public static ReflectedType Get(Type type) => _CACHE.GetOrAdd(type, _Build);
+    public static ReflectedType Get(Type type)
+    {
+        if (_CACHE.TryGetValue(type, out var reflected))
+        {
+            return reflected;
+        }
+
+        reflected = _Build(type);
+        _CACHE.Add(type, reflected);
+        return reflected;
+    }
 
     public static bool CanRead(MemberInfo member) => member switch
     {
@@ -96,6 +105,49 @@ internal static class ReflectionMetadata
             .Cast<ValidationAttribute>()
             .ToArray();
 
+    public static ReflectedMember? CreateMember(MemberInfo member, string name)
+    {
+        var memberType = member switch
+        {
+            PropertyInfo property => property.PropertyType,
+            FieldInfo field => field.FieldType,
+            MethodInfo method when method.IsDefined(typeof(ActionAttribute), inherit: true) =>
+                method.ReturnType,
+            _ => null,
+        };
+        if (memberType is null)
+        {
+            return null;
+        }
+
+        ReflectedMemberKind kind;
+        if (member is MethodInfo)
+            kind = ReflectedMemberKind.ACTION;
+        else if (_IsCollection(memberType))
+            kind = ReflectedMemberKind.COLLECTION;
+        else if (_IsScalar(memberType))
+            kind = ReflectedMemberKind.VALUE;
+        else
+            kind = ReflectedMemberKind.REFERENCE;
+
+        var validation = GetValidationAttributes(member);
+        var options = ValueConversion.GetEnumOptions(memberType);
+        var range = validation.OfType<RangeAttribute>()
+            .Select(static attribute =>
+                new ValueRange<object>(attribute.Minimum, attribute.Maximum))
+            .FirstOrDefault();
+        return new ReflectedMember(
+            name,
+            kind,
+            member,
+            memberType,
+            _IsNullable(member, memberType) &&
+                validation.All(static attribute => attribute is not RequiredAttribute),
+            options,
+            range,
+            validation);
+    }
+
     private static ReflectedType _Build(Type type)
     {
         const BindingFlags FLAGS = BindingFlags.Instance | BindingFlags.Public;
@@ -111,48 +163,17 @@ internal static class ReflectionMetadata
         var members = new List<ReflectedMember>();
         foreach (var member in candidates)
         {
-            var memberType = member switch
-            {
-                PropertyInfo property => property.PropertyType,
-                FieldInfo field => field.FieldType,
-                MethodInfo method when method.IsDefined(typeof(ActionAttribute), inherit: true) =>
-                    method.ReturnType,
-                _ => null,
-            };
-            if (memberType is null)
-            {
-                continue;
-            }
-
             var name = member.Name;
             for (var suffix = 2; !usedNames.Add(name); suffix++)
             {
                 name = $"{member.Name}#{suffix}";
             }
 
-            var kind = member is MethodInfo
-                ? ReflectedMemberKind.ACTION
-                : _IsCollection(memberType)
-                    ? ReflectedMemberKind.COLLECTION
-                    : _IsScalar(memberType)
-                        ? ReflectedMemberKind.VALUE
-                        : ReflectedMemberKind.REFERENCE;
-            var validation = GetValidationAttributes(member);
-            var options = ValueConversion.GetEnumOptions(memberType);
-            var range = validation.OfType<RangeAttribute>()
-                .Select(static attribute =>
-                    new ValueRange<object>(attribute.Minimum, attribute.Maximum))
-                .FirstOrDefault();
-            members.Add(new ReflectedMember(
-                name,
-                kind,
-                member,
-                memberType,
-                _IsNullable(member, memberType) &&
-                    validation.All(static attribute => attribute is not RequiredAttribute),
-                options,
-                range,
-                validation));
+            var created = CreateMember(member, name);
+            if (created is not null)
+            {
+                members.Add(created);
+            }
         }
 
         var allMembers = type.GetMembers(FLAGS);

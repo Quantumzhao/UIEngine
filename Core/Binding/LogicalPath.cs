@@ -1,12 +1,30 @@
 using System.Globalization;
 using System.Text;
+using LanguageExt;
+using static LanguageExt.Prelude;
 
 namespace UIEngine.Core;
 
 /// <summary>One semantic step in a logical path.</summary>
 public interface ILogicalPathSegment;
 
-/// <summary>Selects a named root or exposed member.</summary>
+/// <summary>Selects one root by its host-lifetime identity.</summary>
+public sealed record RootLogicalPathSegment : ILogicalPathSegment
+{
+    public RootLogicalPathSegment(Guid rootId)
+    {
+        if (rootId == Guid.Empty)
+        {
+            throw new ArgumentException("A root ID cannot be empty.", nameof(rootId));
+        }
+
+        RootId = rootId;
+    }
+
+    public Guid RootId { get; }
+}
+
+/// <summary>Selects a named exposed member.</summary>
 public sealed record MemberLogicalPathSegment : ILogicalPathSegment
 {
     public MemberLogicalPathSegment(string name)
@@ -65,7 +83,7 @@ public sealed class LogicalPath : IEquatable<LogicalPath>
         Count = count;
     }
 
-    public static LogicalPath Root { get; } = new(null, null, 0);
+    public static LogicalPath Empty { get; } = new(null, null, 0);
 
     /// <summary>The semantic parent location, or null for a root node or the empty path.</summary>
     public LogicalPath? Parent { get; }
@@ -75,7 +93,7 @@ public sealed class LogicalPath : IEquatable<LogicalPath>
 
     public int Count { get; }
 
-    public bool IsRoot => Segment is null;
+    public bool IsEmpty => Segment is null;
 
     public IReadOnlyList<ILogicalPathSegment> Segments
     {
@@ -97,20 +115,79 @@ public sealed class LogicalPath : IEquatable<LogicalPath>
 
     public LogicalPath Append(ILogicalPathSegment segment)
     {
-        if (IsRoot && segment is not MemberLogicalPathSegment)
+        if (IsEmpty && segment is not RootLogicalPathSegment)
         {
             throw new ArgumentException(
-                "The first path segment must identify a registered root.",
+                "The first path segment must identify a root by GUID.",
                 nameof(segment));
         }
 
-        return new LogicalPath(IsRoot ? null : this, segment, Count + 1);
+        if (!IsEmpty && segment is RootLogicalPathSegment)
+        {
+            throw new ArgumentException(
+                "A root path segment can only appear first.",
+                nameof(segment));
+        }
+
+        return new LogicalPath(IsEmpty ? null : this, segment, Count + 1);
+    }
+
+    public Either<InteractionError, IReadOnlyList<string>> ResolveNames()
+    {
+        if (IsEmpty)
+        {
+            return Right((IReadOnlyList<string>)[]);
+        }
+
+        var names = new List<string>(Count);
+        foreach (var segment in Segments)
+        {
+            switch (segment)
+            {
+                case RootLogicalPathSegment root:
+                    var resolved = UIEngineHost.Instance.ResolveRootName(root.RootId);
+                    if (!resolved.IsRight)
+                    {
+                        return Left((InteractionError)resolved);
+                    }
+
+                    names.Add((string)resolved);
+                    break;
+                case MemberLogicalPathSegment member:
+                    names.Add(member.Name);
+                    break;
+                case ListLogicalPathSegment list:
+                    names.Add($"[index={list.Index.ToString(CultureInfo.InvariantCulture)}]");
+                    break;
+                case DictLogicalPathSegment dictionary:
+                    names.Add($"[key={dictionary.Key}]");
+                    break;
+                default:
+                    return Left(new InteractionError(
+                        InteractionErrorCode.UNSUPPORTED,
+                        "The logical path contains an unsupported segment."));
+            }
+        }
+
+        return Right((IReadOnlyList<string>)names);
+    }
+
+    public Either<InteractionError, string> ToDisplayString()
+    {
+        var names = ResolveNames();
+        if (!names.IsRight)
+        {
+            return Left((InteractionError)names);
+        }
+
+        return Right(_Format(names.IfLeft(
+            static error => throw new InvalidOperationException(error.Message))));
     }
 
     /// <summary>Returns a human-readable diagnostic representation; it is not a serialization format.</summary>
     public override string ToString()
     {
-        if (IsRoot)
+        if (IsEmpty)
         {
             return "/";
         }
@@ -120,6 +197,9 @@ public sealed class LogicalPath : IEquatable<LogicalPath>
         {
             switch (segment)
             {
+                case RootLogicalPathSegment root:
+                    builder.Append('/').Append(root.RootId.ToString("D"));
+                    break;
                 case MemberLogicalPathSegment member:
                     builder.Append('/').Append(member.Name);
                     break;
@@ -133,6 +213,29 @@ public sealed class LogicalPath : IEquatable<LogicalPath>
                     break;
                 default:
                     throw new InvalidOperationException("Unknown logical path segment type.");
+            }
+        }
+
+        return builder.ToString();
+    }
+
+    private string _Format(IReadOnlyList<string> names)
+    {
+        if (IsEmpty)
+        {
+            return "/";
+        }
+
+        var builder = new StringBuilder();
+        for (var index = 0; index < names.Count; index++)
+        {
+            if (Segments[index] is ListLogicalPathSegment or DictLogicalPathSegment)
+            {
+                builder.Append(names[index]);
+            }
+            else
+            {
+                builder.Append('/').Append(names[index]);
             }
         }
 

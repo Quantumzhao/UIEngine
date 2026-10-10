@@ -15,11 +15,11 @@ public sealed class TuiKeyboardTests
     public async Task NavigatorShortcutsRouteThroughTheTerminalAndPreserveRestoredPresentation()
     {
         using var host = TuiTestModel.CreateHost();
-        using var tui = TuiFrontend.CreateWorkspace(host, new TuiFrontendOptions
+        using var tui = TuiFrontend.CreateWorkspace(new TuiFrontendOptions
         {
             Startup = new AddNavigator(TuiTestModel.Path("model", "Child")),
         });
-        tui.Workspace.AddNavigator("model");
+        tui.Workspace.AddNavigator(TuiTestModel.RootId);
         var firstId = tui.Workspace.Navigators[0].Id;
         var secondId = tui.Workspace.Navigators[1].Id;
         NavigatorPresentation? duplicatedPresentation = null;
@@ -60,7 +60,8 @@ public sealed class TuiKeyboardTests
                         });
                         phase = 3;
                         break;
-                    case 3 when tui.Workspace.Navigators[0].CurrentPath.ToString() == "/model":
+                    case 3 when tui.Workspace.Navigators[0].CurrentPath
+                        .ToDisplayString().IfLeft(static error => error.Message) == "/Model":
                         backend.PushEvent(new TerminalKeyEvent
                         {
                             Key = TerminalKey.Unknown,
@@ -112,14 +113,17 @@ public sealed class TuiKeyboardTests
         Assert.Equal(3, tui.Workspace.Navigators.Count);
         var restoredPresentation = Assert.IsType<NavigatorPresentation>(duplicatedPresentation);
         Assert.Same(restoredPresentation, tui.Presentations.ElementAt(1));
-        Assert.Equal("/model", restoredPresentation.Navigator.CurrentPath.ToString());
+        Assert.Equal(
+            "/Model",
+            restoredPresentation.Navigator.CurrentPath.ToDisplayString()
+                .IfLeft(static error => error.Message));
     }
 
     [Fact]
     public void CompleteCommandMapIsStableAndDeferredCommandsAreUnavailable()
     {
         using var host = TuiTestModel.CreateHost();
-        using var tui = TuiFrontend.CreateWorkspace(host);
+        using var tui = TuiFrontend.CreateWorkspace();
         var commands = tui.Visual.Commands.ToDictionary(static command => command.Id);
 
         Assert.Equal(
@@ -154,7 +158,7 @@ public sealed class TuiKeyboardTests
     public async Task NarrowResizeKeepsEveryNavigatorAndControlAndSelectionScrollsIntoView()
     {
         using var host = TuiTestModel.CreateHost();
-        using var tui = TuiFrontend.CreateWorkspace(host, new TuiFrontendOptions
+        using var tui = TuiFrontend.CreateWorkspace(new TuiFrontendOptions
         {
             Startup = new AddNavigator(TuiTestModel.Path("model")),
         });
@@ -209,7 +213,7 @@ public sealed class TuiKeyboardTests
     public async Task RootAndHelpDialogsTrapAndRestoreFocus()
     {
         using var host = TuiTestModel.CreateHost();
-        using var tui = TuiFrontend.CreateWorkspace(host);
+        using var tui = TuiFrontend.CreateWorkspace();
         var backend = new InMemoryTerminalBackend(new TerminalSize(100, 30));
         using var terminal = Terminal.Open(backend, new TerminalOptions(), force: true);
         Visual? originalFocus = null;
@@ -274,58 +278,6 @@ public sealed class TuiKeyboardTests
 
         Assert.Single(tui.Workspace.Navigators);
         Assert.Single(tui.Presentations);
-    }
-
-    [Fact]
-    public async Task RootDialogShowsAnEmptyStateAndCannotCreateWithoutRegisteredRoots()
-    {
-        using var host = TuiTestModel.CreateHost();
-        host.RemoveRoot("model");
-        using var tui = TuiFrontend.CreateWorkspace(host);
-        var backend = new InMemoryTerminalBackend(new TerminalSize(80, 24));
-        using var terminal = Terminal.Open(backend, new TerminalOptions(), force: true);
-        Visual? originalFocus = null;
-        var phase = 0;
-
-        await terminal.Instance.RunAsync(
-            tui.Visual,
-            async context =>
-            {
-                await Task.CompletedTask;
-                switch (phase)
-                {
-                    case 0:
-                        originalFocus = context.App.FocusedElement;
-                        backend.PushEvent(new TerminalKeyEvent
-                        {
-                            Key = TerminalKey.Unknown,
-                            Char = 'n',
-                            Modifiers = TerminalModifiers.Ctrl,
-                        });
-                        phase = 1;
-                        break;
-                    case 1 when context.App.FocusedElement is Button &&
-                        _IsInDialog(context.App.FocusedElement):
-                        backend.PushEvent(new TerminalKeyEvent { Key = TerminalKey.Enter });
-                        phase = 2;
-                        break;
-                    case 2:
-                        Assert.Empty(tui.Workspace.Navigators);
-                        Assert.True(_IsInDialog(context.App.FocusedElement));
-                        backend.PushEvent(new TerminalKeyEvent { Key = TerminalKey.Escape });
-                        phase = 3;
-                        break;
-                    case 3 when ReferenceEquals(context.App.FocusedElement, originalFocus):
-                        return TerminalLoopResult.Stop;
-                }
-
-                return TerminalLoopResult.Continue;
-            },
-            new TerminalRunOptions(),
-            default).AsTask().WaitAsync(TimeSpan.FromSeconds(5));
-
-        Assert.Empty(tui.Workspace.Navigators);
-        Assert.Empty(tui.Presentations);
     }
 
     private static bool _IsInDialog(Visual? visual)

@@ -3,13 +3,12 @@ namespace UIEngine.Core;
 internal sealed class LiveObjectNode : BaseNode, IObjectNode
 {
     public LiveObjectNode(
-        UIEngineHost host,
         string name,
         Type valueType,
         Guid handle,
         string? summary,
         IReadOnlyList<BaseNode> members)
-        : base(host, name, valueType)
+        : base(name, valueType)
     {
         Handle = handle;
         Summary = summary;

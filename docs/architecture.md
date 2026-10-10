@@ -19,28 +19,30 @@ flowchart LR
 
 The host owns:
 
-- registered domain roots;
+- discovered domain roots;
 - runtime handles;
 - reflection and programmatic exposure;
 - path resolution and live operations;
-- domain-thread-affine interaction; and
+- single-threaded domain interaction; and
 - non-owning diagnostic reporting for invocation faults.
 
-Hosts are isolated and disposable. Their live graph operations are synchronous and must be called
-on the domain model's owning thread. They contain no process-global registry, frontend state, or
-thread-marshaling mechanism.
+Exactly one host is active at a time and is available through `UIEngineHost.Instance`. Its live
+graph operations are synchronous and run on the same thread as the domain model. Constructing a
+host discovers public static members marked `[Root]` from every assembly already loaded, in
+canonical assembly/type/member order. Root methods must also be marked `[Action]`. Invalid roots
+are skipped and reported through diagnostics. Discovery runs once; assemblies loaded later are not
+added. Disposing the host disposes its registered Core workspaces and permits a replacement host.
 
 ### `UIEngineWorkspace`
 
-A workspace is a frontend-neutral navigation session over one host. It owns an ordered collection
+A workspace is a frontend-neutral navigation session over the active host. It owns an ordered collection
 of `Navigator`s and produces a serializable workspace snapshot. A host can support more
 than one workspace without sharing navigation state between them.
 
 ### Frontends
 
 A frontend maps node semantics to controls, creates and owns its workspace, and owns all toolkit
-state. The caller owns the host supplied to the frontend. Core never references controls, focus,
-colors, geometry, key bindings, or a UI dispatcher.
+state. Core never references controls, focus, colors, geometry, key bindings, or a UI dispatcher.
 
 ## Object Nodes
 
@@ -97,11 +99,13 @@ UIEngine keeps two concepts separate:
 
 | Concept | Purpose |
 |---|---|
-| `Guid` | Identifies one live reference within a host lifetime. |
+| `Guid` | Identifies one root or live reference within a host lifetime. |
 | `LogicalPath` | Identifies how a navigator reached an exposed node. |
 
-Logical paths are immutable, case-sensitive linked structures. Core stores member names, list
-indices, and dictionary keys directly without encoding them into a string.
+Logical paths are immutable, case-sensitive linked structures. Their first segment identifies a
+root by its host-lifetime GUID. Later segments store member names, list indices, and dictionary
+keys directly without encoding them into a string. The leading `/` is display decoration rather
+than a root node.
 
 ```text
 /world
@@ -129,18 +133,18 @@ The returned resolution chain contains one fresh `ResolvedNode` for every linked
 from the registered root through the current node. A selected collection element therefore follows
 its collection node directly in both the logical path and the resolution chain.
 
-`LogicalPath.ToString()` is diagnostic display only and is not a serialization format. Frontends
-own any command-text grammar, while layout persistence stores structured path segments.
+`LogicalPath.ToString()` exposes the raw root GUID for diagnostics. `ToDisplayString()` resolves
+that GUID to the root node's member name through the active host. Neither string form is a
+serialization format; layout persistence stores structured path segments, including the root GUID.
 
-`ResolvedNode` is the Core-owned hand-off for that pair. It retains its originating host
-internally so a workspace can reject an occurrence from another host, while neither
-`BaseNode` nor its semantic facets expose a logical path.
+`ResolvedNode` is the Core-owned hand-off for that pair. Neither `ResolvedNode`, `BaseNode`, nor a
+node's semantic facets retains a host reference.
 
 ## Navigators
 
 A `Navigator` is one independent entry point into the graph. It owns a stack of navigation entries.
-Its stable identity is a GUID; navigators have no names. Root, member, node, and logical-path names
-remain part of the graph model.
+Its stable identity is a GUID; navigators have no names. Root nodes and members still have their
+ordinary node names, but root registration stores no separate name.
 Each entry contains:
 
 - a logical path;
@@ -151,9 +155,9 @@ Navigation has destructive stack semantics:
 
 1. Starting a navigator resolves its initial node and pushes the first entry.
 2. Activating a navigable child resolves a fresh node and pushes a new entry.
-3. Going back removes and disposes the current entry, then reveals the previous entry.
+3. Going back removes the current entry, then reveals the previous entry.
 4. There is no forward history.
-5. Removing a navigator disposes all of its entries.
+5. Removing a navigator retires all of its entries.
 
 A navigator may start from a registered root or a specific resolved `BaseNode`. The workspace
 captures the node's current location and resolves a navigator-owned instance. Duplicating a
@@ -166,12 +170,12 @@ restore stale navigation state after back, removal, or disposal.
 
 A navigator has no workspace or host reference. It raises a synchronous path-resolution request
 and its own committed-navigation event. `UIEngineWorkspace` subscribes to both when it adds the
-navigator, resolves requests through its host, relays committed changes through the workspace
+navigator, resolves requests through the active host, relays committed changes through the workspace
 aggregate event, and unsubscribes both before permanent removal.
 
-If a path cannot resolve, the current entry remains present with its structured failure. Back
-navigation remains available. A restored broken path therefore stays visible and can be unwound
-until a valid node is reached.
+If a path cannot resolve, the navigator is invalid and its current entry retains the structured
+failure. Back navigation remains available, but a frontend displays no node content for that
+entry. A restored invalid path can therefore be unwound until a valid node is reached.
 
 ## Workspace Snapshots and Layout Persistence
 
@@ -189,7 +193,7 @@ The snapshot does not contain domain values, runtime handles, node instances, co
 edit drafts, invocation state, or running work.
 
 Deserialization reconstructs navigation entries from each saved path and its semantic parent
-locations. Resolution failures create broken current entries rather than dropping saved
+locations. Resolution failures create invalid current entries rather than dropping saved
 navigators. Frontends own any outer layout contract and stable presentation configuration such as
 placement or size. Serialization produces data; file storage remains the caller's responsibility.
 
@@ -197,9 +201,8 @@ placement or size. Serialization produces data; file storage remains the caller'
 
 All live operations flow synchronously through the host on the domain model's owning thread.
 Expected outcomes use `Either<InteractionError, T>` with stable error codes and validation issues;
-nullable success values use `Either<InteractionError, Option<T>>`. If a frontend runs on another
-thread, the embedding application owns the request boundary into the domain thread; Core does not
-marshal work to or from UI threads.
+nullable success values use `Either<InteractionError, Option<T>>`. UIEngine and the domain model
+share one thread, and Core contains no synchronization or thread-marshaling machinery.
 
 Collection access is always bounded. Collection windows retain positions, optional keys, nulls,
 scalar values, references, optional total counts, and whether more data is available.
@@ -207,7 +210,7 @@ scalar values, references, optional total counts, and whether more data is avail
 Each method-node occurrence exposes its latest invocation status and a result task carrying the
 structured outcome for that exact call. Synchronous execution is observable as running, and one
 occurrence accepts only one running call at a time. Separate occurrences can invoke the same domain
-method concurrently. Once reflection returns a domain task, that task continues independently of the
+method with overlapping asynchronous work. Once reflection returns a domain task, that task continues independently of the
 node and host; the node only observes its outcome.
 
 ## Frontend Lifetime

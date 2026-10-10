@@ -108,7 +108,7 @@ internal sealed class NavigatorPresentation : IDisposable
         title.SetStyle(new TextBlockStyle { Foreground = control.State switch
         {
             PlaceholderNodeState.Healthy => Colors.Green,
-            PlaceholderNodeState.Broken => Colors.Red,
+            PlaceholderNodeState.Invalid => Colors.Red,
             _ => Colors.Yellow,
         }});
         return title;
@@ -121,11 +121,9 @@ internal sealed class PlaceholderNodeControl : IDisposable
     {
         if (!entry.IsRight)
         {
-            State = PlaceholderNodeState.Broken;
-            DisplayName = "Broken";
-            var error = (InteractionError)entry;
-            Visual = new TextBlock($"Broken [{error.Code}]: {error.Message}");
-            Visual.SetStyle(new TextBlockStyle { Foreground = Colors.Red });
+            State = PlaceholderNodeState.Invalid;
+            DisplayName = "Invalid";
+            Visual = new TextBlock(string.Empty);
             return;
         }
 
@@ -160,5 +158,5 @@ internal enum PlaceholderNodeState
 {
     Healthy,
     Empty,
-    Broken,
+    Invalid,
 }

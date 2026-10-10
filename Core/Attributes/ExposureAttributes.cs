@@ -1,5 +1,10 @@
 namespace UIEngine.Core.Attributes;
 
+[AttributeUsage(
+    AttributeTargets.Property | AttributeTargets.Field | AttributeTargets.Method,
+    Inherited = false)]
+public sealed class RootAttribute : Attribute;
+
 [AttributeUsage(AttributeTargets.Property | AttributeTargets.Field, Inherited = true)]
 public sealed class ExposeAttribute : Attribute
 {

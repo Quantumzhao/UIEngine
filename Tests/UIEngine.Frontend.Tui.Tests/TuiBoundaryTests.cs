@@ -18,12 +18,12 @@ public sealed class TuiBoundaryTests
             Startup = new AddNavigator(TuiTestModel.Path("model")),
             CollectionWindowSize = 12,
         };
-        var tui = TuiFrontend.CreateWorkspace(host, options);
+        var tui = TuiFrontend.CreateWorkspace(options);
         var coreWorkspace = tui.Workspace;
 
         Assert.NotSame(options, tui.Options);
         Assert.Equal(options, tui.Options);
-        Assert.Same(host, coreWorkspace.Host);
+        Assert.Null(typeof(UIEngineWorkspace).GetProperty("Host"));
         Assert.NotEqual(Guid.Empty, Assert.Single(coreWorkspace.Navigators).Id);
         Assert.Null(typeof(Navigator).GetProperty("Name"));
 
@@ -31,11 +31,11 @@ public sealed class TuiBoundaryTests
         tui.Dispose();
 
         Assert.Empty(coreWorkspace.Navigators);
-        Assert.True(host.ResolveRootNode("model").IsRight);
+        Assert.True(host.ResolveRootNode(TuiTestModel.RootId).IsRight);
     }
 
     [Fact]
-    public void PublicEntryPointsAcceptOnlyHostAndOptions()
+    public void PublicEntryPointsAcceptOnlyOptions()
     {
         var creates = typeof(TuiFrontend).GetMethods()
             .Where(static method => method.Name == nameof(TuiFrontend.CreateWorkspace))
@@ -47,10 +47,10 @@ public sealed class TuiBoundaryTests
         var create = Assert.Single(creates);
         var run = Assert.Single(runs);
         Assert.Equal(
-            [typeof(UIEngineHost), typeof(TuiFrontendOptions)],
+            [typeof(TuiFrontendOptions)],
             create.GetParameters().Select(static parameter => parameter.ParameterType));
         Assert.Equal(
-            [typeof(UIEngineHost), typeof(TuiFrontendOptions)],
+            [typeof(TuiFrontendOptions)],
             run.GetParameters().Select(static parameter => parameter.ParameterType));
         Assert.Null(typeof(TuiFrontendOptions).GetProperty("InitialPath"));
     }
