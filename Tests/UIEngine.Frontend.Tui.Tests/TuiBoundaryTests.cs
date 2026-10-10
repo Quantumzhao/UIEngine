@@ -15,7 +15,7 @@ public sealed class TuiBoundaryTests
         var options = new TuiFrontendOptions
         {
             ApplicationTitle = "Test application",
-            Startup = new AddNavigator("main", TuiTestModel.Path("model")),
+            Startup = new AddNavigator(TuiTestModel.Path("model")),
             CollectionWindowSize = 12,
         };
         var tui = TuiFrontend.CreateWorkspace(host, options);
@@ -23,7 +23,9 @@ public sealed class TuiBoundaryTests
 
         Assert.NotSame(options, tui.Options);
         Assert.Equal(options, tui.Options);
-        Assert.Equal("main", Assert.Single(coreWorkspace.Navigators).Name);
+        Assert.Same(host, coreWorkspace.Host);
+        Assert.NotEqual(Guid.Empty, Assert.Single(coreWorkspace.Navigators).Id);
+        Assert.Null(typeof(Navigator).GetProperty("Name"));
 
         tui.Dispose();
         tui.Dispose();

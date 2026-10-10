@@ -1,6 +1,10 @@
 using LanguageExt;
 using UIEngine.Core;
 using UIEngine.Frontend.Tui;
+using XenoAtom.Terminal.UI;
+using XenoAtom.Terminal.UI.Commands;
+using XenoAtom.Terminal.UI.Controls;
+using XenoAtom.Terminal.UI.Styling;
 using Xunit;
 using static LanguageExt.Prelude;
 
@@ -17,15 +21,15 @@ public sealed class TuiWorkspaceTests
 
         Assert.Empty(empty.Workspace.Navigators);
         Assert.Empty(empty.Presentations);
-        Assert.Null(empty.SelectedNavigatorName);
+        Assert.Null(empty.SelectedNavigatorId);
 
         using var healthy = TuiFrontend.CreateWorkspace(host, new TuiFrontendOptions
         {
-            Startup = new AddNavigator("healthy", TuiTestModel.Path("model")),
+            Startup = new AddNavigator(TuiTestModel.Path("model")),
         });
         using var broken = TuiFrontend.CreateWorkspace(host, new TuiFrontendOptions
         {
-            Startup = new AddNavigator("broken", TuiTestModel.Path("model", "Missing")),
+            Startup = new AddNavigator(TuiTestModel.Path("model", "Missing")),
         });
 
         Assert.Equal(PlaceholderNodeState.Healthy, Assert.Single(healthy.Presentations).CurrentControl.State);
@@ -36,25 +40,27 @@ public sealed class TuiWorkspaceTests
     public void RestoredStartupBuildsWorkspaceBeforeItIsReturned()
     {
         using var host = TuiTestModel.CreateHost();
+        var firstId = Guid.NewGuid();
+        var brokenId = Guid.NewGuid();
         var layout = new TuiLayoutSnapshot(
             new WorkspaceSnapshot(
                 [
-                    new NavigatorSnapshot("first", [new MemberPathSegmentSnapshot("model")]),
-                    new NavigatorSnapshot("broken", [
+                    new NavigatorSnapshot(firstId, [new MemberPathSegmentSnapshot("model")]),
+                    new NavigatorSnapshot(brokenId, [
                         new MemberPathSegmentSnapshot("model"),
                         new MemberPathSegmentSnapshot("Missing"),
                     ]),
                 ],
-                "broken"),
-            new Dictionary<string, NavigatorPresentationConfiguration>());
+                brokenId),
+            new Dictionary<Guid, NavigatorPresentationConfiguration>());
 
         using var tui = TuiFrontend.CreateWorkspace(host, new TuiFrontendOptions
         {
             Startup = new RestoreLayout(layout),
         });
 
-        Assert.Equal(["first", "broken"], tui.Workspace.Navigators.Select(static item => item.Name));
-        Assert.Equal("broken", tui.SelectedNavigatorName);
+        Assert.Equal([firstId, brokenId], tui.Workspace.Navigators.Select(static item => item.Id));
+        Assert.Equal(brokenId, tui.SelectedNavigatorId);
         Assert.Equal(PlaceholderNodeState.Broken, tui.Presentations.ElementAt(1).CurrentControl.State);
     }
 
@@ -67,8 +73,7 @@ public sealed class TuiWorkspaceTests
         {
             ApplicationTitle = " ",
         }));
-        Assert.Throws<ArgumentException>(() => new AddNavigator(" ", TuiTestModel.Path("model")));
-        Assert.Throws<ArgumentNullException>(() => new AddNavigator("main", null!));
+        Assert.Throws<ArgumentNullException>(() => new AddNavigator(null!));
         Assert.Throws<ArgumentNullException>(() => new RestoreLayout(null!));
         Assert.Throws<ArgumentNullException>(() => TuiFrontend.CreateWorkspace(
             host,
@@ -83,15 +88,15 @@ public sealed class TuiWorkspaceTests
         using var host = TuiTestModel.CreateHost();
         using var tui = TuiFrontend.CreateWorkspace(host, new TuiFrontendOptions
         {
-            Startup = new AddNavigator("first", TuiTestModel.Path("model")),
+            Startup = new AddNavigator(TuiTestModel.Path("model")),
         });
         var coreWorkspace = tui.Workspace;
         var firstPresentation = Assert.Single(tui.Presentations);
         var firstControl = firstPresentation.CurrentControl;
 
-        coreWorkspace.AddNavigator("second", "model");
+        coreWorkspace.AddNavigator("model");
         var secondPresentation = tui.Presentations.ElementAt(1);
-        coreWorkspace.DuplicateNavigator(coreWorkspace.Navigators[0].Id, "duplicate");
+        coreWorkspace.DuplicateNavigator(coreWorkspace.Navigators[0].Id);
         var duplicatePresentation = tui.Presentations.ElementAt(1);
 
         Assert.Equal(3, tui.Presentations.Count);
@@ -140,5 +145,103 @@ public sealed class TuiWorkspaceTests
         Assert.Equal(PlaceholderNodeState.Healthy, healthy.State);
         Assert.Equal(PlaceholderNodeState.Empty, empty.State);
         Assert.Equal(PlaceholderNodeState.Broken, broken.State);
+    }
+
+    [Fact]
+    public void SuspensionIsPresentationOnlyAndRestoresExactLiveObjects()
+    {
+        using var host = TuiTestModel.CreateHost();
+        using var tui = TuiFrontend.CreateWorkspace(host, new TuiFrontendOptions
+        {
+            Startup = new AddNavigator(TuiTestModel.Path("model")),
+        });
+        tui.Workspace.AddNavigator(TuiTestModel.Path("model", "Child"));
+        var firstNavigator = tui.Workspace.Navigators[0];
+        var firstNode = ((Option<BaseNode>)firstNavigator.CurrentEntry)
+            .IfNoneUnsafe((BaseNode?)null)!;
+        var firstPresentation = tui.Presentations.ElementAt(0);
+        var firstControl = firstPresentation.CurrentControl;
+
+        _Execute(tui, TuiCommandIds.Suspend);
+
+        Assert.Equal(2, tui.Workspace.Navigators.Count);
+        Assert.Same(firstNavigator, tui.Workspace.Navigators[0]);
+        Assert.Same(
+            firstNode,
+            ((Option<BaseNode>)firstNavigator.CurrentEntry).IfNoneUnsafe((BaseNode?)null));
+        Assert.Same(firstPresentation, tui.SuspendedPresentation);
+        Assert.Same(
+            firstControl,
+            Assert.IsType<NavigatorPresentation>(tui.SuspendedPresentation).CurrentControl);
+        Assert.False(firstPresentation.IsDisposed);
+        Assert.DoesNotContain(firstPresentation, tui.Presentations);
+        var hiddenSnapshot = (TuiLayoutSnapshot)tui.CreateLayoutSnapshot();
+        Assert.DoesNotContain(hiddenSnapshot.Workspace.Navigators, item => item.Id == firstNavigator.Id);
+        Assert.DoesNotContain(firstNavigator.Id, hiddenSnapshot.Navigators.Keys);
+
+        _Execute(tui, TuiCommandIds.Restore);
+
+        Assert.Null(tui.SuspendedPresentation);
+        Assert.Same(firstNavigator, tui.Workspace.Navigators[0]);
+        Assert.Same(firstPresentation, tui.Presentations.ElementAt(0));
+        Assert.Same(firstControl, firstPresentation.CurrentControl);
+
+        _Execute(tui, TuiCommandIds.Suspend);
+        var secondNavigator = tui.Workspace.Navigators[1];
+        var secondPresentation = Assert.Single(tui.Presentations);
+        _Execute(tui, TuiCommandIds.Suspend);
+
+        Assert.Empty(firstNavigator.Entries);
+        Assert.True(firstPresentation.IsDisposed);
+        Assert.Same(secondNavigator, Assert.Single(tui.Workspace.Navigators));
+        Assert.Same(secondPresentation, tui.SuspendedPresentation);
+        Assert.Empty(tui.Presentations);
+        Assert.Null(tui.SelectedNavigatorId);
+    }
+
+    [Fact]
+    public void PaneTitlesAndSharedStatusUseTextAndSemanticColors()
+    {
+        using var host = TuiTestModel.CreateHost();
+        using var healthy = TuiFrontend.CreateWorkspace(host, new TuiFrontendOptions
+        {
+            Startup = new AddNavigator(TuiTestModel.Path("model")),
+        });
+        using var broken = TuiFrontend.CreateWorkspace(host, new TuiFrontendOptions
+        {
+            Startup = new AddNavigator(TuiTestModel.Path("model", "Missing")),
+        });
+        var healthyPresentation = Assert.Single(healthy.Presentations);
+        var brokenPresentation = Assert.Single(broken.Presentations);
+        var healthyTitle = Assert.IsType<TextBlock>(healthyPresentation.Header.Content);
+        var brokenTitle = Assert.IsType<TextBlock>(brokenPresentation.Header.Content);
+
+        Assert.Equal("model", healthyTitle.Text);
+        Assert.Equal("Broken", brokenTitle.Text);
+        Assert.Equal(Colors.Green, healthyTitle.GetStyle<TextBlockStyle>().Foreground);
+        Assert.Equal(Colors.Red, brokenTitle.GetStyle<TextBlockStyle>().Foreground);
+        Assert.Equal("Healthy", healthy.StateText);
+        Assert.Equal("Broken", broken.StateText);
+        Assert.Equal("/model/Missing", broken.AddressText);
+        Assert.DoesNotContain(healthyPresentation.Navigator.Id.ToString(), healthyTitle.Text);
+        Assert.DoesNotContain("1", healthyTitle.Text);
+        var border = healthyPresentation.Container
+            .GetStyle<GroupStyle>()
+            .BorderCellStyle;
+        Assert.True(border.HasValue);
+        Assert.True(border.Value.TryGetForeground(out var selectedBorder));
+        Assert.Equal(Colors.Cyan, selectedBorder);
+
+        using var empty = new PlaceholderNodeControl(
+            Right<InteractionError, Option<BaseNode>>(None));
+        Assert.Equal("Empty", empty.DisplayName);
+        Assert.Equal(Colors.Yellow, empty.Visual.GetStyle<TextBlockStyle>().Foreground);
+    }
+
+    private static void _Execute(TuiWorkspace tui, string commandId)
+    {
+        var command = Assert.Single(tui.Visual.Commands, command => command.Id == commandId);
+        Assert.True(command.CanExecuteFor(tui.Visual));
+        command.Execute(tui.Visual);
     }
 }

@@ -11,10 +11,10 @@ prototypes that need generated user interfaces over live state.
 
 ## Architecture
 
-`UIEngineHost` owns registered roots and access to the live domain graph. An
-`UIEngineWorkspace` owns an ordered collection of independent `Navigator`s. Each navigator tracks
-one stack of logical paths alongside `Either<InteractionError, Option<BaseNode>>` resolution
-results.
+`UIEngineHost` owns registered roots and access to the live domain graph. A
+`UIEngineWorkspace` holds the single authoritative reference to its caller-owned host and owns an
+ordered collection of independent `Navigator`s. Each navigator tracks one stack of logical paths
+alongside `Either<InteractionError, Option<BaseNode>>` resolution results.
 
 `BaseNode` is frontend-neutral. Its concrete types and semantic interfaces describe .NET
 language features rather than controls. Names follow those features—for example, `PropertyNode`,
@@ -31,9 +31,13 @@ toolkit types in Core.
 - Nodes are live operation endpoints, not copied domain state.
 - Nodes do not own logical paths or UI controls.
 - A navigator records the path and stack for one independent view into the graph.
+- A navigator holds no workspace or host reference. It requests path resolution and publishes
+  committed navigation changes through events; the owning workspace subscribes while the
+  navigator belongs to its ordered collection.
 - Navigating deeper pushes a new entry. Going back removes the current entry permanently.
-- Removing an entry or navigator causes its frontend control and frontend-owned work to be
-  disposed.
+- Removing an entry or permanently removing a navigator causes its frontend control and
+  frontend-owned work to be disposed. A TUI-close operation may instead hide one live presentation
+  in its transient one-item cache.
 - Each method-node occurrence owns its latest invocation state. The underlying domain task
   continues independently after its control is removed or the host is disposed.
 - A workspace may contain several navigators at the same path. Each resolves separate node and
@@ -42,7 +46,8 @@ toolkit types in Core.
   captures that node's location and resolves a navigator-owned instance.
 - An unresolved persisted path remains as a broken navigator entry. The user can navigate back
   until a valid node is reached.
-- Core workspace snapshots store navigator names, order, structured logical paths, and selection.
+- Navigators have stable GUID identities and no names. Core workspace snapshots store navigator
+  GUIDs, order, structured logical paths, and selected GUID.
   Frontend-owned layouts may add stable presentation configuration. Neither stores domain values,
   runtime handles, node instances, edit drafts, or running operations.
 - Runtime handles and logical paths remain distinct concepts.
@@ -79,7 +84,9 @@ complete.
 
 The reusable TUI boundary creates and owns its `UIEngineWorkspace` over a caller-owned host. It
 supports explicit startup configuration, frontend layout snapshots, notification-driven navigator
-presentation lifetimes, and synchronous UI-thread workspace updates.
+presentation lifetimes, GUID-keyed scrollable grid placement, shared address/status chrome, and
+synchronous UI-thread workspace updates. Closing a pane hides its exact live presentation in a
+TUI-only one-item cache; Core continues to treat that navigator as an ordinary live navigator.
 
 ## Repository Structure
 

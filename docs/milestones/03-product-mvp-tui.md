@@ -26,7 +26,8 @@ and save or restore navigator layouts without domain-specific screens.
 - Show registered roots when creating a navigator.
 - Add a navigator from a chosen root.
 - Duplicate the current navigator at the same path with fresh node and control instances.
-- Remove a navigator without affecting its domain object or other navigators.
+- Close a pane into a reversible one-item TUI cache without affecting its live Core navigator,
+  domain object, or other navigators; permanently remove the evicted cached navigator.
 - Navigate from any current node to its exposed children.
 - Allow scalar and method nodes to be current while treating them as terminal.
 - Go back by permanently removing the current navigation entry.
@@ -47,7 +48,8 @@ and save or restore navigator layouts without domain-specific screens.
 ## Lifetime Requirements
 
 - Each navigator and current control has independent presentation state.
-- Going back or removing a navigator removes the affected controls.
+- Going back or permanently removing a navigator removes the affected controls. Suspending a pane
+  keeps its exact control alive but invisible and non-interactive.
 - No disposed control receives later updates.
 - Removing one navigator does not interfere with another navigator's work.
 - Removing a method control prevents later completion from updating that control without stopping
@@ -58,7 +60,7 @@ and save or restore navigator layouts without domain-specific screens.
 
 The saved layout contains:
 
-- navigator names and order;
+- navigator GUIDs and order;
 - current logical paths; and
 - stable placement, size, and selection configuration.
 
@@ -68,8 +70,8 @@ running operations. Every saved navigator is recreated, including broken entries
 ## Interaction and Layout
 
 - All workflows are keyboard accessible.
-- Normal widths may present navigators side by side.
-- Narrow widths may present one selected navigator at a time.
+- Every active navigator remains present in a scrollable logical grid at every terminal width.
+- Narrow widths change only the two-axis viewport and scroll offsets.
 - Resize preserves navigator paths, identity, selection, and drafts.
 - Loading, empty, success, validation, and failure states are explicit.
 
@@ -84,7 +86,8 @@ The cyclic-world example must demonstrate:
 5. Edit values and display validation failures.
 6. Browse several bounded collection windows.
 7. Start an asynchronous method, remove its control, and confirm the domain invocation continues.
-8. Remove one navigator without disturbing the other.
+8. Close and restore one navigator without disturbing the other, then permanently evict a cached
+   navigator by closing another.
 9. Save and restore the layout.
 10. Restore a broken path and navigate back to a valid node.
 11. Complete the workflow using only the keyboard and repeat it after resize.
@@ -140,7 +143,8 @@ Before moving behavior, define and test the smallest public contracts needed by 
 6. [x] Define synchronous mutation results and frontend-neutral change notifications for navigator add,
    navigate, back, duplicate, reorder, and remove operations. Notifications must let the TUI
    retire exactly the control and scope associated with a removed entry without exposing toolkit
-   types from Core.
+   types from Core. Navigators retain neither workspace nor host; the workspace subscribes to each
+   navigator's resolution-request and committed-change events while it owns that navigator.
 7. [x] Keep mutation and resolution synchronous on the domain thread so no queued older resolution can
    publish after navigation, back, removal, or disposal.
 
@@ -221,7 +225,8 @@ Add the frontend-neutral navigation session only after node and path behavior is
    - a selected registered root;
    - an absolute logical path; and
    - a supplied resolved-node occurrence through the location hand-off defined in Step 1.
-3. [x] Give each navigator a stable name, an ordered entry stack, and one current entry.
+3. [x] Give each navigator a stable GUID identity, no navigator name, an ordered entry stack, and
+   one current entry. Root, member, node, and path names remain unchanged.
 4. [x] Navigate deeper by resolving and pushing a fresh node. Reject navigation from terminal nodes
    without changing the stack.
 5. [x] Go back by permanently removing the current entry. Expose no forward history, and define the
@@ -248,8 +253,8 @@ Verification:
 
 Implement address persistence before building TUI save/restore commands.
 
-1. [x] Define a small unversioned workspace snapshot containing navigator names, order, current
-   paths, and the selected navigator name. Restore snapshots optimistically without a schema-version
+1. [x] Define a small unversioned workspace snapshot containing navigator GUIDs, order, current
+   paths, and the selected navigator GUID. Restore snapshots optimistically without a schema-version
    gate.
 2. [x] Represent each structured path segment with a serializable snapshot type corresponding to
    its `ILogicalPathSegment`. Keep diagnostic path strings out of the persistence contract.
@@ -262,8 +267,8 @@ Implement address persistence before building TUI save/restore commands.
 6. [x] If any restored prefix cannot resolve, retain that prefix and each requested descendant as
    structured broken entries so repeated back navigation eventually reaches the deepest valid
    ancestor.
-7. [x] Define deterministic handling for duplicate navigator names, malformed path records, an
-   invalid selected name, empty snapshots, and unknown serialized fields.
+7. [x] Define deterministic handling for empty or duplicate navigator GUIDs, malformed path records,
+   an invalid selected GUID, empty snapshots, and unknown serialized fields.
 8. [x] Keep JSON or other file storage in the caller/example layer; Core only creates and consumes the
    serializable snapshot.
 
@@ -286,7 +291,7 @@ Preserve the completed XenoAtom hosting boundary while changing its model source
 4. [x] Define the frontend-owned TUI layout snapshot and bounded
    `NavigatorPresentationConfiguration` for placement and size. Combine them with the Core workspace
    snapshot without putting presentation types in Core.
-5. [x] Maintain a TUI presentation record keyed by navigator name. Each record owns the current
+5. [x] Maintain a TUI presentation record keyed by navigator GUID. Each record owns the current
    control.
 6. [x] React to Core navigation notifications by creating one replacement control for a pushed/revealed
    entry and removing the departed control exactly once.
@@ -305,25 +310,39 @@ Verification:
 Build the workspace interaction shell with placeholder node controls before completing the control
 catalogue.
 
-1. Add root selection and commands to create, select, duplicate, reorder, and remove navigators.
-2. Give each navigator a header showing its current canonical path, broken/healthy state, and
-   available back/remove commands.
-3. Define stable keyboard commands and focus order for root selection, navigator selection,
-   duplicate, remove, back, activation, refresh, save/load, help, and close.
-4. Present navigators side by side at accepted normal widths and one selected navigator at a time at
-   narrow widths.
-5. Make resize a presentation recomposition only. Preserve Core navigator identity and paths plus
-   TUI selection and draft state.
-6. Cover zero navigators, one navigator, several navigators, and removal of the selected navigator
-   with deterministic next-selection behavior.
+1. [x] Add a root-selection dialog and commands to create, select, duplicate, close/suspend, and
+   restore navigators. The dialog requests no navigator name and lists registered roots in host
+   order. No reorder command or shortcut is exposed in this step.
+2. [x] Add shared New, Up, Duplicate, Close, and Restore Closed actions plus a read-only canonical
+   address and textual state. Pane headers display only the current node name or `Broken`/`Empty`—no
+   ordinal, GUID, or synthetic navigator name.
+3. [x] Use green for healthy, red for broken, yellow for empty, and an independent cyan selected
+   border. Retain textual state for monochrome terminals.
+4. [x] Register stable keyboard commands for root selection, navigator cycling, duplication,
+   suspension, restoration, destructive Up, Help, and close request. Reserve activation, refresh,
+   save, and load as unavailable commands for their later steps.
+5. [x] Place every active pane in a logical grid inside a two-axis scroll viewer. Honor saved row,
+   column, width, and height; repair collisions deterministically in workspace order; and scroll a
+   newly selected off-screen pane into view.
+6. [x] Make resize remeasure and redraw existing visuals without recreating navigators,
+   presentations, or controls. Preserve selection, placement, focus memory, and transient state.
+7. [x] Implement close/suspend entirely in the TUI. Core continues to hold the navigator as an
+   ordinary live navigator while its exact presentation is hidden and non-interactive. A second
+   close permanently removes and disposes the old cache; Restore Closed returns the exact cached
+   objects at the saved index.
+8. [x] Exclude the transient cache from TUI layout snapshots. Layout replacement and workspace
+   disposal discard it; permanent Core removal disposes either an active or cached presentation.
 
 Verification:
 
-- Inject keyboard input for every workspace command and verify visible focus and return focus after
-  dialogs.
-- Resize across normal and narrow thresholds without recreating navigators or losing selection.
-- Duplicate one navigator and prove the two headers refer to distinct Core navigator and node
-  instances.
+- [x] Inject navigator keyboard shortcuts and close requests through `InMemoryTerminalBackend`, and
+  verify the complete stable command map including unavailable deferred commands.
+- [x] Resize to a narrow viewport without recreating navigators or controls, and verify selection
+  scrolls in both axes.
+- [x] Duplicate one navigator and prove the two GUIDs, Core node occurrences, presentations, and
+  controls are distinct even when their node-name titles match.
+- [x] Cover GUID layout round trips, collision repair, semantic state colors, textual labels, exact
+  suspend/restore identity, and permanent cache eviction.
 
 ### 9. Add the node-to-control factory and scalar controls
 
@@ -398,7 +417,7 @@ Verification:
 2. Expose save/load through caller-supplied callbacks or another explicit composition boundary so
    the reusable TUI library does not choose a filesystem location.
 3. Reconcile controls when a layout is loaded: retire removed presentations, retain navigator
-   names from the snapshot, create fresh nodes and controls, and select the restored
+   GUIDs from the snapshot, create fresh nodes and controls, and select the restored
    navigator deterministically.
 4. Finish `Examples/CyclicWorld.Tui` as composition and manual-acceptance code only. Add no
    model-specific control or Core behavior to the executable.

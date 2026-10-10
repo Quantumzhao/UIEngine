@@ -20,25 +20,24 @@ public sealed class UIEngineWorkspace : IDisposable
 
     public event EventHandler<WorkspaceChangedEventArgs>? Changed;
 
-    internal UIEngineHost Host { get; }
+    /// <summary>Gets the caller-owned host whose roots and policies this workspace navigates.</summary>
+    public UIEngineHost Host { get; }
 
     /// <summary>Adds a navigator whose initial location is a registered root.</summary>
-    public Either<InteractionError, NavigatorAddedChange> AddNavigator( string name, string rootName) => 
-        AddNavigator(name, LogicalPath.Root.Append(rootName));
+    public Either<InteractionError, NavigatorAddedChange> AddNavigator(string rootName) =>
+        AddNavigator(LogicalPath.Root.Append(rootName));
 
     /// <summary>Adds a navigator whose stack is reconstructed from an absolute path.</summary>
-    public Either<InteractionError, NavigatorAddedChange> AddNavigator(
-        string name,
+    public Either<InteractionError, NavigatorAddedChange> AddNavigator(LogicalPath path) =>
+        _AddNavigator(Guid.NewGuid(), path);
+
+    private Either<InteractionError, NavigatorAddedChange> _AddNavigator(
+        Guid id,
         LogicalPath path)
     {
-        var validation = _ValidateNewName(name);
-        if (validation is not null)
-        {
-            return Left(validation);
-        }
-
         var entries = _ResolveInitialEntries(path);
-        var navigator = new Navigator(this, Guid.NewGuid(), name, entries);
+        var navigator = new Navigator(id, entries);
+        _Subscribe(navigator);
         var index = Navigators.Count;
         _Navigators.Add(navigator);
 
@@ -54,20 +53,13 @@ public sealed class UIEngineWorkspace : IDisposable
     /// <summary>
     /// Captures a supplied occurrence's location and creates a fresh navigator-owned stack there.
     /// </summary>
-    public Either<InteractionError, NavigatorAddedChange> AddNavigator(string name, ResolvedNode resolvedNode) => 
-        AddNavigator(name, resolvedNode.CanonicalPath);
+    public Either<InteractionError, NavigatorAddedChange> AddNavigator(ResolvedNode resolvedNode) =>
+        AddNavigator(resolvedNode.CanonicalPath);
 
     /// <summary>Duplicates a navigator at its current path with fresh entry and node instances.</summary>
     public Either<InteractionError, NavigatorDuplicatedChange> DuplicateNavigator(
-        Guid sourceNavigatorId,
-        string name)
+        Guid sourceNavigatorId)
     {
-        var validation = _ValidateNewName(name);
-        if (validation is not null)
-        {
-            return Left(validation);
-        }
-
         var source = _FindNavigator(sourceNavigatorId);
         if (source is null)
         {
@@ -75,7 +67,8 @@ public sealed class UIEngineWorkspace : IDisposable
         }
 
         var entries = _ResolveInitialEntries(source.CurrentPath);
-        var navigator = new Navigator(this, Guid.NewGuid(), name, entries);
+        var navigator = new Navigator(Guid.NewGuid(), entries);
+        _Subscribe(navigator);
         var index = _Navigators.IndexOf(source) + 1;
         _Navigators.Insert(index, navigator);
 
@@ -133,25 +126,23 @@ public sealed class UIEngineWorkspace : IDisposable
 
     /// <summary>Creates a serializable snapshot of stable navigation state.</summary>
     public Either<InteractionError, WorkspaceSnapshot> CreateSnapshot(
-        string? selectedNavigatorName)
+        Guid? selectedNavigatorId)
     {
         if (Navigators.Count == 0)
         {
-            return selectedNavigatorName is null
+            return selectedNavigatorId is null
                 ? Right(new WorkspaceSnapshot([], null))
                 : Left(new InteractionError(
                     InteractionErrorCode.INVALID_INPUT,
                     "An empty workspace cannot have a selected navigator."));
         }
 
-        if (string.IsNullOrWhiteSpace(selectedNavigatorName) ||
-            !Navigators.Any(navigator => StringComparer.Ordinal.Equals(
-                navigator.Name,
-                selectedNavigatorName)))
+        if (selectedNavigatorId is null ||
+            !Navigators.Any(navigator => navigator.Id == selectedNavigatorId))
         {
             return Left(new InteractionError(
                 InteractionErrorCode.INVALID_INPUT,
-                $"Selected navigator '{selectedNavigatorName}' was not found."));
+                $"Selected navigator '{selectedNavigatorId}' was not found."));
         }
 
         var snapshots = new List<NavigatorSnapshot>(Navigators.Count);
@@ -161,7 +152,7 @@ public sealed class UIEngineWorkspace : IDisposable
             {
                 return Left(new InteractionError(
                     InteractionErrorCode.INVALID_INPUT,
-                    $"Navigator '{navigator.Name}' does not identify a registered root."));
+                    $"Navigator '{navigator.Id}' does not identify a registered root."));
             }
 
             var segments = new List<IPathSegmentSnapshot>(navigator.CurrentPath.Count);
@@ -178,10 +169,10 @@ public sealed class UIEngineWorkspace : IDisposable
                 segments.Add(serialized);
             }
 
-            snapshots.Add(new NavigatorSnapshot(navigator.Name, segments.ToArray()));
+            snapshots.Add(new NavigatorSnapshot(navigator.Id, segments.ToArray()));
         }
 
-        return Right(new WorkspaceSnapshot(snapshots, selectedNavigatorName));
+        return Right(new WorkspaceSnapshot(snapshots, selectedNavigatorId));
     }
 
     /// <summary>
@@ -191,8 +182,8 @@ public sealed class UIEngineWorkspace : IDisposable
     public WorkspaceRestoreResult RestoreSnapshot(WorkspaceSnapshot snapshot)
     {
         var issues = new List<SnapshotRestoreIssue>();
-        var candidates = new List<(string Name, LogicalPath Path)>();
-        var names = new System.Collections.Generic.HashSet<string>(StringComparer.Ordinal);
+        var candidates = new List<(Guid Id, LogicalPath Path)>();
+        var ids = new System.Collections.Generic.HashSet<Guid>();
         var records = snapshot.Navigators;
 
         if (records is null)
@@ -208,23 +199,23 @@ public sealed class UIEngineWorkspace : IDisposable
             for (var index = 0; index < records.Count; index++)
             {
                 var record = records[index];
-                if (record is null || string.IsNullOrWhiteSpace(record.Name))
+                if (record is null || record.Id == Guid.Empty)
                 {
                     issues.Add(_RestoreIssue(
                         SnapshotRestoreIssueCode.INVALID_NAVIGATOR_RECORD,
                         index,
-                        record?.Name,
-                        "A navigator record and its name must be present."));
+                        record?.Id,
+                        "A navigator record and its non-empty ID must be present."));
                     continue;
                 }
 
-                if (!names.Add(record.Name))
+                if (!ids.Add(record.Id))
                 {
                     issues.Add(_RestoreIssue(
-                        SnapshotRestoreIssueCode.DUPLICATE_NAVIGATOR_NAME,
+                        SnapshotRestoreIssueCode.DUPLICATE_NAVIGATOR_ID,
                         index,
-                        record.Name,
-                        $"Navigator name '{record.Name}' has already appeared in the snapshot."));
+                        record.Id,
+                        $"Navigator ID '{record.Id}' has already appeared in the snapshot."));
                     continue;
                 }
 
@@ -234,12 +225,12 @@ public sealed class UIEngineWorkspace : IDisposable
                     issues.Add(new SnapshotRestoreIssue(
                         SnapshotRestoreIssueCode.INVALID_NAVIGATOR_PATH,
                         index,
-                        record.Name,
+                        record.Id,
                         (InteractionError)path));
                     continue;
                 }
 
-                candidates.Add((record.Name, (LogicalPath)path));
+                candidates.Add((record.Id, (LogicalPath)path));
             }
         }
 
@@ -250,26 +241,25 @@ public sealed class UIEngineWorkspace : IDisposable
 
         foreach (var candidate in candidates)
         {
-            AddNavigator(candidate.Name, candidate.Path);
+            _AddNavigator(candidate.Id, candidate.Path);
         }
 
-        var selectedNavigatorName = Navigators.Any(navigator => StringComparer.Ordinal.Equals(
-            navigator.Name,
-            snapshot.SelectedNavigatorName))
-            ? snapshot.SelectedNavigatorName
-            : Navigators.Count > 0 ? Navigators[0].Name : null;
-        if (!StringComparer.Ordinal.Equals(selectedNavigatorName, snapshot.SelectedNavigatorName))
+        var selectedNavigatorId = Navigators.Any(navigator =>
+            navigator.Id == snapshot.SelectedNavigatorId)
+            ? snapshot.SelectedNavigatorId
+            : Navigators.Count > 0 ? Navigators[0].Id : null;
+        if (selectedNavigatorId != snapshot.SelectedNavigatorId)
         {
             issues.Add(_RestoreIssue(
                 SnapshotRestoreIssueCode.SELECTION_ADJUSTED,
                 null,
-                snapshot.SelectedNavigatorName,
-                selectedNavigatorName is null
+                snapshot.SelectedNavigatorId,
+                selectedNavigatorId is null
                     ? "The requested selection could not be restored because the workspace is empty."
-                    : $"The requested selection could not be restored; '{selectedNavigatorName}' was selected instead."));
+                    : $"The requested selection could not be restored; '{selectedNavigatorId}' was selected instead."));
         }
 
-        return new WorkspaceRestoreResult(selectedNavigatorName, issues.ToArray());
+        return new WorkspaceRestoreResult(selectedNavigatorId, issues.ToArray());
     }
 
     public void Dispose()
@@ -280,7 +270,26 @@ public sealed class UIEngineWorkspace : IDisposable
         }
     }
 
-    internal void Publish(WorkspaceChange change) =>
+    private void _OnNavigatorChanged(object? sender, WorkspaceChangedEventArgs eventArgs) =>
+        Publish(eventArgs.Change);
+
+    private Either<InteractionError, ResolvedPath> _ResolveNavigatorPath(
+        Navigator navigator,
+        LogicalPath path) => PathResolution.Resolve(Host, path);
+
+    private void _Subscribe(Navigator navigator)
+    {
+        navigator.ResolvePathRequested += _ResolveNavigatorPath;
+        navigator.Changed += _OnNavigatorChanged;
+    }
+
+    private void _Unsubscribe(Navigator navigator)
+    {
+        navigator.Changed -= _OnNavigatorChanged;
+        navigator.ResolvePathRequested -= _ResolveNavigatorPath;
+    }
+
+    private void Publish(WorkspaceChange change) =>
         Changed?.Invoke(this, new WorkspaceChangedEventArgs(change));
 
     private (
@@ -288,7 +297,7 @@ public sealed class UIEngineWorkspace : IDisposable
         Either<InteractionError, Option<BaseNode>> Entry)[] _ResolveInitialEntries(
             LogicalPath path)
     {
-        var resolved = Host.ResolvePath(path);
+        var resolved = PathResolution.Resolve(Host, path);
         if (resolved.IsRight)
         {
             return ((ResolvedPath)resolved).ResolutionChain
@@ -309,7 +318,7 @@ public sealed class UIEngineWorkspace : IDisposable
         foreach (var segment in path.Segments)
         {
             prefix = prefix.Append(segment);
-            var prefixResolution = Host.ResolvePath(prefix);
+            var prefixResolution = PathResolution.Resolve(Host, prefix);
             if (prefixResolution.IsRight)
             {
                 var resolvedPrefix = (ResolvedPath)prefixResolution;
@@ -332,23 +341,6 @@ public sealed class UIEngineWorkspace : IDisposable
     private static Either<InteractionError, Option<BaseNode>> _BrokenEntry(
         InteractionError error) =>
         Left(error);
-
-    private InteractionError? _ValidateNewName(string name)
-    {
-        if (string.IsNullOrWhiteSpace(name))
-        {
-            return new InteractionError(
-                InteractionErrorCode.INVALID_INPUT,
-                "A navigator name cannot be empty or whitespace.");
-        }
-
-        return Navigators.Any(navigator =>
-            StringComparer.Ordinal.Equals(navigator.Name, name))
-            ? new InteractionError(
-                InteractionErrorCode.INVALID_INPUT,
-                $"A navigator named '{name}' already exists.")
-            : null;
-    }
 
     private static IPathSegmentSnapshot? _CreateSegmentSnapshot(
         ILogicalPathSegment segment) => segment switch
@@ -416,11 +408,11 @@ public sealed class UIEngineWorkspace : IDisposable
     private static SnapshotRestoreIssue _RestoreIssue(
         SnapshotRestoreIssueCode code,
         int? navigatorIndex,
-        string? navigatorName,
+        Guid? navigatorId,
         string message) => new(
             code,
             navigatorIndex,
-            navigatorName,
+            navigatorId,
             new InteractionError(InteractionErrorCode.INVALID_INPUT, message));
 
     private Navigator? _FindNavigator(Guid navigatorId) =>
@@ -430,6 +422,7 @@ public sealed class UIEngineWorkspace : IDisposable
     {
         var previousIndex = _Navigators.IndexOf(navigator);
         _Navigators.RemoveAt(previousIndex);
+        _Unsubscribe(navigator);
         var removed = navigator.Remove();
         var change = new NavigatorRemovedChange(
             navigator.Id,

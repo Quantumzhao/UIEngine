@@ -88,7 +88,4 @@ public sealed record NavigatorPresentationConfiguration(
         Column is >= 0 and <= ushort.MaxValue &&
         Width is >= 1 and <= ushort.MaxValue &&
         Height is >= 1 and <= ushort.MaxValue;
-
-    internal static NavigatorPresentationConfiguration Default(int index) =>
-        new(0, index, 40, 12);
 }

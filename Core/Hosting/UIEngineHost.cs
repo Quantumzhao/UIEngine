@@ -85,11 +85,6 @@ public sealed class UIEngineHost : IDisposable
             (LiveObjectNode)created));
     }
 
-    public Either<InteractionError, ResolvedPath> ResolvePath(LogicalPath path) =>
-        Execute(
-            "resolve path",
-            () => PathResolution.Resolve(this, path));
-
     public void Dispose()
     {
         _RefreshRouter.Dispose();

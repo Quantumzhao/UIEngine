@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using System.Reflection;
 using UIEngine.Core;
 using UIEngine.Core.Attributes;
 using Xunit;
@@ -16,16 +17,17 @@ public sealed class WorkspaceAndNavigatorTests
         var changes = new List<WorkspaceChange>();
         workspace.Changed += (_, eventArgs) => changes.Add(eventArgs.Change);
 
-        var added = workspace.AddNavigator("one", "model").RightValue();
+        var added = workspace.AddNavigator("model").RightValue();
         Assert.Throws<NotSupportedException>(() => mutableView.Add(workspace.Navigators[0]));
-        var duplicated = workspace.DuplicateNavigator(added.NavigatorId, "two").RightValue();
+        var duplicated = workspace.DuplicateNavigator(added.NavigatorId).RightValue();
         var reordered = workspace.ReorderNavigator(duplicated.NavigatorId, 0).RightValue();
+        var restoredSnapshotId = Guid.NewGuid();
         var restored = workspace.RestoreSnapshot(new WorkspaceSnapshot(
-            [new NavigatorSnapshot("restored", [new MemberPathSegmentSnapshot("model")])],
-            "restored"));
+            [new NavigatorSnapshot(restoredSnapshotId, [new MemberPathSegmentSnapshot("model")])],
+            restoredSnapshotId));
         var restoredId = Assert.Single(workspace.Navigators).Id;
         var removed = workspace.RemoveNavigator(restoredId).RightValue();
-        workspace.AddNavigator("disposed", "model");
+        workspace.AddNavigator("model");
         var disposedId = Assert.Single(workspace.Navigators).Id;
 
         workspace.Dispose();
@@ -45,19 +47,39 @@ public sealed class WorkspaceAndNavigatorTests
     }
 
     [Fact]
+    public void NavigatorHasNoWorkspaceReferenceAndWorkspaceRelaysItsChanges()
+    {
+        var fields = typeof(Navigator).GetFields(BindingFlags.Instance | BindingFlags.NonPublic);
+        Assert.DoesNotContain(fields, static field => field.FieldType == typeof(UIEngineWorkspace));
+        Assert.DoesNotContain(fields, static field => field.FieldType == typeof(UIEngineHost));
+
+        using var host = _CreateHost(new _Model());
+        using var workspace = new UIEngineWorkspace(host);
+        workspace.AddNavigator("model");
+        var navigator = Assert.Single(workspace.Navigators);
+        var changes = new List<WorkspaceChange>();
+        workspace.Changed += (_, eventArgs) => changes.Add(eventArgs.Change);
+
+        var pushed = navigator.Navigate(_Member("Child")).RightValue();
+        var popped = navigator.GoBack().RightValue();
+
+        Assert.Equal([pushed, popped], changes);
+    }
+
+    [Fact]
     public void NavigatorCanStartFromRootPathAndResolvedOccurrenceWithFreshStacks()
     {
         var model = new _Model();
         using var host = _CreateHost(model);
         using var workspace = new UIEngineWorkspace(host);
         var path = _Path(_Member("model"), _Member("Child"), _Member("Value"));
-        var supplied = host.ResolvePath(path).RightValue().ResolutionChain[^1];
+        var supplied = PathResolution.Resolve(host, path).RightValue().ResolutionChain[^1];
         var changes = new List<WorkspaceChange>();
         workspace.Changed += (_, eventArgs) => changes.Add(eventArgs.Change);
 
-        var rootAdded = workspace.AddNavigator("root", "model");
-        var pathAdded = workspace.AddNavigator("path", path);
-        var occurrenceAdded = workspace.AddNavigator("occurrence", supplied);
+        var rootAdded = workspace.AddNavigator("model");
+        var pathAdded = workspace.AddNavigator(path);
+        var occurrenceAdded = workspace.AddNavigator(supplied);
 
         Assert.True(rootAdded.IsRight);
         Assert.True(pathAdded.IsRight);
@@ -65,7 +87,7 @@ public sealed class WorkspaceAndNavigatorTests
         var rootNavigator = workspace.Navigators[0];
         var pathNavigator = workspace.Navigators[1];
         var occurrenceNavigator = workspace.Navigators[2];
-        Assert.Equal("root", rootNavigator.Name);
+        Assert.NotEqual(Guid.Empty, rootNavigator.Id);
         Assert.Single(rootNavigator.Entries);
         Assert.Equal(rootNavigator.Paths.Count, rootNavigator.Entries.Count);
         Assert.Equal(3, pathNavigator.Entries.Count);
@@ -89,7 +111,7 @@ public sealed class WorkspaceAndNavigatorTests
     {
         using var host = _CreateHost(new _Model());
         using var workspace = new UIEngineWorkspace(host);
-        workspace.AddNavigator("main", "model");
+        workspace.AddNavigator("model");
         var navigator = Assert.Single(workspace.Navigators);
         var changes = new List<WorkspaceChange>();
         workspace.Changed += (_, eventArgs) => changes.Add(eventArgs.Change);
@@ -141,10 +163,10 @@ public sealed class WorkspaceAndNavigatorTests
         var model = new _Model();
         using var host = _CreateHost(model);
         using var workspace = new UIEngineWorkspace(host);
-        workspace.AddNavigator("first", "model");
+        workspace.AddNavigator("model");
         var first = Assert.Single(workspace.Navigators);
 
-        var duplicated = workspace.DuplicateNavigator(first.Id, "second");
+        var duplicated = workspace.DuplicateNavigator(first.Id);
         var second = workspace.Navigators[1];
 
         Assert.True(duplicated.IsRight);
@@ -186,9 +208,9 @@ public sealed class WorkspaceAndNavigatorTests
     {
         using var host = _CreateHost(new _Model());
         var workspace = new UIEngineWorkspace(host);
-        workspace.AddNavigator("one", "model");
-        workspace.AddNavigator("two", "model");
-        workspace.AddNavigator("three", "model");
+        workspace.AddNavigator("model");
+        workspace.AddNavigator("model");
+        workspace.AddNavigator("model");
         var one = workspace.Navigators[0];
         var two = workspace.Navigators[1];
         var three = workspace.Navigators[2];
@@ -224,19 +246,18 @@ public sealed class WorkspaceAndNavigatorTests
     }
 
     [Fact]
-    public void InvalidStartIsVisibleAndNamesAndHostOwnershipAreEnforced()
+    public void InvalidStartIsVisibleAndSamePathNavigatorsHaveDistinctIds()
     {
         using var host = _CreateHost(new _Model());
         using var otherHost = _CreateHost(new _Model());
         using var workspace = new UIEngineWorkspace(host);
 
         var broken = workspace.AddNavigator(
-            "broken",
             _Path(_Member("model"), _Member("Missing")));
-        var duplicateName = workspace.AddNavigator("broken", "model");
+        var samePath = workspace.AddNavigator("model");
 
         Assert.True(broken.IsRight);
-        var navigator = Assert.Single(workspace.Navigators);
+        var navigator = workspace.Navigators[0];
         Assert.Equal(2, navigator.Entries.Count);
         Assert.False(navigator.CurrentEntry.IsRight);
         Assert.Equal(
@@ -244,8 +265,9 @@ public sealed class WorkspaceAndNavigatorTests
             navigator.CurrentEntry.LeftValue().Code);
         Assert.True(navigator.GoBack().IsRight);
         Assert.True(navigator.CurrentEntry.RightValue().IsSome);
-        Assert.Equal(InteractionErrorCode.INVALID_INPUT, duplicateName.LeftValue().Code);
-        Assert.Single(workspace.Navigators);
+        Assert.True(samePath.IsRight);
+        Assert.Equal(2, workspace.Navigators.Count);
+        Assert.NotEqual(workspace.Navigators[0].Id, workspace.Navigators[1].Id);
     }
 
     [Fact]
@@ -254,9 +276,7 @@ public sealed class WorkspaceAndNavigatorTests
         var model = new _Model();
         using var host = _CreateHost(model);
         var workspace = new UIEngineWorkspace(host);
-        workspace.AddNavigator(
-            "work",
-            _Path(_Member("model"), _Member("WorkAsync")));
+        workspace.AddNavigator(_Path(_Member("model"), _Member("WorkAsync")));
         var navigator = Assert.Single(workspace.Navigators);
         var method = Assert.IsAssignableFrom<IMethodNode>(
             navigator.CurrentEntry.RightValue().SomeValue());

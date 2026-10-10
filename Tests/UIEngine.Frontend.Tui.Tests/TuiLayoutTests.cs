@@ -9,22 +9,24 @@ namespace UIEngine.Frontend.Tui.Tests;
 public sealed class TuiLayoutTests
 {
     [Fact]
-    public void LayoutRoundTripsNamesOrderPathsSelectionPlacementAndSizeThroughJson()
+    public void LayoutRoundTripsIdsOrderPathsSelectionPlacementAndSizeThroughJson()
     {
         using var host = TuiTestModel.CreateHost();
         using var source = TuiFrontend.CreateWorkspace(host, new TuiFrontendOptions
         {
-            Startup = new AddNavigator("root", TuiTestModel.Path("model")),
+            Startup = new AddNavigator(TuiTestModel.Path("model")),
         });
         var sourceWorkspace = source.Workspace;
-        sourceWorkspace.AddNavigator("child", TuiTestModel.Path("model", "Child"));
+        sourceWorkspace.AddNavigator(TuiTestModel.Path("model", "Child"));
+        var rootId = sourceWorkspace.Navigators[0].Id;
+        var childId = sourceWorkspace.Navigators[1].Id;
         sourceWorkspace.ReorderNavigator(sourceWorkspace.Navigators[1].Id, 0);
-        source.SetPresentationConfiguration("child", new(2, 3, 60, 18));
-        source.SetPresentationConfiguration("root", new(4, 5, 30, 9));
+        source.SetPresentationConfiguration(childId, new(2, 3, 60, 18));
+        source.SetPresentationConfiguration(rootId, new(4, 5, 30, 9));
         source.RestoreLayout(new TuiLayoutSnapshot(
-            (WorkspaceSnapshot)sourceWorkspace.CreateSnapshot("root"),
+            (WorkspaceSnapshot)sourceWorkspace.CreateSnapshot(rootId),
             source.Presentations.ToDictionary(
-                static item => item.Navigator.Name,
+                static item => item.Navigator.Id,
                 static item => item.Configuration)));
 
         var layout = (TuiLayoutSnapshot)source.CreateLayoutSnapshot();
@@ -36,9 +38,9 @@ public sealed class TuiLayoutTests
         });
         var targetWorkspace = target.Workspace;
 
-        Assert.Equal(["child", "root"], targetWorkspace.Navigators.Select(static item => item.Name));
+        Assert.Equal([childId, rootId], targetWorkspace.Navigators.Select(static item => item.Id));
         Assert.Equal(["/model/Child", "/model"], targetWorkspace.Navigators.Select(static item => item.CurrentPath.ToString()));
-        Assert.Equal("root", target.SelectedNavigatorName);
+        Assert.Equal(rootId, target.SelectedNavigatorId);
         Assert.Equal(new NavigatorPresentationConfiguration(2, 3, 60, 18), target.Presentations.ElementAt(0).Configuration);
         Assert.Equal(new NavigatorPresentationConfiguration(4, 5, 30, 9), target.Presentations.ElementAt(1).Configuration);
         Assert.DoesNotContain("Version", json, StringComparison.OrdinalIgnoreCase);
@@ -48,19 +50,22 @@ public sealed class TuiLayoutTests
     public void MissingInvalidAndOrphanedConfigurationUseDeterministicDefaults()
     {
         using var host = TuiTestModel.CreateHost();
+        var missingId = Guid.NewGuid();
+        var invalidId = Guid.NewGuid();
+        var savedId = Guid.NewGuid();
         var layout = new TuiLayoutSnapshot(
             new WorkspaceSnapshot(
                 [
-                    new NavigatorSnapshot("missing", [new MemberPathSegmentSnapshot("model")]),
-                    new NavigatorSnapshot("invalid", [new MemberPathSegmentSnapshot("model")]),
-                    new NavigatorSnapshot("saved", [new MemberPathSegmentSnapshot("model")]),
+                    new NavigatorSnapshot(missingId, [new MemberPathSegmentSnapshot("model")]),
+                    new NavigatorSnapshot(invalidId, [new MemberPathSegmentSnapshot("model")]),
+                    new NavigatorSnapshot(savedId, [new MemberPathSegmentSnapshot("model")]),
                 ],
-                "saved"),
-            new Dictionary<string, NavigatorPresentationConfiguration>
+                savedId),
+            new Dictionary<Guid, NavigatorPresentationConfiguration>
             {
-                ["invalid"] = new(-1, 0, 0, 12),
-                ["saved"] = new(8, 9, 70, 20),
-                ["orphan"] = new(1, 1, 1, 1),
+                [invalidId] = new(-1, 0, 0, 12),
+                [savedId] = new(8, 9, 70, 20),
+                [Guid.NewGuid()] = new(1, 1, 1, 1),
             });
 
         using var tui = TuiFrontend.CreateWorkspace(host, new TuiFrontendOptions
@@ -78,16 +83,17 @@ public sealed class TuiLayoutTests
     public void BrokenPathKeepsConfigurationAndBackRecovery()
     {
         using var host = TuiTestModel.CreateHost();
+        var brokenId = Guid.NewGuid();
         var layout = new TuiLayoutSnapshot(
             new WorkspaceSnapshot(
-                [new NavigatorSnapshot("broken", [
+                [new NavigatorSnapshot(brokenId, [
                     new MemberPathSegmentSnapshot("model"),
                     new MemberPathSegmentSnapshot("Missing"),
                 ])],
-                "broken"),
-            new Dictionary<string, NavigatorPresentationConfiguration>
+                brokenId),
+            new Dictionary<Guid, NavigatorPresentationConfiguration>
             {
-                ["broken"] = new(5, 6, 50, 15),
+                [brokenId] = new(5, 6, 50, 15),
             });
         using var tui = TuiFrontend.CreateWorkspace(host, new TuiFrontendOptions
         {
@@ -111,7 +117,7 @@ public sealed class TuiLayoutTests
         using var host = TuiTestModel.CreateHost(model);
         using var tui = TuiFrontend.CreateWorkspace(host, new TuiFrontendOptions
         {
-            Startup = new AddNavigator("main", TuiTestModel.Path("model")),
+            Startup = new AddNavigator(TuiTestModel.Path("model")),
         });
 
         var json = JsonSerializer.Serialize((TuiLayoutSnapshot)tui.CreateLayoutSnapshot());
@@ -125,5 +131,41 @@ public sealed class TuiLayoutTests
         Assert.DoesNotContain("Task", json, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("Width", json, StringComparison.Ordinal);
         Assert.Contains("CurrentPath", json, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void RestoredGridCollisionsMoveLaterNavigatorsWithoutChangingPreferredSize()
+    {
+        using var host = TuiTestModel.CreateHost();
+        var firstId = Guid.NewGuid();
+        var secondId = Guid.NewGuid();
+        var thirdId = Guid.NewGuid();
+        var layout = new TuiLayoutSnapshot(
+            new WorkspaceSnapshot(
+                [
+                    new NavigatorSnapshot(firstId, [new MemberPathSegmentSnapshot("model")]),
+                    new NavigatorSnapshot(secondId, [new MemberPathSegmentSnapshot("model")]),
+                    new NavigatorSnapshot(thirdId, [new MemberPathSegmentSnapshot("model")]),
+                ],
+                firstId),
+            new Dictionary<Guid, NavigatorPresentationConfiguration>
+            {
+                [firstId] = new(0, 0, 50, 14),
+                [secondId] = new(0, 0, 60, 16),
+                [thirdId] = new(0, 1, 70, 18),
+            });
+
+        using var tui = TuiFrontend.CreateWorkspace(host, new TuiFrontendOptions
+        {
+            Startup = new RestoreLayout(layout),
+        });
+
+        Assert.Equal(
+            [
+                new NavigatorPresentationConfiguration(0, 0, 50, 14),
+                new NavigatorPresentationConfiguration(0, 1, 60, 16),
+                new NavigatorPresentationConfiguration(0, 2, 70, 18),
+            ],
+            tui.Presentations.Select(static presentation => presentation.Configuration));
     }
 }

@@ -139,6 +139,8 @@ internally so a workspace can reject an occurrence from another host, while neit
 ## Navigators
 
 A `Navigator` is one independent entry point into the graph. It owns a stack of navigation entries.
+Its stable identity is a GUID; navigators have no names. Root, member, node, and logical-path names
+remain part of the graph model.
 Each entry contains:
 
 - a logical path;
@@ -162,6 +164,11 @@ mutation returns the same committed change object published by its change notifi
 mutation publishes no change. Since Core does not queue or dispatch mutations, it cannot later
 restore stale navigation state after back, removal, or disposal.
 
+A navigator has no workspace or host reference. It raises a synchronous path-resolution request
+and its own committed-navigation event. `UIEngineWorkspace` subscribes to both when it adds the
+navigator, resolves requests through its host, relays committed changes through the workspace
+aggregate event, and unsubscribes both before permanent removal.
+
 If a path cannot resolve, the current entry remains present with its structured failure. Back
 navigation remains available. A restored broken path therefore stays visible and can be unwound
 until a valid node is reached.
@@ -170,9 +177,9 @@ until a valid node is reached.
 
 A workspace creates an unversioned snapshot containing:
 
-- navigator order and names;
+- navigator GUIDs and order;
 - each navigator's current structured logical path; and
-- the selected navigator name.
+- the selected navigator GUID.
 
 Each supported `ILogicalPathSegment` has a corresponding serializable snapshot type. Restore is
 optimistic: malformed navigator records are reported and skipped without discarding usable records,

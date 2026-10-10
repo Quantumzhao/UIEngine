@@ -12,29 +12,30 @@ public sealed class WorkspaceSnapshotTests
     {
         using var host = _CreateHost(new _SnapshotModel());
         using var workspace = new UIEngineWorkspace(host);
-        workspace.AddNavigator("member", _Path(_Member("model"), _Member("Child"), _Member("Name")));
-        workspace.AddNavigator("list", _Path(
+        workspace.AddNavigator(_Path(_Member("model"), _Member("Child"), _Member("Name")));
+        workspace.AddNavigator(_Path(
             _Member("model"),
             _Member("Items"),
             new ListLogicalPathSegment(0),
             _Member("Name")));
-        workspace.AddNavigator("dictionary", _Path(
+        workspace.AddNavigator(_Path(
             _Member("model"),
             _Member("ByKey"),
             new DictLogicalPathSegment("key/one"),
             _Member("Name")));
+        var selectedId = workspace.Navigators[2].Id;
         workspace.ReorderNavigator(workspace.Navigators[0].Id, 2);
 
-        var created = workspace.CreateSnapshot("dictionary");
+        var created = workspace.CreateSnapshot(selectedId);
         var json = JsonSerializer.Serialize(created.RightValue());
         var deserialized = JsonSerializer.Deserialize<WorkspaceSnapshot>(json)!;
         var restored = workspace.RestoreSnapshot(deserialized);
 
-        Assert.Equal("dictionary", restored.SelectedNavigatorName);
+        Assert.Equal(selectedId, restored.SelectedNavigatorId);
         Assert.Empty(restored.Issues);
         Assert.Equal(
-            ["list", "dictionary", "member"],
-            workspace.Navigators.Select(static navigator => navigator.Name));
+            created.RightValue().Navigators.Select(static navigator => navigator.Id),
+            workspace.Navigators.Select(static navigator => navigator.Id));
         Assert.Equal(
             [
                 "/model/Items[index=0]/Name",
@@ -53,17 +54,18 @@ public sealed class WorkspaceSnapshotTests
         var model = new _SnapshotModel();
         using var host = _CreateHost(model);
         using var workspace = new UIEngineWorkspace(host);
-        workspace.AddNavigator("selected item", _Path(
+        workspace.AddNavigator(_Path(
             _Member("model"),
             _Member("Items"),
             new ListLogicalPathSegment(0),
             _Member("Name")));
-        var snapshot = workspace.CreateSnapshot("selected item").RightValue();
+        var selectedId = Assert.Single(workspace.Navigators).Id;
+        var snapshot = workspace.CreateSnapshot(selectedId).RightValue();
         model.Items.Clear();
 
         var restored = workspace.RestoreSnapshot(snapshot);
 
-        Assert.Equal("selected item", restored.SelectedNavigatorName);
+        Assert.Equal(selectedId, restored.SelectedNavigatorId);
         var navigator = Assert.Single(workspace.Navigators);
         Assert.Equal(4, navigator.Entries.Count);
         Assert.True(navigator.Entries[0].IsRight);
@@ -79,39 +81,41 @@ public sealed class WorkspaceSnapshotTests
     }
 
     [Fact]
-    public void RestoreSalvagesRecordsAndUsesFirstOccurrenceOfEachName()
+    public void RestoreSalvagesRecordsAndUsesFirstOccurrenceOfEachId()
     {
         using var host = _CreateHost(new _SnapshotModel());
         using var workspace = new UIEngineWorkspace(host);
+        var firstId = Guid.NewGuid();
+        var brokenId = Guid.NewGuid();
         var snapshot = new WorkspaceSnapshot(
             [
-                new NavigatorSnapshot("first", [_SavedMember("model")]),
-                new NavigatorSnapshot(" ", [_SavedMember("model")]),
-                new NavigatorSnapshot("first", [
+                new NavigatorSnapshot(firstId, [_SavedMember("model")]),
+                new NavigatorSnapshot(Guid.Empty, [_SavedMember("model")]),
+                new NavigatorSnapshot(firstId, [
                     _SavedMember("model"),
                     _SavedMember("Child"),
                 ]),
-                new NavigatorSnapshot("bad path", [
+                new NavigatorSnapshot(Guid.NewGuid(), [
                     new _UnknownPathSegmentSnapshot(),
                 ]),
-                new NavigatorSnapshot("broken", [
+                new NavigatorSnapshot(brokenId, [
                     _SavedMember("model"),
                     _SavedMember("Missing"),
                     _SavedMember("Descendant"),
                 ]),
             ],
-            "missing selection");
+            Guid.NewGuid());
 
         var restored = workspace.RestoreSnapshot(snapshot);
 
-        Assert.Equal(["first", "broken"], workspace.Navigators.Select(static item => item.Name));
-        Assert.Equal("first", restored.SelectedNavigatorName);
+        Assert.Equal([firstId, brokenId], workspace.Navigators.Select(static item => item.Id));
+        Assert.Equal(firstId, restored.SelectedNavigatorId);
         Assert.False(workspace.Navigators[1].Entries[1].IsRight);
         Assert.False(workspace.Navigators[1].Entries[2].IsRight);
         Assert.Equal(
             [
                 SnapshotRestoreIssueCode.INVALID_NAVIGATOR_RECORD,
-                SnapshotRestoreIssueCode.DUPLICATE_NAVIGATOR_NAME,
+                SnapshotRestoreIssueCode.DUPLICATE_NAVIGATOR_ID,
                 SnapshotRestoreIssueCode.INVALID_NAVIGATOR_PATH,
                 SnapshotRestoreIssueCode.SELECTION_ADJUSTED,
             ],
@@ -124,27 +128,28 @@ public sealed class WorkspaceSnapshotTests
     {
         using var host = _CreateHost(new _SnapshotModel());
         using var workspace = new UIEngineWorkspace(host);
+        var validId = Guid.NewGuid();
         var snapshot = new WorkspaceSnapshot(
             [
-                new NavigatorSnapshot("empty path", []),
-                new NavigatorSnapshot("list root", [new ListPathSegmentSnapshot(0)]),
-                new NavigatorSnapshot("empty member", [new MemberPathSegmentSnapshot("")]),
-                new NavigatorSnapshot("negative index", [
+                new NavigatorSnapshot(Guid.NewGuid(), []),
+                new NavigatorSnapshot(Guid.NewGuid(), [new ListPathSegmentSnapshot(0)]),
+                new NavigatorSnapshot(Guid.NewGuid(), [new MemberPathSegmentSnapshot("")]),
+                new NavigatorSnapshot(Guid.NewGuid(), [
                     _SavedMember("model"),
                     new ListPathSegmentSnapshot(-1),
                 ]),
-                new NavigatorSnapshot("empty key", [
+                new NavigatorSnapshot(Guid.NewGuid(), [
                     _SavedMember("model"),
                     new DictionaryPathSegmentSnapshot(""),
                 ]),
-                new NavigatorSnapshot("valid", [_SavedMember("model")]),
+                new NavigatorSnapshot(validId, [_SavedMember("model")]),
             ],
-            "valid");
+            validId);
 
         var restored = workspace.RestoreSnapshot(snapshot);
 
-        Assert.Equal("valid", restored.SelectedNavigatorName);
-        Assert.Equal("valid", Assert.Single(workspace.Navigators).Name);
+        Assert.Equal(validId, restored.SelectedNavigatorId);
+        Assert.Equal(validId, Assert.Single(workspace.Navigators).Id);
         Assert.Equal(5, restored.Issues.Count);
         Assert.All(restored.Issues, static issue =>
             Assert.Equal(SnapshotRestoreIssueCode.INVALID_NAVIGATOR_PATH, issue.Code));
@@ -153,26 +158,28 @@ public sealed class WorkspaceSnapshotTests
     }
 
     [Fact]
-    public void FirstMalformedDuplicateStillClaimsItsName()
+    public void FirstMalformedDuplicateStillClaimsItsId()
     {
         using var host = _CreateHost(new _SnapshotModel());
         using var workspace = new UIEngineWorkspace(host);
+        var claimedId = Guid.NewGuid();
+        var fallbackId = Guid.NewGuid();
         var snapshot = new WorkspaceSnapshot(
             [
-                new NavigatorSnapshot("claimed", [new _UnknownPathSegmentSnapshot()]),
-                new NavigatorSnapshot("claimed", [_SavedMember("model")]),
-                new NavigatorSnapshot("fallback", [_SavedMember("model")]),
+                new NavigatorSnapshot(claimedId, [new _UnknownPathSegmentSnapshot()]),
+                new NavigatorSnapshot(claimedId, [_SavedMember("model")]),
+                new NavigatorSnapshot(fallbackId, [_SavedMember("model")]),
             ],
-            "claimed");
+            claimedId);
 
         var restored = workspace.RestoreSnapshot(snapshot);
 
-        Assert.Equal("fallback", Assert.Single(workspace.Navigators).Name);
-        Assert.Equal("fallback", restored.SelectedNavigatorName);
+        Assert.Equal(fallbackId, Assert.Single(workspace.Navigators).Id);
+        Assert.Equal(fallbackId, restored.SelectedNavigatorId);
         Assert.Equal(
             [
                 SnapshotRestoreIssueCode.INVALID_NAVIGATOR_PATH,
-                SnapshotRestoreIssueCode.DUPLICATE_NAVIGATOR_NAME,
+                SnapshotRestoreIssueCode.DUPLICATE_NAVIGATOR_ID,
                 SnapshotRestoreIssueCode.SELECTION_ADJUSTED,
             ],
             restored.Issues.Select(static issue => issue.Code));
@@ -183,16 +190,16 @@ public sealed class WorkspaceSnapshotTests
     {
         using var host = _CreateHost(new _SnapshotModel());
         using var workspace = new UIEngineWorkspace(host);
-        workspace.AddNavigator("existing", "model");
+        workspace.AddNavigator("model");
         var existingId = workspace.Navigators[0].Id;
         var changes = new List<WorkspaceChange>();
         workspace.Changed += (_, eventArgs) => changes.Add(eventArgs.Change);
-        var malformed = new WorkspaceSnapshot(null!, "existing");
+        var malformed = new WorkspaceSnapshot(null!, existingId);
 
         var restored = workspace.RestoreSnapshot(malformed);
 
         Assert.Empty(workspace.Navigators);
-        Assert.Null(restored.SelectedNavigatorName);
+        Assert.Null(restored.SelectedNavigatorId);
         Assert.Equal(
             [
                 SnapshotRestoreIssueCode.INVALID_NAVIGATOR_COLLECTION,
@@ -208,20 +215,22 @@ public sealed class WorkspaceSnapshotTests
     {
         using var host = _CreateHost(new _SnapshotModel());
         using var workspace = new UIEngineWorkspace(host);
-        workspace.AddNavigator("old one", "model");
-        workspace.AddNavigator("old two", "model");
+        workspace.AddNavigator("model");
+        workspace.AddNavigator("model");
         var oldIds = workspace.Navigators.Select(static navigator => navigator.Id).ToArray();
         var changes = new List<WorkspaceChange>();
         workspace.Changed += (_, eventArgs) => changes.Add(eventArgs.Change);
+        var newOneId = Guid.NewGuid();
+        var newTwoId = Guid.NewGuid();
         var snapshot = new WorkspaceSnapshot(
             [
-                new NavigatorSnapshot("new one", [_SavedMember("model")]),
-                new NavigatorSnapshot("new two", [
+                new NavigatorSnapshot(newOneId, [_SavedMember("model")]),
+                new NavigatorSnapshot(newTwoId, [
                     _SavedMember("model"),
                     _SavedMember("Child"),
                 ]),
             ],
-            "new two");
+            newTwoId);
 
         var restored = workspace.RestoreSnapshot(snapshot);
 
@@ -231,8 +240,8 @@ public sealed class WorkspaceSnapshotTests
             [oldIds[1], oldIds[0]],
             changes.OfType<NavigatorRemovedChange>().Select(static change => change.NavigatorId));
         Assert.Equal(
-            ["new one", "new two"],
-            workspace.Navigators.Select(static navigator => navigator.Name));
+            [newOneId, newTwoId],
+            workspace.Navigators.Select(static navigator => navigator.Id));
         Assert.Equal(
             workspace.Navigators.Select(static navigator => navigator.Id),
             changes.OfType<NavigatorAddedChange>().Select(static change => change.NavigatorId));
@@ -243,37 +252,38 @@ public sealed class WorkspaceSnapshotTests
     {
         using var host = _CreateHost(new _SnapshotModel());
         using var workspace = new UIEngineWorkspace(host);
-        workspace.AddNavigator("existing", "model");
+        workspace.AddNavigator("model");
 
         var empty = workspace.RestoreSnapshot(new WorkspaceSnapshot([], null));
-        var invalidEmptySelection = workspace.CreateSnapshot("missing");
+        var invalidEmptySelection = workspace.CreateSnapshot(Guid.NewGuid());
         var emptySnapshot = workspace.CreateSnapshot(null);
 
         Assert.Empty(workspace.Navigators);
-        Assert.Null(empty.SelectedNavigatorName);
+        Assert.Null(empty.SelectedNavigatorId);
         Assert.Empty(empty.Issues);
         Assert.False(invalidEmptySelection.IsRight);
         Assert.Equal(InteractionErrorCode.INVALID_INPUT, invalidEmptySelection.LeftValue().Code);
         Assert.True(emptySnapshot.IsRight);
         Assert.Empty(emptySnapshot.RightValue().Navigators);
-        Assert.Null(emptySnapshot.RightValue().SelectedNavigatorName);
+        Assert.Null(emptySnapshot.RightValue().SelectedNavigatorId);
     }
 
     [Fact]
     public void JsonWithUnknownFieldsRestoresWithoutSchemaGate()
     {
-        const string json = """
+        var id = Guid.NewGuid();
+        var json = $$"""
             {
               "Navigators": [
                 {
-                  "Name": "main",
+                  "Id": "{{id}}",
                   "CurrentPath": [
                     { "segment": "member", "Name": "model", "FutureSegmentData": true }
                   ],
                   "FutureNavigatorData": "ignored"
                 }
               ],
-              "SelectedNavigatorName": "main",
+              "SelectedNavigatorId": "{{id}}",
               "FutureWorkspaceData": { "revision": 12 }
             }
             """;
@@ -284,7 +294,7 @@ public sealed class WorkspaceSnapshotTests
         var restored = workspace.RestoreSnapshot(snapshot);
 
         Assert.Empty(restored.Issues);
-        Assert.Equal("main", restored.SelectedNavigatorName);
+        Assert.Equal(id, restored.SelectedNavigatorId);
         Assert.Equal("/model", Assert.Single(workspace.Navigators).CurrentPath.ToString());
     }
 
@@ -294,12 +304,12 @@ public sealed class WorkspaceSnapshotTests
         var model = new _SnapshotModel { Secret = "domain-secret-9217" };
         using var host = _CreateHost(model);
         using var workspace = new UIEngineWorkspace(host);
-        workspace.AddNavigator("work", _Path(_Member("model"), _Member("WorkAsync")));
+        workspace.AddNavigator(_Path(_Member("model"), _Member("WorkAsync")));
         var method = Assert.IsAssignableFrom<IMethodNode>(
             workspace.Navigators[0].CurrentEntry.RightValue().SomeValue());
         method.Invoke(new Dictionary<string, object?>());
 
-        var snapshot = workspace.CreateSnapshot("work").RightValue();
+        var snapshot = workspace.CreateSnapshot(workspace.Navigators[0].Id).RightValue();
         var json = JsonSerializer.Serialize(snapshot);
 
         Assert.DoesNotContain(model.Secret, json, StringComparison.Ordinal);
@@ -315,16 +325,17 @@ public sealed class WorkspaceSnapshotTests
     }
 
     [Fact]
-    public void NavigatorNamesCannotBeBlank()
+    public void SamePathNavigatorsHaveDistinctPersistentIds()
     {
         using var host = _CreateHost(new _SnapshotModel());
         using var workspace = new UIEngineWorkspace(host);
 
-        var added = workspace.AddNavigator(" ", "model");
+        var first = workspace.AddNavigator("model");
+        var second = workspace.AddNavigator("model");
 
-        Assert.False(added.IsRight);
-        Assert.Equal(InteractionErrorCode.INVALID_INPUT, added.LeftValue().Code);
-        Assert.Empty(workspace.Navigators);
+        Assert.True(first.IsRight);
+        Assert.True(second.IsRight);
+        Assert.NotEqual(first.RightValue().NavigatorId, second.RightValue().NavigatorId);
     }
 
     [Fact]
@@ -333,9 +344,9 @@ public sealed class WorkspaceSnapshotTests
         using var host = _CreateHost(new _SnapshotModel());
         using var workspace = new UIEngineWorkspace(host);
         var path = _Path(_Member("model"), new _UnknownPathSegment());
-        workspace.AddNavigator("unsupported", path);
+        workspace.AddNavigator(path);
 
-        var snapshot = workspace.CreateSnapshot("unsupported");
+        var snapshot = workspace.CreateSnapshot(workspace.Navigators[0].Id);
 
         Assert.False(snapshot.IsRight);
         Assert.Equal(InteractionErrorCode.UNSUPPORTED, snapshot.LeftValue().Code);

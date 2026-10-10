@@ -37,7 +37,7 @@
 ## Snapshot Persistence
 
 - [x] Define an unversioned workspace navigation snapshot.
-- [x] Persist navigator names, order, structured paths, and selection.
+- [x] Persist navigator GUIDs, order, structured paths, and selection.
 - [x] Restore each navigator independently and report malformed records.
 - [x] Preserve broken paths during restore.
 - [x] Verify that live state, handles, nodes, controls, drafts, and running work are never persisted.
@@ -46,15 +46,18 @@
 
 - [x] Qualify and pin XenoAtom.Terminal.UI 3.9.0.
 - [x] Establish reusable fullscreen and embedded hosting.
-- [ ] Present several navigators in one workspace.
-- [ ] Add root selection, navigator duplication, removal, and destructive back navigation.
+- [x] Present every active navigator in a two-axis scrollable logical grid.
+- [x] Add shared address/status chrome, root selection, navigator cycling, duplication, reversible
+  TUI-only suspension/restoration, and destructive back navigation.
+- [x] Add semantic healthy/broken/empty colors and an independent selected-pane border without
+  displaying navigator ordinals, GUIDs, or synthetic names.
 - [ ] Generate controls from node language semantics.
 - [ ] Add scalar editors and method forms.
 - [ ] Add bounded collection browsing.
 - [ ] Refresh controls from live node operations and present structured failures.
 - [ ] Save and restore navigator layouts.
-- [ ] Show broken entries and allow back navigation to a valid node.
-- [ ] Verify keyboard-only operation and terminal resizing.
+- [x] Show broken placeholder entries and allow back navigation to a valid node.
+- [x] Verify Step 8 navigator shortcuts and terminal resizing without recreating controls.
 - [ ] Complete the cyclic-world acceptance workflow.
 
 ## Product Release

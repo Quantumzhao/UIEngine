@@ -1,4 +1,3 @@
-using System.Collections.ObjectModel;
 using LanguageExt;
 using static LanguageExt.Prelude;
 
@@ -7,16 +6,12 @@ namespace UIEngine.Core;
 /// <summary>One independent, destructive navigation stack within a workspace.</summary>
 public sealed class Navigator
 {
-    private readonly UIEngineWorkspace _Workspace;
-
     internal Navigator(
-        UIEngineWorkspace workspace,
         Guid id,
         IReadOnlyList<(
             LogicalPath Path,
             Either<InteractionError, Option<BaseNode>> Entry)> entries)
     {
-        _Workspace = workspace;
         Id = id;
         Paths = entries.Select(static item => item.Path).ToList();
         Entries = entries.Select(static item => item.Entry).ToList();
@@ -31,6 +26,10 @@ public sealed class Navigator
     public LogicalPath CurrentPath => Paths[^1];
 
     public Either<InteractionError, Option<BaseNode>> CurrentEntry => Entries[^1];
+
+    internal event EventHandler<WorkspaceChangedEventArgs>? Changed;
+
+    internal event ResolveNavigatorPathHandler? ResolvePathRequested;
 
     /// <summary>Resolves one child location and makes it the current entry.</summary>
     /// <remarks>
@@ -76,7 +75,9 @@ public sealed class Navigator
                 exception.Message));
         }
 
-        var resolved = _Workspace.Host.ResolvePath(target);
+        var resolvePath = ResolvePathRequested ??
+            throw new InvalidOperationException("The navigator has no path-resolution subscriber.");
+        var resolved = resolvePath(this, target);
         LogicalPath path;
         Either<InteractionError, Option<BaseNode>> entry;
         if (resolved.IsRight)
@@ -95,7 +96,7 @@ public sealed class Navigator
         ((List<Either<InteractionError, Option<BaseNode>>>)Entries).Add(entry);
 
         var change = new NavigationPushedChange(Id, path, entry);
-        _Workspace.Publish(change);
+        Changed?.Invoke(this, new WorkspaceChangedEventArgs(change));
         return Right(change);
     }
 
@@ -119,7 +120,7 @@ public sealed class Navigator
             removedEntry,
             Paths[^1],
             Entries[^1]);
-        _Workspace.Publish(change);
+        Changed?.Invoke(this, new WorkspaceChangedEventArgs(change));
         return Right(change);
     }
 
@@ -134,3 +135,7 @@ public sealed class Navigator
         return (paths, entries);
     }
 }
+
+internal delegate Either<InteractionError, ResolvedPath> ResolveNavigatorPathHandler(
+    Navigator navigator,
+    LogicalPath path);

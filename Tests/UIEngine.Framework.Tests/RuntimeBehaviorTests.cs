@@ -121,15 +121,15 @@ public sealed class RuntimeBehaviorTests
     public void PathsPreserveCyclesSharedReferencesAndReplacementObjects()
     {
         using var host = _CreateWorldHost();
-        var nation = host.ResolvePath(_Path(
+        var nation = PathResolution.Resolve(host, _Path(
             _Member("world"), _Member("Nations"), _Index(0)));
-        var cycled = host.ResolvePath(_Path(
+        var cycled = PathResolution.Resolve(host, _Path(
             _Member("world"),
             _Member("Nations"),
             _Index(0),
             _Member("Capital"),
             _Member("OwnerNation")));
-        var legacyAlias = host.ResolvePath(_Path(
+        var legacyAlias = PathResolution.Resolve(host, _Path(
             _Member("world"), _Member("Nations"), _Member("0")));
 
         Assert.True(nation.IsRight);
@@ -143,10 +143,10 @@ public sealed class RuntimeBehaviorTests
             cycled.RightValue().CanonicalPath.ToString());
         Assert.False(legacyAlias.IsRight);
 
-        var original = host.ResolvePath(_Path(
+        var original = PathResolution.Resolve(host, _Path(
             _Member("world"), _Member("Nations"), _Index(0)));
         host.SetRoot("world", CyclicWorldFactory.Create());
-        var replacement = host.ResolvePath(_Path(
+        var replacement = PathResolution.Resolve(host, _Path(
             _Member("world"), _Member("Nations"), _Index(0)));
 
         Assert.True(original.IsRight);
@@ -165,15 +165,15 @@ public sealed class RuntimeBehaviorTests
         using var host = new UIEngineHost();
         host.SetRoot("model", model);
 
-        var initialByKey = host.ResolvePath(_Path(
+        var initialByKey = PathResolution.Resolve(host, _Path(
             _Member("model"), _Member("ByKey"), _Key("a")));
-        var initialByIndex = host.ResolvePath(_Path(
+        var initialByIndex = PathResolution.Resolve(host, _Path(
             _Member("model"), _Member("Items"), _Index(0)));
         model.ByKey["a"] = second;
         model.Items.Reverse();
-        var remappedByKey = host.ResolvePath(_Path(
+        var remappedByKey = PathResolution.Resolve(host, _Path(
             _Member("model"), _Member("ByKey"), _Key("a")));
-        var reorderedByIndex = host.ResolvePath(_Path(
+        var reorderedByIndex = PathResolution.Resolve(host, _Path(
             _Member("model"), _Member("Items"), _Index(0)));
 
         Assert.True(initialByKey.IsRight);
@@ -196,10 +196,10 @@ public sealed class RuntimeBehaviorTests
     {
         using var host = _CreateWorldHost();
 
-        var firstName = host.ResolvePath(_Path(_Member("world"), _Member("Name")));
-        var secondName = host.ResolvePath(_Path(_Member("world"), _Member("Name")));
-        var nations = host.ResolvePath(_Path(_Member("world"), _Member("Nations")));
-        var advance = host.ResolvePath(_Path(
+        var firstName = PathResolution.Resolve(host, _Path(_Member("world"), _Member("Name")));
+        var secondName = PathResolution.Resolve(host, _Path(_Member("world"), _Member("Name")));
+        var nations = PathResolution.Resolve(host, _Path(_Member("world"), _Member("Nations")));
+        var advance = PathResolution.Resolve(host, _Path(
             _Member("world"),
             _Member("Nations"),
             _Index(0),
@@ -220,14 +220,14 @@ public sealed class RuntimeBehaviorTests
     {
         using var host = _CreateWorldHost();
 
-        var root = host.ResolvePath(_Path(_Member("world")));
-        var scalar = host.ResolvePath(_Path(_Member("world"), _Member("Name")));
-        var collection = host.ResolvePath(_Path(_Member("world"), _Member("Nations")));
-        var selected = host.ResolvePath(_Path(
+        var root = PathResolution.Resolve(host, _Path(_Member("world")));
+        var scalar = PathResolution.Resolve(host, _Path(_Member("world"), _Member("Name")));
+        var collection = PathResolution.Resolve(host, _Path(_Member("world"), _Member("Nations")));
+        var selected = PathResolution.Resolve(host, _Path(
             _Member("world"), _Member("Nations"), _Index(0)));
-        var reference = host.ResolvePath(_Path(
+        var reference = PathResolution.Resolve(host, _Path(
             _Member("world"), _Member("Nations"), _Index(0), _Member("Capital")));
-        var method = host.ResolvePath(_Path(
+        var method = PathResolution.Resolve(host, _Path(
             _Member("world"),
             _Member("Nations"),
             _Index(0),
@@ -257,8 +257,8 @@ public sealed class RuntimeBehaviorTests
             _Index(0),
             _Member("Capital"),
             _Member("Name"));
-        var first = host.ResolvePath(path);
-        var second = host.ResolvePath(path);
+        var first = PathResolution.Resolve(host, path);
+        var second = PathResolution.Resolve(host, path);
 
         Assert.True(first.IsRight);
         Assert.True(second.IsRight);
@@ -298,11 +298,11 @@ public sealed class RuntimeBehaviorTests
         });
         host.SetRoot("root/name", model);
 
-        var resolved = host.ResolvePath(_Path(
+        var resolved = PathResolution.Resolve(host, _Path(
             _Member("root/name"), _Member("value/name")));
-        var wrongRootCase = host.ResolvePath(_Path(
+        var wrongRootCase = PathResolution.Resolve(host, _Path(
             _Member("Root/name"), _Member("value/name")));
-        var wrongMemberCase = host.ResolvePath(_Path(
+        var wrongMemberCase = PathResolution.Resolve(host, _Path(
             _Member("root/name"), _Member("Value/name")));
 
         Assert.True(resolved.IsRight);
@@ -321,23 +321,23 @@ public sealed class RuntimeBehaviorTests
         using var host = new UIEngineHost();
         host.SetRoot("model", model);
 
-        var nullReference = host.ResolvePath(_Path(_Member("model"), _Member("Child")));
-        var missingMember = host.ResolvePath(_Path(_Member("model"), _Member("Missing")));
-        var missingElement = host.ResolvePath(_Path(
+        var nullReference = PathResolution.Resolve(host, _Path(_Member("model"), _Member("Child")));
+        var missingMember = PathResolution.Resolve(host, _Path(_Member("model"), _Member("Missing")));
+        var missingElement = PathResolution.Resolve(host, _Path(
             _Member("model"), _Member("Items"), _Index(2)));
-        var scalarElement = host.ResolvePath(_Path(
+        var scalarElement = PathResolution.Resolve(host, _Path(
             _Member("model"), _Member("Items"), _Index(0)));
-        var ambiguousElement = host.ResolvePath(_Path(
+        var ambiguousElement = PathResolution.Resolve(host, _Path(
             _Member("model"), _Member("Duplicates"), _Key("duplicate")));
-        var fieldReference = host.ResolvePath(_Path(
+        var fieldReference = PathResolution.Resolve(host, _Path(
             _Member("model"), _Member("FieldChild")));
-        var keyedList = host.ResolvePath(_Path(
+        var keyedList = PathResolution.Resolve(host, _Path(
             _Member("model"), _Member("Items"), _Key("0")));
-        var indexedDictionary = host.ResolvePath(_Path(
+        var indexedDictionary = PathResolution.Resolve(host, _Path(
             _Member("model"), _Member("Duplicates"), _Index(0)));
-        var runtimeList = host.ResolvePath(_Path(
+        var runtimeList = PathResolution.Resolve(host, _Path(
             _Member("model"), _Member("ListView"), _Index(0)));
-        var runtimeDictionary = host.ResolvePath(_Path(
+        var runtimeDictionary = PathResolution.Resolve(host, _Path(
             _Member("model"), _Member("DictView"), _Key("item")));
 
         Assert.Equal(InteractionErrorCode.UNAVAILABLE, nullReference.LeftValue().Code);
@@ -602,7 +602,7 @@ public sealed class RuntimeBehaviorTests
             static method => method.Name is "ResolveRootNodeAsync" or "ResolvePathAsync");
         Assert.DoesNotContain(
             typeof(UIEngineHost).GetMethods(),
-            static method => method.Name == nameof(UIEngineHost.ResolvePath) &&
+            static method => method.Name == "ResolvePath" &&
                 method.GetParameters() is [{ ParameterType: var type }] &&
                 type == typeof(string));
         Assert.Null(typeof(LogicalPath).GetMethod("Parse", [typeof(string)]));
@@ -678,7 +678,7 @@ public sealed class RuntimeBehaviorTests
         var child = new _DomainObject("temporary");
         var target = new WeakReference(child);
         model.Child = child;
-        var resolved = host.ResolvePath(_Path(_Member("model"), _Member("Child")));
+        var resolved = PathResolution.Resolve(host, _Path(_Member("model"), _Member("Child")));
         var member = Assert.Single(
             ((IObjectNode)resolved.RightValue().Node).Members,
             static candidate => candidate.Name == nameof(_DomainObject.Key));
